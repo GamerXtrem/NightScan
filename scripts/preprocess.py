@@ -11,6 +11,7 @@ import argparse
 import csv
 import random
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
 
 import librosa
 import numpy as np
@@ -21,21 +22,33 @@ TARGET_DURATION_MS = 8000  # 8 seconds
 SILENCE_THRESH = -40
 
 
-def convert_mp3_to_wav(input_dir: Path, wav_dir: Path) -> None:
+def _convert_mp3(args: tuple[Path, Path, Path]) -> Path:
+    mp3_path, input_dir, wav_dir = args
+    audio = AudioSegment.from_mp3(mp3_path)
+    relative = mp3_path.relative_to(input_dir).with_suffix(".wav")
+    out_path = wav_dir / relative
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    audio.export(out_path, format="wav")
+    return out_path
+
+
+def convert_mp3_to_wav(input_dir: Path, wav_dir: Path, workers: int) -> list[Path]:
     """Recursively convert MP3 files in ``input_dir`` to WAV files in ``wav_dir``.
 
     The directory structure of ``input_dir`` is mirrored in ``wav_dir`` so that
     sub-folder names can be used as class labels later on.
+    Returns a list of generated WAV paths.
     """
     input_dir = Path(input_dir)
     wav_dir.mkdir(parents=True, exist_ok=True)
 
-    for mp3_path in input_dir.rglob("*.mp3"):
-        audio = AudioSegment.from_mp3(mp3_path)
-        relative = mp3_path.relative_to(input_dir).with_suffix(".wav")
-        out_path = wav_dir / relative
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        audio.export(out_path, format="wav")
+    mp3_files = list(input_dir.rglob("*.mp3"))
+    args_list = [(p, input_dir, wav_dir) for p in mp3_files]
+    if workers == 1:
+        return [_convert_mp3(a) for a in args_list]
+
+    with ProcessPoolExecutor(max_workers=workers) as exe:
+        return list(exe.map(_convert_mp3, args_list))
 
 
 def is_silent(segment: AudioSegment, threshold_db: float = -60.0) -> bool:
@@ -84,27 +97,52 @@ def isolate_cries(audio_path: Path, out_dir: Path) -> list[Path]:
     return paths
 
 
-def generate_spectrograms(wav_dir: Path, spec_dir: Path, sr: int = 22050) -> list[Path]:
-    """Generate mel-spectrograms for all WAV files in ``wav_dir``.
+def _isolate_wrapper(args: tuple[Path, Path, Path]) -> list[Path]:
+    wav_file, wav_dir, processed_dir = args
+    out_dir = processed_dir / wav_file.relative_to(wav_dir).parent
+    return isolate_cries(wav_file, out_dir)
 
-    The resulting ``.npy`` files are stored in ``spec_dir`` while preserving the
-    directory structure of ``wav_dir``. This allows folder names to be used as
-    class labels.
-    """
+
+def process_wav_files(wav_dir: Path, processed_dir: Path, workers: int) -> list[Path]:
+    wav_files = list(wav_dir.rglob("*.wav"))
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    args_list = [(wf, wav_dir, processed_dir) for wf in wav_files]
+    if workers == 1:
+        results = [_isolate_wrapper(a) for a in args_list]
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as exe:
+            results = list(exe.map(_isolate_wrapper, args_list))
+
+    processed_paths: list[Path] = []
+    for r in results:
+        processed_paths.extend(r)
+    return processed_paths
+
+
+def _generate_spec(args: tuple[Path, Path, Path, int]) -> Path:
+    wav_path, wav_dir, spec_dir, sr = args
+    y, _ = librosa.load(wav_path, sr=sr, mono=True)
+    mel = librosa.feature.melspectrogram(y=y, sr=sr)
+    mel_db = librosa.power_to_db(mel, ref=np.max)
+    relative = wav_path.relative_to(wav_dir).with_suffix(".npy")
+    out_path = spec_dir / relative
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(out_path, mel_db)
+    return out_path
+
+
+def generate_spectrograms(wav_dir: Path, spec_dir: Path, sr: int, workers: int) -> list[Path]:
+    """Generate mel-spectrograms for all WAV files in ``wav_dir`` in parallel."""
     wav_dir = Path(wav_dir)
     spec_dir.mkdir(parents=True, exist_ok=True)
 
-    spec_paths: list[Path] = []
-    for wav_path in wav_dir.rglob("*.wav"):
-        y, _ = librosa.load(wav_path, sr=sr, mono=True)
-        mel = librosa.feature.melspectrogram(y=y, sr=sr)
-        mel_db = librosa.power_to_db(mel, ref=np.max)
-        relative = wav_path.relative_to(wav_dir).with_suffix(".npy")
-        out_path = spec_dir / relative
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(out_path, mel_db)
-        spec_paths.append(out_path)
-    return spec_paths
+    wav_files = list(wav_dir.rglob("*.wav"))
+    args_list = [(p, wav_dir, spec_dir, sr) for p in wav_files]
+    if workers == 1:
+        return [_generate_spec(a) for a in args_list]
+
+    with ProcessPoolExecutor(max_workers=workers) as exe:
+        return list(exe.map(_generate_spec, args_list))
 
 
 def split_and_save(files: list[Path], out_dir: Path, train: float = 0.7, val: float = 0.15) -> None:
@@ -137,6 +175,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Preprocess audio files")
     parser.add_argument("--input_dir", type=Path, required=True, help="Directory with raw MP3 files")
     parser.add_argument("--output_dir", type=Path, required=True, help="Directory to store processed data")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of worker processes for parallel preprocessing",
+    )
     args = parser.parse_args()
 
     wav_dir = args.output_dir / "wav"
@@ -144,15 +188,11 @@ def main() -> None:
     spec_dir = args.output_dir / "spectrograms"
     csv_dir = args.output_dir / "csv"
 
-    convert_mp3_to_wav(args.input_dir, wav_dir)
+    convert_mp3_to_wav(args.input_dir, wav_dir, args.workers)
 
-    processed_paths: list[Path] = []
-    processed_dir.mkdir(parents=True, exist_ok=True)
-    for wav_file in wav_dir.rglob("*.wav"):
-        out_dir = processed_dir / wav_file.relative_to(wav_dir).parent
-        processed_paths.extend(isolate_cries(wav_file, out_dir))
+    processed_paths = process_wav_files(wav_dir, processed_dir, args.workers)
 
-    spec_paths = generate_spectrograms(processed_dir, spec_dir)
+    spec_paths = generate_spectrograms(processed_dir, spec_dir, sr=22050, workers=args.workers)
     split_and_save(spec_paths, csv_dir)
 
 
