@@ -55,8 +55,8 @@ def convert_mp3_to_wav(input_dir: Path, wav_dir: Path, workers: int) -> list[Pat
     input_dir = Path(input_dir)
     wav_dir.mkdir(parents=True, exist_ok=True)
 
-    mp3_files = list(input_dir.rglob("*.mp3"))
-    wav_files = list(input_dir.rglob("*.wav"))
+    mp3_files = [p for p in input_dir.rglob("*.mp3") if not p.name.startswith("._")]
+    wav_files = [p for p in input_dir.rglob("*.wav") if not p.name.startswith("._")]
 
     args_list = [(p, input_dir, wav_dir) for p in mp3_files]
     if workers == 1:
@@ -98,7 +98,11 @@ def isolate_cries(audio_path: Path, out_dir: Path) -> list[Path]:
     list[Path]
         List of paths to the generated WAV segments.
     """
-    audio = AudioSegment.from_file(audio_path)
+    try:
+        audio = AudioSegment.from_file(audio_path)
+    except CouldntDecodeError as exc:
+        logger.warning("Could not decode %s: %s", audio_path, exc)
+        return []
     out_dir.mkdir(parents=True, exist_ok=True)
     chunks = silence.split_on_silence(
         audio,
@@ -132,7 +136,7 @@ def _isolate_wrapper(args: tuple[Path, Path, Path]) -> list[Path]:
 
 
 def process_wav_files(wav_dir: Path, processed_dir: Path, workers: int) -> list[Path]:
-    wav_files = list(wav_dir.rglob("*.wav"))
+    wav_files = [p for p in wav_dir.rglob("*.wav") if not p.name.startswith("._")]
     processed_dir.mkdir(parents=True, exist_ok=True)
     args_list = [(wf, wav_dir, processed_dir) for wf in wav_files]
     if workers == 1:
@@ -147,9 +151,13 @@ def process_wav_files(wav_dir: Path, processed_dir: Path, workers: int) -> list[
     return processed_paths
 
 
-def _generate_spec(args: tuple[Path, Path, Path, int]) -> Path:
+def _generate_spec(args: tuple[Path, Path, Path, int]) -> Path | None:
     wav_path, wav_dir, spec_dir, sr = args
-    waveform, original_sr = torchaudio.load(wav_path)
+    try:
+        waveform, original_sr = torchaudio.load(wav_path)
+    except Exception as exc:  # catch decoding errors
+        logger.warning("Could not load %s: %s", wav_path, exc)
+        return None
     if waveform.size(0) > 1:
         waveform = waveform.mean(dim=0, keepdim=True)
     if original_sr != sr:
@@ -168,13 +176,15 @@ def generate_spectrograms(wav_dir: Path, spec_dir: Path, sr: int, workers: int) 
     wav_dir = Path(wav_dir)
     spec_dir.mkdir(parents=True, exist_ok=True)
 
-    wav_files = list(wav_dir.rglob("*.wav"))
+    wav_files = [p for p in wav_dir.rglob("*.wav") if not p.name.startswith("._")]
     args_list = [(p, wav_dir, spec_dir, sr) for p in wav_files]
     if workers == 1:
-        return [_generate_spec(a) for a in args_list]
+        results = [_generate_spec(a) for a in args_list]
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as exe:
+            results = list(exe.map(_generate_spec, args_list))
 
-    with ProcessPoolExecutor(max_workers=workers) as exe:
-        return list(exe.map(_generate_spec, args_list))
+    return [r for r in results if r is not None]
 
 
 def split_and_save(
