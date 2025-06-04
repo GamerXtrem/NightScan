@@ -59,4 +59,4 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 - Charge chaque spectrogramme `.npy`, le normalise entre 0 et 1 puis le redimensionne en 224×224 et le duplique sur trois canaux pour l'utiliser avec ResNet18.
 - Entraîne un réseau ResNet18 (poids initiaux aléatoires) sur GPU si disponible.
 - Après chaque époque, affiche la perte et la précision de validation et sauvegarde dans `--model_dir/best_model.pth` le modèle obtenant la meilleure précision.
-- Paramètres optionnels : `--epochs` (10 par défaut), `--batch_size` (32) et `--lr` (1e-3).
+- Paramètres optionnels : `--epochs` (10 par défaut), `--batch_size` (32), `--lr` (1e-3) et `--num_workers` (0).

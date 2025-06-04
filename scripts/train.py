@@ -79,16 +79,34 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=0,
+        help="Number of worker processes for data loading",
+    )
     args = parser.parse_args()
 
     train_ds = SpectrogramDataset(args.csv_dir / "train.csv")
     val_ds = SpectrogramDataset(args.csv_dir / "val.csv")
     num_classes = len(set(label for _, label in train_ds.samples))
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size)
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pin_memory = device.type != "cpu"
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.num_workers,
+        pin_memory=pin_memory,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        pin_memory=pin_memory,
+    )
     model = models.resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
     model.to(device)
