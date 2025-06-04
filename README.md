@@ -48,15 +48,15 @@ python scripts/train.py --csv_dir data/processed/csv --model_dir models/ --pretr
 
 Le dossier `data/raw` doit contenir un sous-répertoire par classe (par exemple `data/raw/chat/`, `data/raw/chien/`, ...). Le prétraitement conserve cette structure et génère des spectrogrammes classés dans `data/processed/spectrograms`. Les fichiers CSV produits dans `data/processed/csv` possèdent désormais deux colonnes : `path` et `label`.
 
-Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieux (volume inférieur à -60 dBFS), le fichier résultant est supprimé et ignoré.
+Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieux (volume inférieur à `CHUNK_SILENCE_THRESH`), le fichier résultant est supprimé et ignoré.
 
 ## Fonctionnement des scripts
 
-### `preprocess.py`
+-### `preprocess.py`
 
-- Convertit récursivement tous les MP3 présents dans `--input_dir` en fichiers WAV placés dans `output_dir/wav`.
-- Découpe chaque WAV en segments de 8 secondes grâce à la détection de silence (seuil −40 dBFS). Les segments trop courts sont complétés par du silence et ceux trop longs sont tronqués.
-- Les segments dont le volume reste inférieur à −60 dBFS sont ignorés.
+- Convertit les MP3 en WAV et recopie directement les fichiers déjà au format WAV dans `output_dir/wav`.
+- Découpe chaque WAV en segments de 8 secondes grâce à la détection de silence (`SPLIT_SILENCE_THRESH` à −40 dBFS par défaut). Les segments trop courts sont complétés par du silence et ceux trop longs sont tronqués.
+- Les segments dont le volume moyen est inférieur à `CHUNK_SILENCE_THRESH` (−60 dBFS par défaut) sont ignorés.
 - Les segments valides sont enregistrés dans `output_dir/segments` en conservant la structure de dossiers des classes.
 - Un mél‑spectrogramme est généré pour chaque segment dans `output_dir/spectrograms` à l'aide de **torchaudio**.
 - Les chemins de ces spectrogrammes et leurs étiquettes sont sauvegardés dans `train.csv`, `val.csv` et `test.csv` sous `output_dir/csv` selon un partage 70 % / 15 % / 15 %.
