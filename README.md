@@ -13,7 +13,7 @@ NightScan est un projet de classification de sons d'animaux basé sur des spectr
 - `README.md` — ce fichier
 - `data/` (à créer) — contient les enregistrements (`raw/`) et les spectrogrammes (`processed/`)
 - `models/` (à créer) — répertoire pour stocker les modèles entraînés
-- `scripts/` (à créer) — scripts `preprocess.py`, `train.py` et `evaluate.py`
+- `scripts/` (à créer) — scripts `preprocess.py`, `train.py` et `evaluate.py` (optionnels et pas encore fournis)
 - `utils/` (à créer) — fonctions utilitaires
 - `requirements.txt` (à créer) — dépendances Python
 
@@ -30,6 +30,8 @@ pip install -r requirements.txt
 
 ## Utilisation
 Prétraitez les données, entraînez un modèle et évaluez-le :
+
+**Note :** ces scripts peuvent être absents ou inutiles pour le moment.
 
 ```bash
 python scripts/preprocess.py --input_dir data/raw --output_dir data/processed
