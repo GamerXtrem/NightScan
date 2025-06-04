@@ -66,6 +66,9 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 ### `predict.py`
 
 - Charge un modèle entraîné et renvoie pour chaque fichier audio les trois classes les plus probables.
+  Le fichier est d'abord découpé en segments de 8 s grâce à la même détection de
+  silence que dans `preprocess.py`. Les segments quasiment silencieux sont
+  ignorés.
 - Exemple d'utilisation :
 
 ```bash

@@ -2,20 +2,65 @@ import argparse
 from pathlib import Path
 import csv
 from typing import List, Tuple
+from io import BytesIO
 
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 from torchaudio import transforms as T
 import torchaudio
+from pydub import AudioSegment, silence
+
+TARGET_DURATION_MS = 8000  # 8 seconds
+SILENCE_THRESH = -40
+
+
+def is_silent(segment: AudioSegment, threshold_db: float = -60.0) -> bool:
+    """Return ``True`` if the segment contains almost no sound."""
+    return segment.rms == 0 or segment.dBFS < threshold_db
+
+
+def extract_segments(path: Path, sr: int) -> List[torch.Tensor]:
+    """Split ``path`` on silence and return padded waveforms."""
+    audio = AudioSegment.from_file(path)
+    chunks = silence.split_on_silence(
+        audio,
+        min_silence_len=500,
+        silence_thresh=SILENCE_THRESH,
+        keep_silence=250,
+    )
+    segments: List[torch.Tensor] = []
+    for chunk in chunks:
+        if len(chunk) > TARGET_DURATION_MS:
+            chunk = chunk[:TARGET_DURATION_MS]
+        elif len(chunk) < TARGET_DURATION_MS:
+            padding = AudioSegment.silent(TARGET_DURATION_MS - len(chunk))
+            chunk += padding
+
+        if is_silent(chunk):
+            continue
+
+        buf = BytesIO()
+        chunk.export(buf, format="wav")
+        buf.seek(0)
+        waveform, orig_sr = torchaudio.load(buf)
+        if orig_sr != sr:
+            waveform = torchaudio.functional.resample(waveform, orig_sr, sr)
+        segments.append(waveform)
+    return segments
 
 
 class AudioDataset(Dataset):
-    """Dataset loading audio files and converting them to spectrogram tensors."""
+    """Dataset loading audio segments and converting them to spectrogram tensors."""
 
     def __init__(self, files: List[Path], sr: int = 22050) -> None:
-        self.files = files
+        self.samples: List[Tuple[torch.Tensor, str]] = []
         self.sr = sr
+        for path in files:
+            segments = extract_segments(path, sr)
+            for idx, waveform in enumerate(segments):
+                name = f"{path.as_posix()}#{idx}" if len(segments) > 1 else path.as_posix()
+                self.samples.append((waveform, name))
         self.mel = T.MelSpectrogram(sample_rate=sr)
         self.to_db = T.AmplitudeToDB()
         self.transform = transforms.Compose([
@@ -24,15 +69,10 @@ class AudioDataset(Dataset):
         ])
 
     def __len__(self) -> int:
-        return len(self.files)
+        return len(self.samples)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, str]:
-        path = self.files[idx]
-        waveform, sample_rate = torchaudio.load(path)
-        if waveform.size(0) > 1:
-            waveform = waveform.mean(dim=0, keepdim=True)
-        if sample_rate != self.sr:
-            waveform = torchaudio.functional.resample(waveform, sample_rate, self.sr)
+        waveform, name = self.samples[idx]
         num_samples = self.sr * 8
         if waveform.size(1) < num_samples:
             pad = num_samples - waveform.size(1)
@@ -44,7 +84,7 @@ class AudioDataset(Dataset):
         mel = mel.squeeze(0)
         mel = mel.unsqueeze(0).repeat(3, 1, 1)
         mel = self.transform(mel)
-        return mel, path.as_posix()
+        return mel, name
 
 
 def gather_files(inputs: List[Path]) -> List[Path]:
