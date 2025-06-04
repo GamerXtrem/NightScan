@@ -17,15 +17,22 @@ import numpy as np
 import torchaudio
 from torchaudio import transforms as T
 from pydub import AudioSegment, silence
+from pydub.exceptions import CouldntDecodeError
 
 
 TARGET_DURATION_MS = 8000  # 8 seconds
 SILENCE_THRESH = -40
 
 
-def _convert_mp3(args: tuple[Path, Path, Path]) -> Path:
+def _convert_mp3(args: tuple[Path, Path, Path]) -> Path | None:
     mp3_path, input_dir, wav_dir = args
-    audio = AudioSegment.from_mp3(mp3_path)
+    try:
+        audio = AudioSegment.from_mp3(mp3_path)
+    except CouldntDecodeError as exc:
+        # Skip files that ffmpeg cannot decode and warn the user
+        print(f"[WARN] Could not decode {mp3_path}: {exc}")
+        return None
+
     relative = mp3_path.relative_to(input_dir).with_suffix(".wav")
     out_path = wav_dir / relative
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -46,10 +53,12 @@ def convert_mp3_to_wav(input_dir: Path, wav_dir: Path, workers: int) -> list[Pat
     mp3_files = list(input_dir.rglob("*.mp3"))
     args_list = [(p, input_dir, wav_dir) for p in mp3_files]
     if workers == 1:
-        return [_convert_mp3(a) for a in args_list]
+        results = [_convert_mp3(a) for a in args_list]
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as exe:
+            results = list(exe.map(_convert_mp3, args_list))
 
-    with ProcessPoolExecutor(max_workers=workers) as exe:
-        return list(exe.map(_convert_mp3, args_list))
+    return [r for r in results if r is not None]
 
 
 def is_silent(segment: AudioSegment, threshold_db: float = -60.0) -> bool:
