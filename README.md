@@ -36,6 +36,7 @@ pip install pyaudio audioop-lts
 ```
 
 Le prétraitement avec `pydub` nécessite également l'outil système **ffmpeg** disponible sur la plupart des distributions Linux et sur Windows.
+Vérifiez que la commande `ffmpeg` est accessible (essayez `ffmpeg -version` dans un terminal).
 Les spectrogrammes sont désormais calculés avec **torchaudio**.
 
 ## Utilisation

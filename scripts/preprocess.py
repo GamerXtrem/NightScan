@@ -20,6 +20,7 @@ import torchaudio
 from torchaudio import transforms as T
 from pydub import AudioSegment, silence
 from pydub.exceptions import CouldntDecodeError
+from pydub.utils import which
 
 
 TARGET_DURATION_MS = 8000  # 8 seconds
@@ -27,6 +28,14 @@ SPLIT_SILENCE_THRESH = -40
 CHUNK_SILENCE_THRESH = -20
 
 logger = logging.getLogger(__name__)
+
+
+def ensure_ffmpeg() -> None:
+    """Exit with a helpful message if ffmpeg is missing."""
+    if which("ffmpeg") is None:
+        raise SystemExit(
+            "ffmpeg not found. Install it and ensure it is available in your PATH."
+        )
 
 
 def _convert_mp3(args: tuple[Path, Path, Path]) -> Path | None:
@@ -249,6 +258,8 @@ def main() -> None:
         help="Random seed for dataset splitting",
     )
     args = parser.parse_args()
+
+    ensure_ffmpeg()
 
     logging.basicConfig(
         format="%(levelname)s:%(processName)s:%(message)s", level=logging.INFO
