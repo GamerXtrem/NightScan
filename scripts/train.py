@@ -85,6 +85,11 @@ def main() -> None:
         default=0,
         help="Number of worker processes for data loading",
     )
+    parser.add_argument(
+        "--pretrained",
+        action="store_true",
+        help="Use ImageNet pretrained weights for ResNet18",
+    )
     args = parser.parse_args()
 
     train_ds = SpectrogramDataset(args.csv_dir / "train.csv")
@@ -112,7 +117,8 @@ def main() -> None:
         num_workers=args.num_workers,
         pin_memory=pin_memory,
     )
-    model = models.resnet18(weights=None)
+    weights = models.ResNet18_Weights.DEFAULT if args.pretrained else None
+    model = models.resnet18(weights=weights)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
     model.to(device)
 
