@@ -28,6 +28,13 @@ source env/bin/activate  # Sur Windows : env\Scripts\activate
 pip install -r requirements.txt
 ```
 
+Avant d'exécuter `preprocess.py`, installez également :
+
+```bash
+brew install portaudio   # macOS uniquement
+pip install pyaudio audioop-lts
+```
+
 Le prétraitement avec `pydub` nécessite également l'outil système **ffmpeg** disponible sur la plupart des distributions Linux et sur Windows.
 Les spectrogrammes sont désormais calculés avec **torchaudio**.
 
