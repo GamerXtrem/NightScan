@@ -34,7 +34,9 @@ Prétraitez les données, entraînez un modèle et évaluez-le :
 **Note :** ces scripts peuvent être absents ou inutiles pour le moment.
 
 ```bash
-python scripts/preprocess.py --input_dir data/raw --output_dir data/processed
+python scripts/preprocess.py \
+  --input_dir Volumes/dataset/NightScan/raw_audio \
+  --output_dir Volumes/dataset/NightScan/processed3
 python scripts/train.py --data_dir data/processed --model_dir models/
 python scripts/evaluate.py --model_path models/best_model.pth --data_dir data/processed
 ```
