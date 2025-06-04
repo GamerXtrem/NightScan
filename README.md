@@ -35,7 +35,7 @@ Prétraitez les données puis entraînez un modèle :
 
 ```bash
 python scripts/preprocess.py --input_dir data/raw --output_dir data/processed
-python scripts/train.py --csv_dir data/processed/csv --model_dir models/
+python scripts/train.py --csv_dir data/processed/csv --model_dir models/ --pretrained
 ```
 
 Le dossier `data/raw` doit contenir un sous-répertoire par classe (par exemple `data/raw/chat/`, `data/raw/chien/`, ...). Le prétraitement conserve cette structure et génère des spectrogrammes classés dans `data/processed/spectrograms`. Les fichiers CSV produits dans `data/processed/csv` possèdent désormais deux colonnes : `path` et `label`.
@@ -57,6 +57,6 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 
 - Lit `train.csv` et `val.csv` depuis le répertoire indiqué par `--csv_dir`.
 - Charge chaque spectrogramme `.npy`, le normalise entre 0 et 1 puis le redimensionne en 224×224 et le duplique sur trois canaux pour l'utiliser avec ResNet18.
-- Entraîne un réseau ResNet18 (poids initiaux aléatoires) sur GPU ou MPS (Apple Silicon) si disponible.
+- Entraîne un réseau ResNet18 sur GPU ou MPS (Apple Silicon) si disponible. Les poids ImageNet peuvent être chargés avec `--pretrained`.
 - Après chaque époque, affiche la perte et la précision de validation et sauvegarde dans `--model_dir/best_model.pth` le modèle obtenant la meilleure précision.
 - Paramètres optionnels : `--epochs` (10 par défaut), `--batch_size` (32), `--lr` (1e-3) et `--num_workers` (0).
