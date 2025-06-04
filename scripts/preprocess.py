@@ -148,8 +148,27 @@ def generate_spectrograms(wav_dir: Path, spec_dir: Path, sr: int, workers: int) 
         return list(exe.map(_generate_spec, args_list))
 
 
-def split_and_save(files: list[Path], out_dir: Path, train: float = 0.7, val: float = 0.15) -> None:
-    """Split ``files`` into train/val/test sets and save CSV metadata including labels."""
+def split_and_save(
+    files: list[Path],
+    out_dir: Path,
+    train: float = 0.7,
+    val: float = 0.15,
+    *,
+    seed: int | None = None,
+) -> None:
+    """Split ``files`` into train/val/test sets and save CSV metadata including labels.
+
+    Parameters
+    ----------
+    files:
+        List of spectrogram paths to split.
+    out_dir:
+        Directory where ``train.csv``, ``val.csv`` and ``test.csv`` will be written.
+    seed:
+        Optional random seed ensuring deterministic shuffling.
+    """
+    if seed is not None:
+        random.seed(seed)
     random.shuffle(files)
     n_total = len(files)
     n_train = int(n_total * train)
@@ -184,6 +203,12 @@ def main() -> None:
         default=1,
         help="Number of worker processes for parallel preprocessing",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for dataset splitting",
+    )
     args = parser.parse_args()
 
     wav_dir = args.output_dir / "wav"
@@ -196,7 +221,7 @@ def main() -> None:
     processed_paths = process_wav_files(wav_dir, processed_dir, args.workers)
 
     spec_paths = generate_spectrograms(processed_dir, spec_dir, sr=22050, workers=args.workers)
-    split_and_save(spec_paths, csv_dir)
+    split_and_save(spec_paths, csv_dir, seed=args.seed)
 
 
 if __name__ == "__main__":
