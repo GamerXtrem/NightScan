@@ -29,6 +29,7 @@ pip install -r requirements.txt
 ```
 
 Le prétraitement avec `pydub` nécessite également l'outil système **ffmpeg** disponible sur la plupart des distributions Linux et sur Windows.
+Les spectrogrammes sont désormais calculés avec **torchaudio**.
 
 ## Utilisation
 Prétraitez les données puis entraînez un modèle :
@@ -50,7 +51,7 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 - Découpe chaque WAV en segments de 8 secondes grâce à la détection de silence (seuil −40 dBFS). Les segments trop courts sont complétés par du silence et ceux trop longs sont tronqués.
 - Les segments dont le volume reste inférieur à −60 dBFS sont ignorés.
 - Les segments valides sont enregistrés dans `output_dir/segments` en conservant la structure de dossiers des classes.
-- Un mél‑spectrogramme est généré pour chaque segment dans `output_dir/spectrograms`.
+- Un mél‑spectrogramme est généré pour chaque segment dans `output_dir/spectrograms` à l'aide de **torchaudio**.
 - Les chemins de ces spectrogrammes et leurs étiquettes sont sauvegardés dans `train.csv`, `val.csv` et `test.csv` sous `output_dir/csv` selon un partage 70 % / 15 % / 15 %.
 - Optionnel : `--workers` permet de paralléliser les conversions et traitements.
 
