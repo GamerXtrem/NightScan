@@ -34,7 +34,7 @@ Le prétraitement avec `pydub` nécessite également l'outil système **ffmpeg**
 Prétraitez les données puis entraînez un modèle :
 
 ```bash
-python scripts/preprocess.py --input_dir data/raw --output_dir data/processed
+python scripts/preprocess.py --input_dir data/raw --output_dir data/processed --workers 4
 python scripts/train.py --csv_dir data/processed/csv --model_dir models/ --pretrained
 ```
 
@@ -52,6 +52,7 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 - Les segments valides sont enregistrés dans `output_dir/segments` en conservant la structure de dossiers des classes.
 - Un mél‑spectrogramme est généré pour chaque segment dans `output_dir/spectrograms`.
 - Les chemins de ces spectrogrammes et leurs étiquettes sont sauvegardés dans `train.csv`, `val.csv` et `test.csv` sous `output_dir/csv` selon un partage 70 % / 15 % / 15 %.
+- Optionnel : `--workers` permet de paralléliser les conversions et traitements.
 
 ### `train.py`
 
