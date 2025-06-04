@@ -35,8 +35,10 @@ Prétraitez les données, entraînez un modèle et évaluez-le :
 
 ```bash
 python scripts/preprocess.py --input_dir data/raw --output_dir data/processed
-python scripts/train.py --data_dir data/processed --model_dir models/
+python scripts/train.py --csv_dir data/processed/csv --model_dir models/
 python scripts/evaluate.py --model_path models/best_model.pth --data_dir data/processed
 ```
+
+Le dossier `data/raw` doit contenir un sous-répertoire par classe (par exemple `data/raw/chat/`, `data/raw/chien/`, ...). Le prétraitement conserve cette structure et génère des spectrogrammes classés dans `data/processed/spectrograms`. Les fichiers CSV produits dans `data/processed/csv` possèdent désormais deux colonnes : `path` et `label`.
 
 Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieux (volume inférieur à -60 dBFS), le fichier résultant est supprimé et ignoré.
