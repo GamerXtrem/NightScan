@@ -1,12 +1,17 @@
 import argparse
 from pathlib import Path
 import csv
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
+
+try:
+    _DEFAULT_WEIGHTS = models.ResNet18_Weights.DEFAULT
+except AttributeError:  # backward compatibility
+    _DEFAULT_WEIGHTS = None
 import torch.nn as nn
 
 
@@ -18,18 +23,23 @@ class SpectrogramDataset(Dataset):
     integer class index.
     """
 
-    def __init__(self, csv_file: Path) -> None:
+    def __init__(self, csv_file: Path, transform: Optional[transforms.Compose] = None) -> None:
         self.samples: List[Tuple[Path, int]] = []
         with open(csv_file, newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 self.samples.append((Path(row["path"]), int(row["label"])))
 
-        # Normalize spectrograms to [0, 1]
-        self.transform = transforms.Compose([
-            transforms.Lambda(lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9)),
-            transforms.Resize((224, 224)),
-        ])
+        if transform is None:
+            # Normalize spectrograms to [0, 1] and resize
+            self.transform = transforms.Compose([
+                transforms.Lambda(
+                    lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9)
+                ),
+                transforms.Resize((224, 224)),
+            ])
+        else:
+            self.transform = transform
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -81,15 +91,26 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-3)
     args = parser.parse_args()
 
-    train_ds = SpectrogramDataset(args.csv_dir / "train.csv")
-    val_ds = SpectrogramDataset(args.csv_dir / "val.csv")
+    weights = _DEFAULT_WEIGHTS
+    transform = None
+    if weights is not None:
+        transform = transforms.Compose([
+            transforms.Lambda(
+                lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9)
+            ),
+            transforms.Resize((224, 224)),
+            transforms.Normalize(mean=weights.meta["mean"], std=weights.meta["std"]),
+        ])
+
+    train_ds = SpectrogramDataset(args.csv_dir / "train.csv", transform=transform)
+    val_ds = SpectrogramDataset(args.csv_dir / "val.csv", transform=transform)
     num_classes = len(set(label for _, label in train_ds.samples))
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = models.resnet18(weights=None)
+    model = models.resnet18(weights=weights)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
     model.to(device)
 
