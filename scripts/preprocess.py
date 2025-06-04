@@ -1,9 +1,9 @@
 """Audio preprocessing utilities for NightScan.
 
-This script converts MP3 recordings to WAV, isolates cries using silence
-splitting and pads or truncates segments to 8 seconds. It also generates
-mel-spectrograms in ``.npy`` format and creates CSV files describing the
-train/val/test splits.
+This script converts MP3 recordings to WAV (existing WAV files are copied as
+is), isolates cries using silence splitting and pads or truncates segments to
+8 seconds. It also generates mel-spectrograms in ``.npy`` format and creates
+CSV files describing the train/val/test splits.
 """
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ import csv
 import random
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
+import logging
+import shutil
 
 import numpy as np
 import torchaudio
@@ -21,7 +23,10 @@ from pydub.exceptions import CouldntDecodeError
 
 
 TARGET_DURATION_MS = 8000  # 8 seconds
-SILENCE_THRESH = -40
+SPLIT_SILENCE_THRESH = -40
+CHUNK_SILENCE_THRESH = -60
+
+logger = logging.getLogger(__name__)
 
 
 def _convert_mp3(args: tuple[Path, Path, Path]) -> Path | None:
@@ -30,7 +35,7 @@ def _convert_mp3(args: tuple[Path, Path, Path]) -> Path | None:
         audio = AudioSegment.from_mp3(mp3_path)
     except CouldntDecodeError as exc:
         # Skip files that ffmpeg cannot decode and warn the user
-        print(f"[WARN] Could not decode {mp3_path}: {exc}")
+        logger.warning("Could not decode %s: %s", mp3_path, exc)
         return None
 
     relative = mp3_path.relative_to(input_dir).with_suffix(".wav")
@@ -51,6 +56,8 @@ def convert_mp3_to_wav(input_dir: Path, wav_dir: Path, workers: int) -> list[Pat
     wav_dir.mkdir(parents=True, exist_ok=True)
 
     mp3_files = list(input_dir.rglob("*.mp3"))
+    wav_files = list(input_dir.rglob("*.wav"))
+
     args_list = [(p, input_dir, wav_dir) for p in mp3_files]
     if workers == 1:
         results = [_convert_mp3(a) for a in args_list]
@@ -58,10 +65,21 @@ def convert_mp3_to_wav(input_dir: Path, wav_dir: Path, workers: int) -> list[Pat
         with ProcessPoolExecutor(max_workers=workers) as exe:
             results = list(exe.map(_convert_mp3, args_list))
 
-    return [r for r in results if r is not None]
+    converted = [r for r in results if r is not None]
+
+    copied: list[Path] = []
+    for p in wav_files:
+        relative = p.relative_to(input_dir)
+        out_path = wav_dir / relative
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        if out_path != p:
+            shutil.copy2(p, out_path)
+        copied.append(out_path)
+
+    return converted + copied
 
 
-def is_silent(segment: AudioSegment, threshold_db: float = -60.0) -> bool:
+def is_silent(segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH) -> bool:
     """Return ``True`` if the segment contains almost no sound."""
     return segment.rms == 0 or segment.dBFS < threshold_db
 
@@ -85,7 +103,7 @@ def isolate_cries(audio_path: Path, out_dir: Path) -> list[Path]:
     chunks = silence.split_on_silence(
         audio,
         min_silence_len=500,
-        silence_thresh=SILENCE_THRESH,
+        silence_thresh=SPLIT_SILENCE_THRESH,
         keep_silence=250,
     )
 
@@ -132,6 +150,8 @@ def process_wav_files(wav_dir: Path, processed_dir: Path, workers: int) -> list[
 def _generate_spec(args: tuple[Path, Path, Path, int]) -> Path:
     wav_path, wav_dir, spec_dir, sr = args
     waveform, original_sr = torchaudio.load(wav_path)
+    if waveform.size(0) > 1:
+        waveform = waveform.mean(dim=0, keepdim=True)
     if original_sr != sr:
         waveform = torchaudio.functional.resample(waveform, original_sr, sr)
     mel = T.MelSpectrogram(sample_rate=sr)(waveform)
@@ -219,6 +239,10 @@ def main() -> None:
         help="Random seed for dataset splitting",
     )
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format="%(levelname)s:%(processName)s:%(message)s", level=logging.INFO
+    )
 
     wav_dir = args.output_dir / "wav"
     processed_dir = args.output_dir / "segments"

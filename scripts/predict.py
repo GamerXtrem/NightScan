@@ -10,12 +10,16 @@ from torchvision import models, transforms
 from torchaudio import transforms as T
 import torchaudio
 from pydub import AudioSegment, silence
+import logging
 
 TARGET_DURATION_MS = 8000  # 8 seconds
-SILENCE_THRESH = -40
+SPLIT_SILENCE_THRESH = -40
+CHUNK_SILENCE_THRESH = -60
+
+logger = logging.getLogger(__name__)
 
 
-def is_silent(segment: AudioSegment, threshold_db: float = -60.0) -> bool:
+def is_silent(segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH) -> bool:
     """Return ``True`` if the segment contains almost no sound."""
     return segment.rms == 0 or segment.dBFS < threshold_db
 
@@ -26,7 +30,7 @@ def extract_segments(path: Path, sr: int) -> List[torch.Tensor]:
     chunks = silence.split_on_silence(
         audio,
         min_silence_len=500,
-        silence_thresh=SILENCE_THRESH,
+        silence_thresh=SPLIT_SILENCE_THRESH,
         keep_silence=250,
     )
     segments: List[torch.Tensor] = []
@@ -44,6 +48,8 @@ def extract_segments(path: Path, sr: int) -> List[torch.Tensor]:
         chunk.export(buf, format="wav")
         buf.seek(0)
         waveform, orig_sr = torchaudio.load(buf)
+        if waveform.size(0) > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
         if orig_sr != sr:
             waveform = torchaudio.functional.resample(waveform, orig_sr, sr)
         segments.append(waveform)
@@ -117,6 +123,10 @@ def main() -> None:
     parser.add_argument("inputs", nargs="+", type=Path, help="Audio files or directories")
     parser.add_argument("--batch_size", type=int, default=1)
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format="%(levelname)s:%(processName)s:%(message)s", level=logging.INFO
+    )
 
     files = gather_files(args.inputs)
     if not files:
