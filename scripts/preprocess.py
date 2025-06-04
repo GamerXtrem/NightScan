@@ -13,8 +13,9 @@ import random
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 
-import librosa
 import numpy as np
+import torchaudio
+from torchaudio import transforms as T
 from pydub import AudioSegment, silence
 
 
@@ -121,13 +122,13 @@ def process_wav_files(wav_dir: Path, processed_dir: Path, workers: int) -> list[
 
 def _generate_spec(args: tuple[Path, Path, Path, int]) -> Path:
     wav_path, wav_dir, spec_dir, sr = args
-    y, _ = librosa.load(wav_path, sr=sr, mono=True)
-    mel = librosa.feature.melspectrogram(y=y, sr=sr)
-    mel_db = librosa.power_to_db(mel, ref=np.max)
+    waveform, _ = torchaudio.load(wav_path)
+    mel = T.MelSpectrogram(sample_rate=sr)(waveform)
+    mel_db = T.AmplitudeToDB()(mel)
     relative = wav_path.relative_to(wav_dir).with_suffix(".npy")
     out_path = spec_dir / relative
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    np.save(out_path, mel_db)
+    np.save(out_path, mel_db.squeeze(0).numpy())
     return out_path
 
 
