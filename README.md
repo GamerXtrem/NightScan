@@ -13,7 +13,7 @@ NightScan est un projet de classification de sons d'animaux basé sur des spectr
 - `README.md` — ce fichier
 - `data/` (à créer) — contient les enregistrements (`raw/`) et les spectrogrammes (`processed/`)
 - `models/` (à créer) — répertoire pour stocker les modèles entraînés
-- `scripts/` — scripts `preprocess.py` et `train.py` pour prétraiter les données et entraîner un modèle. Un script d'évaluation pourra être ajouté ultérieurement.
+- `scripts/` — scripts `preprocess.py`, `train.py` et `predict.py` pour prétraiter les données, entraîner un modèle et effectuer des prédictions.
 - `utils/` (à créer) — fonctions utilitaires
 - `requirements.txt` — dépendances Python
 
@@ -62,3 +62,12 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 - Entraîne un réseau ResNet18 sur GPU ou MPS (Apple Silicon) si disponible. Les poids ImageNet peuvent être chargés avec `--pretrained`.
 - Après chaque époque, affiche la perte et la précision de validation et sauvegarde dans `--model_dir/best_model.pth` le modèle obtenant la meilleure précision.
 - Paramètres optionnels : `--epochs` (10 par défaut), `--batch_size` (32), `--lr` (1e-3) et `--num_workers` (0).
+
+### `predict.py`
+
+- Charge un modèle entraîné et renvoie pour chaque fichier audio les trois classes les plus probables.
+- Exemple d'utilisation :
+
+```bash
+python scripts/predict.py --model_path models/best_model.pth --csv_dir data/processed/csv sample.wav
+```
