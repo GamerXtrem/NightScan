@@ -14,7 +14,7 @@ import logging
 
 TARGET_DURATION_MS = 8000  # 8 seconds
 SPLIT_SILENCE_THRESH = -40
-CHUNK_SILENCE_THRESH = -60
+CHUNK_SILENCE_THRESH = -20
 
 logger = logging.getLogger(__name__)
 

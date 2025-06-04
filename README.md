@@ -56,7 +56,7 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 
 - Convertit les MP3 en WAV et recopie directement les fichiers déjà au format WAV dans `output_dir/wav`.
 - Découpe chaque WAV en segments de 8 secondes grâce à la détection de silence (`SPLIT_SILENCE_THRESH` à −40 dBFS par défaut). Les segments trop courts sont complétés par du silence et ceux trop longs sont tronqués.
-- Les segments dont le volume moyen est inférieur à `CHUNK_SILENCE_THRESH` (−60 dBFS par défaut) sont ignorés.
+- Les segments dont le volume moyen est inférieur à `CHUNK_SILENCE_THRESH` (−20 dBFS par défaut) sont ignorés.
 - Les segments valides sont enregistrés dans `output_dir/segments` en conservant la structure de dossiers des classes.
 - Un mél‑spectrogramme est généré pour chaque segment dans `output_dir/spectrograms` à l'aide de **torchaudio**.
 - Les chemins de ces spectrogrammes et leurs étiquettes sont sauvegardés dans `train.csv`, `val.csv` et `test.csv` sous `output_dir/csv` selon un partage 70 % / 15 % / 15 %.
