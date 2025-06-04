@@ -3,3 +3,5 @@ pydub
 torch
 torchvision
 torchaudio
+pyaudio
+audioop-lts
