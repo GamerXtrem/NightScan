@@ -122,7 +122,9 @@ def process_wav_files(wav_dir: Path, processed_dir: Path, workers: int) -> list[
 
 def _generate_spec(args: tuple[Path, Path, Path, int]) -> Path:
     wav_path, wav_dir, spec_dir, sr = args
-    waveform, _ = torchaudio.load(wav_path)
+    waveform, original_sr = torchaudio.load(wav_path)
+    if original_sr != sr:
+        waveform = torchaudio.functional.resample(waveform, original_sr, sr)
     mel = T.MelSpectrogram(sample_rate=sr)(waveform)
     mel_db = T.AmplitudeToDB()(mel)
     relative = wav_path.relative_to(wav_dir).with_suffix(".npy")
