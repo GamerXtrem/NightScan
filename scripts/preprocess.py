@@ -122,6 +122,9 @@ def isolate_cries(audio_path: Path, out_dir: Path) -> list[Path]:
 
     paths: list[Path] = []
     for idx, chunk in enumerate(chunks):
+        if len(chunk) == 0:
+            logger.warning("Chunk vide ignor\xE9 : %s [%d]", audio_path, idx)
+            continue
         if len(chunk) > TARGET_DURATION_MS:
             chunk = chunk[:TARGET_DURATION_MS]
         elif len(chunk) < TARGET_DURATION_MS:
@@ -172,7 +175,7 @@ def _generate_spec(args: tuple[Path, Path, Path, int]) -> Path | None:
     if original_sr != sr:
         waveform = torchaudio.functional.resample(waveform, original_sr, sr)
     mel = T.MelSpectrogram(sample_rate=sr)(waveform)
-    mel_db = T.AmplitudeToDB()(mel)
+    mel_db = T.AmplitudeToDB(top_db=80)(mel)
     relative = wav_path.relative_to(wav_dir).with_suffix(".npy")
     out_path = spec_dir / relative
     out_path.parent.mkdir(parents=True, exist_ok=True)
