@@ -16,7 +16,7 @@ NightScan est un projet de classification de sons d'animaux basé sur des spectr
 - `scripts/` — scripts `preprocess.py`, `train.py` et `predict.py` pour prétraiter les données, entraîner un modèle et effectuer des prédictions.
 - `utils/` — fonctions utilitaires
 - `setup.sh` — script créant automatiquement les dossiers `data/`, `models/` et `utils/`
-- `requirements.txt` — dépendances Python
+- `../requirements.txt` — dépendances Python communes (à la racine)
 
 ## Installation
 Clonez le dépôt puis installez les dépendances dans un environnement virtuel :

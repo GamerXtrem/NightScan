@@ -1,0 +1,8 @@
+audioop-lts
+numpy
+pillow
+pyaudio
+pydub
+torch
+torchaudio
+torchvision
