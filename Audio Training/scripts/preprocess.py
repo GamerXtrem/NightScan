@@ -1,9 +1,9 @@
 """Audio preprocessing utilities for NightScan.
 
-This script converts MP3 recordings to WAV (existing WAV files are copied as
-is), isolates cries using silence splitting and pads or truncates segments to
-8 seconds. It also generates mel-spectrograms in ``.npy`` format and creates
-CSV files describing the train/val/test splits.
+This script expects WAV recordings organised by class folders. It isolates
+cries using silence splitting, pads or truncates segments to 8 seconds and
+generates mel-spectrograms in ``.npy`` format. Finally, CSV files describing
+the train/val/test splits are created.
 """
 from __future__ import annotations
 
@@ -38,43 +38,17 @@ def ensure_ffmpeg() -> None:
         )
 
 
-def _convert_mp3(args: tuple[Path, Path, Path]) -> Path | None:
-    mp3_path, input_dir, wav_dir = args
-    try:
-        audio = AudioSegment.from_mp3(mp3_path)
-    except CouldntDecodeError as exc:
-        # Skip files that ffmpeg cannot decode and warn the user
-        logger.warning("Could not decode %s: %s", mp3_path, exc)
-        return None
-
-    relative = mp3_path.relative_to(input_dir).with_suffix(".wav")
-    out_path = wav_dir / relative
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    audio.export(out_path, format="wav")
-    return out_path
-
-
-def convert_mp3_to_wav(input_dir: Path, wav_dir: Path, workers: int) -> list[Path]:
-    """Recursively convert MP3 files in ``input_dir`` to WAV files in ``wav_dir``.
+def copy_wav_files(input_dir: Path, wav_dir: Path) -> list[Path]:
+    """Recursively copy WAV files from ``input_dir`` to ``wav_dir``.
 
     The directory structure of ``input_dir`` is mirrored in ``wav_dir`` so that
-    sub-folder names can be used as class labels later on.
-    Returns a list of generated WAV paths.
+    sub-folder names can be used as class labels later on. Returns a list of
+    copied paths.
     """
     input_dir = Path(input_dir)
     wav_dir.mkdir(parents=True, exist_ok=True)
 
-    mp3_files = [p for p in input_dir.rglob("*.mp3") if not p.name.startswith("._")]
     wav_files = [p for p in input_dir.rglob("*.wav") if not p.name.startswith("._")]
-
-    args_list = [(p, input_dir, wav_dir) for p in mp3_files]
-    if workers == 1:
-        results = [_convert_mp3(a) for a in args_list]
-    else:
-        with ProcessPoolExecutor(max_workers=workers) as exe:
-            results = list(exe.map(_convert_mp3, args_list))
-
-    converted = [r for r in results if r is not None]
 
     copied: list[Path] = []
     for p in wav_files:
@@ -85,7 +59,7 @@ def convert_mp3_to_wav(input_dir: Path, wav_dir: Path, workers: int) -> list[Pat
             shutil.copy2(p, out_path)
         copied.append(out_path)
 
-    return converted + copied
+    return copied
 
 
 def is_silent(segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH) -> bool:
@@ -246,7 +220,7 @@ def split_and_save(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Preprocess audio files")
-    parser.add_argument("--input_dir", type=Path, required=True, help="Directory with raw MP3 files")
+    parser.add_argument("--input_dir", type=Path, required=True, help="Directory with WAV files organized by class")
     parser.add_argument("--output_dir", type=Path, required=True, help="Directory to store processed data")
     parser.add_argument(
         "--workers",
@@ -273,7 +247,7 @@ def main() -> None:
     spec_dir = args.output_dir / "spectrograms"
     csv_dir = args.output_dir / "csv"
 
-    convert_mp3_to_wav(args.input_dir, wav_dir, args.workers)
+    copy_wav_files(args.input_dir, wav_dir)
 
     processed_paths = process_wav_files(wav_dir, processed_dir, args.workers)
 
