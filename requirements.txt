@@ -3,7 +3,5 @@ pydub
 torch
 torchvision
 torchaudio
-python3.13-dev portaudio19-dev
-python3.13 -m pip install --no-binary :all: pyaudio
 pyaudio
 audioop-lts
