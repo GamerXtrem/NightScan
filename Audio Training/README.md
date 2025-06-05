@@ -59,7 +59,7 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 
 -### `preprocess.py`
 
-- Convertit les MP3 en WAV et recopie directement les fichiers déjà au format WAV dans `output_dir/wav`.
+- Copie les fichiers WAV dans `output_dir/wav` en conservant la structure des dossiers.
 - Découpe chaque WAV en segments de 8 secondes grâce à la détection de silence (`SPLIT_SILENCE_THRESH` à −40 dBFS par défaut). Les segments trop courts sont complétés par du silence et ceux trop longs sont tronqués.
 - Les segments dont le volume moyen est inférieur à `CHUNK_SILENCE_THRESH` (−20 dBFS par défaut) sont ignorés.
 - Les segments valides sont enregistrés dans `output_dir/segments` en conservant la structure de dossiers des classes.

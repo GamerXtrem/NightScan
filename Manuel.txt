@@ -36,7 +36,7 @@ Créez un dossier data/raw.
 À l’intérieur, ajoutez un sous-dossier pour chaque type d’animal :
 data/raw/chat/, data/raw/chien/, etc.
 
-Placez vos fichiers MP3 dans les bons sous-dossiers.
+Placez vos fichiers WAV dans les bons sous-dossiers.
 
 Lancer le prétraitement
 Dans le terminal :
@@ -44,7 +44,7 @@ Dans le terminal :
 python scripts/preprocess.py --input_dir data/raw --output_dir data/processed --workers 4
 Le programme :
 
-Convertit les MP3 en WAV.
+Copie les fichiers WAV dans le dossier de sortie.
 
 Découpe les sons en segments de 8 secondes.
 
@@ -67,11 +67,11 @@ Le meilleur modèle obtenu est enregistré sous models/best_model.pth.
 
 4. Identifier des sons
 Préparer un ou plusieurs fichiers audio
-Placez vos fichiers WAV ou MP3 (par exemple moncricha.mp3) dans un dossier accessible.
+Placez vos fichiers WAV (par exemple moncricha.wav) dans un dossier accessible.
 
 Lancer la prédiction
 
-python scripts/predict.py --model_path models/best_model.pth --csv_dir data/processed/csv moncricha.mp3
+python scripts/predict.py --model_path models/best_model.pth --csv_dir data/processed/csv moncricha.wav
 Le script découpe l’audio, applique le modèle et affiche pour chaque extrait les trois espèces les plus probables (ex. : chat, chien, etc.) avec leur score.
 
 5. Conseils et dépannage
