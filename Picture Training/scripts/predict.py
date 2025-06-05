@@ -80,12 +80,13 @@ def main() -> None:
     model.eval()
 
     softmax = torch.nn.Softmax(dim=1)
+    top_k = min(3, num_classes)
     with torch.no_grad():
         for batch, paths in loader:
             batch = batch.to(device)
             outputs = model(batch)
             probs = softmax(outputs)
-            values, indices = torch.topk(probs, k=3, dim=1)
+            values, indices = torch.topk(probs, k=top_k, dim=1)
             for path, vals, idxs in zip(paths, values, indices):
                 print(path)
                 for rank, (val, idx) in enumerate(zip(vals, idxs), 1):
