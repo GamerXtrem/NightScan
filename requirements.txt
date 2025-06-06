@@ -6,3 +6,4 @@ pydub
 torch
 torchaudio
 torchvision
+tqdm

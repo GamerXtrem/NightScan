@@ -21,6 +21,7 @@ from torchaudio import transforms as T
 from pydub import AudioSegment, silence
 from pydub.exceptions import CouldntDecodeError
 from pydub.utils import which
+from tqdm import tqdm
 
 
 TARGET_DURATION_MS = 8000  # 8 seconds
@@ -49,7 +50,7 @@ def copy_wav_files(input_dir: Path, wav_dir: Path) -> list[Path]:
     wav_files = [p for p in input_dir.rglob("*.wav") if not p.name.startswith("._")]
 
     copied: list[Path] = []
-    for p in wav_files:
+    for p in tqdm(wav_files, desc="Copying WAV", unit="file"):
         relative = p.relative_to(input_dir)
         out_path = wav_dir / relative
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -144,10 +145,17 @@ def process_wav_files(
         (wf, wav_dir, processed_dir, split_thresh, chunk_thresh) for wf in wav_files
     ]
     if workers == 1:
-        results = [_isolate_wrapper(a) for a in args_list]
+        results = [_isolate_wrapper(a) for a in tqdm(args_list, desc="Isolating", unit="file")]
     else:
         with ProcessPoolExecutor(max_workers=workers) as exe:
-            results = list(exe.map(_isolate_wrapper, args_list))
+            results = list(
+                tqdm(
+                    exe.map(_isolate_wrapper, args_list),
+                    total=len(args_list),
+                    desc="Isolating",
+                    unit="file",
+                )
+            )
 
     processed_paths: list[Path] = []
     for r in results:
@@ -183,10 +191,17 @@ def generate_spectrograms(wav_dir: Path, spec_dir: Path, sr: int, workers: int) 
     wav_files = [p for p in wav_dir.rglob("*.wav") if not p.name.startswith("._")]
     args_list = [(p, wav_dir, spec_dir, sr) for p in wav_files]
     if workers == 1:
-        results = [_generate_spec(a) for a in args_list]
+        results = [_generate_spec(a) for a in tqdm(args_list, desc="Spectrograms", unit="file")]
     else:
         with ProcessPoolExecutor(max_workers=workers) as exe:
-            results = list(exe.map(_generate_spec, args_list))
+            results = list(
+                tqdm(
+                    exe.map(_generate_spec, args_list),
+                    total=len(args_list),
+                    desc="Spectrograms",
+                    unit="file",
+                )
+            )
 
     return [r for r in results if r is not None]
 
@@ -238,7 +253,7 @@ def split_and_save(
         with csv_path.open("w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["path", "label"])
-            for p in split_files:
+            for p in tqdm(split_files, desc=f"Writing {split}", unit="file"):
                 writer.writerow([p.as_posix(), label_to_idx[p.parent.name]])
 
 
