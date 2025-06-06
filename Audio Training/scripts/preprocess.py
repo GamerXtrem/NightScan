@@ -108,8 +108,12 @@ def isolate_cries(
         if len(chunk) > TARGET_DURATION_MS:
             chunk = chunk[:TARGET_DURATION_MS]
         elif len(chunk) < TARGET_DURATION_MS:
-            padding = AudioSegment.silent(TARGET_DURATION_MS - len(chunk))
-            chunk += padding
+            pad_len = TARGET_DURATION_MS - len(chunk)
+            chunk = (
+                AudioSegment.silent(pad_len // 2)
+                + chunk
+                + AudioSegment.silent(pad_len - pad_len // 2)
+            )
 
         if is_silent(chunk, chunk_thresh):
             # Skip silent segments as per README recommendation
