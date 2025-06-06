@@ -86,6 +86,9 @@ def isolate_cries(
     """
     try:
         audio = AudioSegment.from_file(audio_path)
+        # Normalize audio so that the maximum peak is at 0 dBFS
+        if audio.max_dBFS != float("-inf"):
+            audio = audio.apply_gain(-audio.max_dBFS)
     except CouldntDecodeError as exc:
         logger.warning("Could not decode %s: %s", audio_path, exc)
         return []
