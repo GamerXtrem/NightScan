@@ -10,6 +10,7 @@ from torchvision import models, transforms
 from torchaudio import transforms as T
 import torchaudio
 from pydub import AudioSegment, silence
+from pydub.exceptions import CouldntDecodeError
 import logging
 
 TARGET_DURATION_MS = 8000  # 8 seconds
@@ -19,21 +20,26 @@ CHUNK_SILENCE_THRESH = -35
 logger = logging.getLogger(__name__)
 
 
+def iter_wav_files(root: Path):
+    """Yield ``.wav`` files under ``root`` skipping AppleDouble artifacts."""
+    for p in root.rglob("*.wav"):
+        if p.name.startswith("._"):
+            continue
+        yield p
+
+
 def is_silent(segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH) -> bool:
     """Return ``True`` if the segment contains almost no sound."""
     return segment.rms == 0 or segment.dBFS < threshold_db
 
 
 def extract_segments(path: Path, sr: int) -> List[torch.Tensor]:
-    """Split ``path`` on silence and return padded waveforms.
-
-    Only WAV files are supported. A ``ValueError`` is raised for any other
-    extension.
-    """
-    if path.suffix.lower() != ".wav":
-        raise ValueError(f"Unsupported format for {path}. Only WAV files are allowed.")
-
-    audio = AudioSegment.from_wav(path)
+    """Split ``path`` on silence and return padded waveforms."""
+    try:
+        audio = AudioSegment.from_file(path)
+    except CouldntDecodeError as e:
+        print(f"\u26A0\ufe0f  {path} ignoré : {e}")
+        return []
     if audio.max_dBFS != float("-inf"):
         audio = audio.apply_gain(-audio.max_dBFS)
     chunks = silence.split_on_silence(
@@ -110,8 +116,10 @@ def gather_files(inputs: List[Path]) -> List[Path]:
     files: List[Path] = []
     for p in inputs:
         if p.is_dir():
-            files.extend(list(p.rglob("*.wav")))
+            files.extend(iter_wav_files(p))
         else:
+            if p.name.startswith("._"):
+                continue
             files.append(p)
     return sorted(files)
 
