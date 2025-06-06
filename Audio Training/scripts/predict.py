@@ -13,8 +13,8 @@ from pydub import AudioSegment, silence
 import logging
 
 TARGET_DURATION_MS = 8000  # 8 seconds
-SPLIT_SILENCE_THRESH = -40
-CHUNK_SILENCE_THRESH = -20
+SPLIT_SILENCE_THRESH = -35
+CHUNK_SILENCE_THRESH = -35
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +27,25 @@ def is_silent(segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH)
 def extract_segments(path: Path, sr: int) -> List[torch.Tensor]:
     """Split ``path`` on silence and return padded waveforms."""
     audio = AudioSegment.from_file(path)
+    if audio.max_dBFS != float("-inf"):
+        audio = audio.apply_gain(-audio.max_dBFS)
     chunks = silence.split_on_silence(
         audio,
-        min_silence_len=500,
+        min_silence_len=300,
         silence_thresh=SPLIT_SILENCE_THRESH,
-        keep_silence=250,
+        keep_silence=150,
     )
     segments: List[torch.Tensor] = []
     for chunk in chunks:
         if len(chunk) > TARGET_DURATION_MS:
             chunk = chunk[:TARGET_DURATION_MS]
         elif len(chunk) < TARGET_DURATION_MS:
-            padding = AudioSegment.silent(TARGET_DURATION_MS - len(chunk))
-            chunk += padding
+            pad_len = TARGET_DURATION_MS - len(chunk)
+            chunk = (
+                AudioSegment.silent(pad_len // 2)
+                + chunk
+                + AudioSegment.silent(pad_len - pad_len // 2)
+            )
 
         if is_silent(chunk):
             continue
@@ -68,7 +74,7 @@ class AudioDataset(Dataset):
                 name = f"{path.as_posix()}#{idx}" if len(segments) > 1 else path.as_posix()
                 self.samples.append((waveform, name))
         self.mel = T.MelSpectrogram(sample_rate=sr)
-        self.to_db = T.AmplitudeToDB()
+        self.to_db = T.AmplitudeToDB(top_db=80)
         self.transform = transforms.Compose([
             transforms.Lambda(lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9)),
             transforms.Resize((224, 224)),
