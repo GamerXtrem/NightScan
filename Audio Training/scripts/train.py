@@ -8,6 +8,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 import torch.nn as nn
+from tqdm import tqdm
 
 
 class SpectrogramDataset(Dataset):
@@ -47,7 +48,7 @@ class SpectrogramDataset(Dataset):
 def train_epoch(model: nn.Module, loader: DataLoader, criterion, optimizer, device: torch.device) -> float:
     model.train()
     running_loss = 0.0
-    for inputs, targets in loader:
+    for inputs, targets in tqdm(loader, desc="Training", leave=False):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
@@ -63,7 +64,7 @@ def evaluate(model: nn.Module, loader: DataLoader, criterion, device: torch.devi
     loss = 0.0
     correct = 0
     with torch.no_grad():
-        for inputs, targets in loader:
+        for inputs, targets in tqdm(loader, desc="Validation", leave=False):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = model(inputs)
             loss += criterion(outputs, targets).item() * inputs.size(0)
