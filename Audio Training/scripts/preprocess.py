@@ -24,8 +24,6 @@ from pydub.utils import which
 
 
 TARGET_DURATION_MS = 8000  # 8 seconds
-SPLIT_SILENCE_THRESH = -45
-CHUNK_SILENCE_THRESH = -40
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +60,17 @@ def copy_wav_files(input_dir: Path, wav_dir: Path) -> list[Path]:
     return copied
 
 
-def is_silent(segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH) -> bool:
+def is_silent(segment: AudioSegment, threshold_db: float) -> bool:
     """Return ``True`` if the segment contains almost no sound."""
-    return segment.rms == 0 or segment.dBFS < threshold_db
+    return segment.dBFS < threshold_db or segment.rms == 0
 
 
-def isolate_cries(audio_path: Path, out_dir: Path) -> list[Path]:
+def isolate_cries(
+    audio_path: Path,
+    out_dir: Path,
+    split_thresh: float,
+    chunk_thresh: float,
+) -> list[Path]:
     """Split a WAV file on silence and save 8s segments to ``out_dir``.
 
     Parameters
@@ -89,9 +92,9 @@ def isolate_cries(audio_path: Path, out_dir: Path) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     chunks = silence.split_on_silence(
         audio,
-        min_silence_len=500,
-        silence_thresh=SPLIT_SILENCE_THRESH,
-        keep_silence=250,
+        min_silence_len=300,
+        silence_thresh=split_thresh,
+        keep_silence=150,
     )
 
     paths: list[Path] = []
@@ -105,7 +108,7 @@ def isolate_cries(audio_path: Path, out_dir: Path) -> list[Path]:
             padding = AudioSegment.silent(TARGET_DURATION_MS - len(chunk))
             chunk += padding
 
-        if is_silent(chunk):
+        if is_silent(chunk, chunk_thresh):
             # Skip silent segments as per README recommendation
             continue
 
@@ -115,16 +118,24 @@ def isolate_cries(audio_path: Path, out_dir: Path) -> list[Path]:
     return paths
 
 
-def _isolate_wrapper(args: tuple[Path, Path, Path]) -> list[Path]:
-    wav_file, wav_dir, processed_dir = args
+def _isolate_wrapper(args: tuple[Path, Path, Path, float, float]) -> list[Path]:
+    wav_file, wav_dir, processed_dir, split_thresh, chunk_thresh = args
     out_dir = processed_dir / wav_file.relative_to(wav_dir).parent
-    return isolate_cries(wav_file, out_dir)
+    return isolate_cries(wav_file, out_dir, split_thresh, chunk_thresh)
 
 
-def process_wav_files(wav_dir: Path, processed_dir: Path, workers: int) -> list[Path]:
+def process_wav_files(
+    wav_dir: Path,
+    processed_dir: Path,
+    workers: int,
+    split_thresh: float,
+    chunk_thresh: float,
+) -> list[Path]:
     wav_files = [p for p in wav_dir.rglob("*.wav") if not p.name.startswith("._")]
     processed_dir.mkdir(parents=True, exist_ok=True)
-    args_list = [(wf, wav_dir, processed_dir) for wf in wav_files]
+    args_list = [
+        (wf, wav_dir, processed_dir, split_thresh, chunk_thresh) for wf in wav_files
+    ]
     if workers == 1:
         results = [_isolate_wrapper(a) for a in args_list]
     else:
@@ -240,6 +251,18 @@ def main() -> None:
         default=None,
         help="Random seed for dataset splitting",
     )
+    parser.add_argument(
+        "--split_thresh",
+        type=float,
+        default=-35,
+        help="Silence threshold (dBFS) for splitting",
+    )
+    parser.add_argument(
+        "--chunk_thresh",
+        type=float,
+        default=-35,
+        help="Threshold for is_silent()",
+    )
     args = parser.parse_args()
 
     ensure_ffmpeg()
@@ -255,7 +278,13 @@ def main() -> None:
 
     copy_wav_files(args.input_dir, wav_dir)
 
-    processed_paths = process_wav_files(wav_dir, processed_dir, args.workers)
+    processed_paths = process_wav_files(
+        wav_dir,
+        processed_dir,
+        args.workers,
+        args.split_thresh,
+        args.chunk_thresh,
+    )
 
     spec_paths = generate_spectrograms(processed_dir, spec_dir, sr=22050, workers=args.workers)
     split_and_save(spec_paths, csv_dir, seed=args.seed)
