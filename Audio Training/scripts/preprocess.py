@@ -254,13 +254,13 @@ def main() -> None:
     parser.add_argument(
         "--split_thresh",
         type=float,
-        default=-45,
+        default=-35,
         help="Silence threshold (dBFS) for splitting",
     )
     parser.add_argument(
         "--chunk_thresh",
         type=float,
-        default=-40,
+        default=-35,
         help="Threshold for is_silent()",
     )
     args = parser.parse_args()
