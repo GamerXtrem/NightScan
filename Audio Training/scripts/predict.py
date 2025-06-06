@@ -25,8 +25,15 @@ def is_silent(segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH)
 
 
 def extract_segments(path: Path, sr: int) -> List[torch.Tensor]:
-    """Split ``path`` on silence and return padded waveforms."""
-    audio = AudioSegment.from_file(path)
+    """Split ``path`` on silence and return padded waveforms.
+
+    Only WAV files are supported. A ``ValueError`` is raised for any other
+    extension.
+    """
+    if path.suffix.lower() != ".wav":
+        raise ValueError(f"Unsupported format for {path}. Only WAV files are allowed.")
+
+    audio = AudioSegment.from_wav(path)
     if audio.max_dBFS != float("-inf"):
         audio = audio.apply_gain(-audio.max_dBFS)
     chunks = silence.split_on_silence(
@@ -104,7 +111,6 @@ def gather_files(inputs: List[Path]) -> List[Path]:
     for p in inputs:
         if p.is_dir():
             files.extend(list(p.rglob("*.wav")))
-            files.extend(list(p.rglob("*.mp3")))
         else:
             files.append(p)
     return sorted(files)
@@ -126,7 +132,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Predict top3 classes for audio files")
     parser.add_argument("--model_path", type=Path, required=True, help="Path to trained model")
     parser.add_argument("--csv_dir", type=Path, required=True, help="Directory containing train.csv")
-    parser.add_argument("inputs", nargs="+", type=Path, help="Audio files or directories")
+    parser.add_argument(
+        "inputs",
+        nargs="+",
+        type=Path,
+        help="WAV files or directories containing WAV files",
+    )
     parser.add_argument("--batch_size", type=int, default=1)
     args = parser.parse_args()
 
