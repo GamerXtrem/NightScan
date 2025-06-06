@@ -183,6 +183,10 @@ def split_and_save(
 ) -> None:
     """Split ``files`` into train/val/test sets and save CSV metadata including labels.
 
+    ``train`` and ``val`` must be in the ``[0, 1]`` range and ``train + val`` must
+    be strictly less than 1, leaving some data for the test split.  A
+    :class:`ValueError` is raised if the ratios are invalid.
+
     Parameters
     ----------
     files:
@@ -192,6 +196,8 @@ def split_and_save(
     seed:
         Optional random seed ensuring deterministic shuffling.
     """
+    if not (0 <= train <= 1) or not (0 <= val <= 1) or train + val >= 1:
+        raise ValueError("Invalid split ratios: train and val must be between 0 and 1, with train + val < 1")
     if seed is not None:
         random.seed(seed)
     random.shuffle(files)

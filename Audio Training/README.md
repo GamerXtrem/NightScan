@@ -64,7 +64,7 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 - Les segments dont le volume moyen est inférieur à `CHUNK_SILENCE_THRESH` (−20 dBFS par défaut) sont ignorés.
 - Les segments valides sont enregistrés dans `output_dir/segments` en conservant la structure de dossiers des classes.
 - Un mél‑spectrogramme est généré pour chaque segment dans `output_dir/spectrograms` à l'aide de **torchaudio**.
-- Les chemins de ces spectrogrammes et leurs étiquettes sont sauvegardés dans `train.csv`, `val.csv` et `test.csv` sous `output_dir/csv` selon un partage 70 % / 15 % / 15 %.
+  - Les chemins de ces spectrogrammes et leurs étiquettes sont sauvegardés dans `train.csv`, `val.csv` et `test.csv` sous `output_dir/csv` selon un partage 70 % / 15 % / 15 % par défaut. Si vous modifiez ces ratios via le code, assurez-vous que chaque valeur est comprise entre 0 et 1 et que la somme de `train` et `val` reste strictement inférieure à 1, faute de quoi une erreur sera levée.
 - Optionnel : `--workers` permet de paralléliser les conversions et traitements.
 
 ### `train.py`
