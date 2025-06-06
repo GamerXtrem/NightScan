@@ -24,8 +24,8 @@ from pydub.utils import which
 
 
 TARGET_DURATION_MS = 8000  # 8 seconds
-SPLIT_SILENCE_THRESH = -40
-CHUNK_SILENCE_THRESH = -20
+SPLIT_SILENCE_THRESH = -45
+CHUNK_SILENCE_THRESH = -40
 
 logger = logging.getLogger(__name__)
 
