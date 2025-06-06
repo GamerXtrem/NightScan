@@ -38,14 +38,14 @@ python scripts/prepare_csv.py --input_dir data/raw --output_dir data/csv
 python scripts/train.py --csv_dir data/csv --model_dir models/ --pretrained
 ```
 
-Le dossier `data/raw` doit contenir un sous-dossier par espèce (ex. `data/raw/bubo_bubo/`, `data/raw/capreolus_capreolus/`, ...). Les chemins d'accès aux images sont stockés dans `train.csv`, `val.csv` et `test.csv` selon une répartition 70/15/15.
+Le dossier `data/raw` doit contenir un sous-dossier par espèce (ex. `data/raw/bubo_bubo/`, `data/raw/capreolus_capreolus/`, ...). Les chemins d'accès aux images sont stockés dans `train.csv`, `val.csv` et `test.csv` selon une répartition 70/15/15 par défaut. Si vous changez ces fractions, chaque valeur doit rester comprise entre 0 et 1 et `train + val` doit être strictement inférieur à 1, sinon le programme refusera de générer les CSV.
 
 ### Fonctionnement des scripts
 
 - **`prepare_csv.py`**
   - Scanne tous les dossiers de `--input_dir`.
   - Crée trois fichiers CSV (`train.csv`, `val.csv`, `test.csv`) avec les colonnes `path` et `label`.
-  - Répartition des données configurable (par défaut : 70/15/15).
+  - Répartition des données configurable (par défaut : 70/15/15). Les valeurs fournies doivent être comprises entre 0 et 1 et la somme `train + val` doit rester inférieure à 1.
 
 - **`train.py`**
   - Lit `train.csv` et `val.csv` depuis le dossier indiqué par `--csv_dir`.

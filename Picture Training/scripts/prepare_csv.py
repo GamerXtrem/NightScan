@@ -18,6 +18,13 @@ def gather_images(input_dir: Path) -> list[Path]:
 
 
 def split_files(files: Sequence[Path], train: float, val: float, *, seed: int | None = None) -> dict[str, list[Path]]:
+    """Split ``files`` into train/val/test subsets.
+
+    ``train`` and ``val`` must be between 0 and 1 and ``train + val`` must be
+    strictly less than 1. A :class:`ValueError` is raised otherwise.
+    """
+    if not (0 <= train <= 1) or not (0 <= val <= 1) or train + val >= 1:
+        raise ValueError("Invalid split ratios: train and val must be between 0 and 1, with train + val < 1")
     if seed is not None:
         random.seed(seed)
     files = list(files)
