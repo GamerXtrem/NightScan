@@ -24,6 +24,7 @@ requirements (including `pyaudio`).
 If you are deploying on a new Infomaniak VPS, see
 [`docs/vps_lite_first_connection.md`](docs/vps_lite_first_connection.md)
 for instructions on making the initial SSH connection.
+For guidance on formatting and mounting the data volume, see [`docs/vps_volume_setup.md`](docs/vps_volume_setup.md).
 
 ## Web interface
 
