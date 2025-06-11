@@ -21,6 +21,10 @@ The script clones the repository if needed, installs `git`, `python3`,
 `ffmpeg` and `portaudio`, then creates `env/` and installs the Python
 requirements (including `pyaudio`).
 
+If you are deploying on a new Infomaniak VPS, see
+[`docs/vps_lite_first_connection.md`](docs/vps_lite_first_connection.md)
+for instructions on making the initial SSH connection.
+
 ## Web interface
 
 A minimal Flask application in `web/` exposes
