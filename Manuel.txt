@@ -22,8 +22,6 @@ Ouvrir un terminal ou un invite de commandes et saisir :
 
 git clone https://github.com/votre-utilisateur/NightScan.git
 cd NightScan
-Vous pouvez ensuite vous placer dans le dossier Audio_Training pour exécuter les prochaines commandes :
-cd Audio_Training
 Installer les dépendances du projet
 Toujours dans le terminal, exécuter :
 
