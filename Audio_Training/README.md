@@ -86,3 +86,9 @@ Lorsque le script `preprocess.py` isole un cri mais obtient un segment silencieu
 ```bash
 python scripts/predict.py --model_path models/best_model.pth --csv_dir data/processed/csv sample.wav
 ```
+
+- Pour obtenir le résultat au format JSON :
+
+```bash
+python scripts/predict.py --model_path models/best_model.pth --csv_dir data/processed/csv --json sample.wav
+```
