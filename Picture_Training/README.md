@@ -58,7 +58,8 @@ Le dossier `data/raw` doit contenir un sous-dossier par espèce (ex. `data/raw/b
   - Charge un modèle entraîné et prédit l'espèce d'une ou plusieurs images.
   - Applique les mêmes transformations que lors de l'entraînement.
   - Affiche le top 3 des classes prédites avec leur score de confiance.
+  - Nécessite l'argument `--csv_dir` pour charger les noms des classes à partir de `train.csv`.
 
 ```bash
-python scripts/predict.py --model_path models/best_model.pth image.jpg
+python scripts/predict.py --model_path models/best_model.pth --csv_dir data/csv image.jpg
 ```
