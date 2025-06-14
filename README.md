@@ -40,6 +40,10 @@ python web/app.py
 Update `MODEL_PATH` and `CSV_DIR` in `web/app.py` so they reference a
 trained model and the directory that contains `train.csv`.
 
+The home page exposes a form for manual tests. A POST request to
+`/api/predict` with a WAV file under the `file` field returns the
+predictions as JSON exactly like `predict.py --json`.
+
 ### Example Nginx configuration
 
 ```
