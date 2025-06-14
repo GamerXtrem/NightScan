@@ -15,7 +15,7 @@ NightScan est un projet de classification d'animaux à partir de photos. Les ima
 - `models/` — répertoire pour stocker les modèles entraînés
 - `scripts/` — `prepare_csv.py`, `train.py` et `predict.py`
 - `utils/` — fonctions utilitaires
-- `setup.sh` — crée automatiquement les dossiers nécessaires
+- `Picture_Training/setup.sh` — script pour créer les dossiers nécessaires
 - `../requirements.txt` — dépendances Python communes (à la racine)
 
 ## Installation
@@ -27,7 +27,7 @@ cd NightScan
 python -m venv env
 source env/bin/activate  # Sur Windows : env\Scripts\activate
 pip install -r requirements.txt
-./setup.sh
+./Picture_Training/setup.sh
 ```
 
 ## Utilisation
