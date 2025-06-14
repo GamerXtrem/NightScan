@@ -27,10 +27,11 @@ cd NightScan
 python -m venv env
 source env/bin/activate  # Sur Windows : env\Scripts\activate
 pip install -r requirements.txt
+cd Audio_Training
 ./setup.sh
 ```
 
-Le script `setup.sh` crée les dossiers `data/`, `models/` et `utils/` nécessaires au projet.
+Le script `setup.sh`, exécuté depuis `Audio_Training`, crée les dossiers `data/`, `models/` et `utils/` nécessaires au projet.
 
 Avant d'exécuter `preprocess.py`, installez également :
 
