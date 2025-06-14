@@ -22,6 +22,8 @@ Ouvrir un terminal ou un invite de commandes et saisir :
 
 git clone https://github.com/votre-utilisateur/NightScan.git
 cd NightScan
+Vous pouvez ensuite vous placer dans le dossier Audio_Training pour exécuter les prochaines commandes :
+cd Audio_Training
 Installer les dépendances du projet
 Toujours dans le terminal, exécuter :
 
@@ -41,7 +43,7 @@ Placez vos fichiers WAV dans les bons sous-dossiers.
 Lancer le prétraitement
 Dans le terminal :
 
-python scripts/preprocess.py --input_dir data/raw --output_dir data/processed --workers 4
+python Audio_Training/scripts/preprocess.py --input_dir data/raw --output_dir data/processed --workers 4
 Le programme :
 
 Copie les fichiers WAV dans le dossier de sortie.
@@ -58,7 +60,7 @@ Résultat : un nouveau dossier data/processed contenant les WAV découpés, les 
 Lancer l’entraînement
 Toujours dans le terminal :
 
-python scripts/train.py --csv_dir data/processed/csv --model_dir models --pretrained
+python Audio_Training/scripts/train.py --csv_dir data/processed/csv --model_dir models --pretrained
 Le programme lit les CSV, charge les spectrogrammes et entraîne le modèle.
 
 L’entraînement peut durer plusieurs minutes (ou plus, selon la puissance de l’ordinateur).
@@ -71,7 +73,7 @@ Placez vos fichiers WAV (par exemple moncricha.wav) dans un dossier accessible.
 
 Lancer la prédiction
 
-python scripts/predict.py --model_path models/best_model.pth --csv_dir data/processed/csv moncricha.wav
+python Audio_Training/scripts/predict.py --model_path models/best_model.pth --csv_dir data/processed/csv moncricha.wav
 Le script découpe l’audio, applique le modèle et affiche pour chaque extrait les trois espèces les plus probables (ex. : chat, chien, etc.) avec leur score.
 Vous pouvez obtenir le résultat au format JSON avec l'option --json.
 
