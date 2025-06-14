@@ -6,13 +6,26 @@
 </head>
 <body>
   <h1>NightScan Audio Prediction</h1>
+  {% if current_user.is_authenticated %}
+  <p>Logged in as {{ current_user.username }} | <a href="{{ url_for('logout') }}">Logout</a></p>
   <form action="/" method="post" enctype="multipart/form-data">
     <input type="file" name="file" accept="audio/wav" required>
     <input type="submit" value="Analyze">
   </form>
+  {% else %}
+  <p><a href="{{ url_for('login') }}">Login</a> | <a href="{{ url_for('register') }}">Register</a></p>
+  {% endif %}
   {% if result %}
   <h2>Result</h2>
   <pre>{{ result }}</pre>
+  {% endif %}
+  {% if predictions %}
+  <h2>Previous Predictions</h2>
+  <ul>
+    {% for p in predictions %}
+      <li>{{ p.filename }} - {{ p.result }}</li>
+    {% endfor %}
+  </ul>
   {% endif %}
 </body>
 </html>

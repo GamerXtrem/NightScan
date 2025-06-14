@@ -7,3 +7,7 @@ torch
 torchaudio
 torchvision
 tqdm
+Flask
+Flask-Login
+Flask-SQLAlchemy
+requests
