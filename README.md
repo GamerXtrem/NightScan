@@ -39,7 +39,9 @@ python web/app.py
 ```
 
 Set the `PREDICT_API_URL` environment variable to point to your
-prediction service. The home page exposes a form for manual tests.
+prediction service. You must also define `SECRET_KEY` to configure the
+Flask session signing; use a random string for production.
+The home page exposes a form for manual tests.
 When a WAV file is submitted, the server posts it to this API and
 displays the JSON response.
 
