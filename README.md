@@ -27,8 +27,9 @@ for instructions on making the initial SSH connection.
 
 ## Web interface
 
-A minimal Flask application in `web/` exposes
-`Audio_Training/scripts/predict.py` through a browser.
+A minimal Flask application in `web/` forwards
+uploaded audio clips to a prediction API. The endpoint URL is
+read from the `PREDICT_API_URL` environment variable.
 
 Launch it inside the virtual environment:
 
@@ -37,12 +38,10 @@ source env/bin/activate
 python web/app.py
 ```
 
-Update `MODEL_PATH` and `CSV_DIR` in `web/app.py` so they reference a
-trained model and the directory that contains `train.csv`.
-
-The home page exposes a form for manual tests. A POST request to
-`/api/predict` with a WAV file under the `file` field returns the
-predictions as JSON exactly like `predict.py --json`.
+Set the `PREDICT_API_URL` environment variable to point to your
+prediction service. The home page exposes a form for manual tests.
+When a WAV file is submitted, the server posts it to this API and
+displays the JSON response.
 
 ### Example Nginx configuration
 
