@@ -3,6 +3,8 @@ from pathlib import Path
 import csv
 from typing import List, Tuple
 from io import BytesIO
+import json
+import sys
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -147,6 +149,11 @@ def main() -> None:
         help="WAV files or directories containing WAV files",
     )
     parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output predictions as a JSON object instead of plain text",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -172,6 +179,7 @@ def main() -> None:
     model.eval()
 
     softmax = torch.nn.Softmax(dim=1)
+    results = []
     with torch.no_grad():
         for batch, paths in loader:
             batch = batch.to(device)
@@ -179,9 +187,32 @@ def main() -> None:
             probs = softmax(outputs)
             values, indices = torch.topk(probs, k=3, dim=1)
             for path, vals, idxs in zip(paths, values, indices):
-                print(path)
-                for rank, (val, idx) in enumerate(zip(vals, idxs), 1):
-                    print(f"  {rank}. {labels[idx]} ({val.item():.2f})")
+                if args.json:
+                    seg_idx = 0
+                    if "#" in path:
+                        try:
+                            seg_idx = int(path.rsplit("#", 1)[1])
+                        except ValueError:
+                            seg_idx = 0
+                    result = {
+                        "segment": path,
+                        "time": seg_idx * (TARGET_DURATION_MS / 1000),
+                        "predictions": [
+                            {
+                                "label": labels[idx.item()] if hasattr(idx, "item") else labels[int(idx)],
+                                "probability": float(val),
+                            }
+                            for val, idx in zip(vals, idxs)
+                        ],
+                    }
+                    results.append(result)
+                else:
+                    print(path)
+                    for rank, (val, idx) in enumerate(zip(vals, idxs), 1):
+                        print(f"  {rank}. {labels[idx]} ({val.item():.2f})")
+
+    if args.json:
+        json.dump(results, sys.stdout, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":

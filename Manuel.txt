@@ -73,6 +73,7 @@ Lancer la prédiction
 
 python scripts/predict.py --model_path models/best_model.pth --csv_dir data/processed/csv moncricha.wav
 Le script découpe l’audio, applique le modèle et affiche pour chaque extrait les trois espèces les plus probables (ex. : chat, chien, etc.) avec leur score.
+Vous pouvez obtenir le résultat au format JSON avec l'option --json.
 
 5. Conseils et dépannage
 Pas de son détecté ?
