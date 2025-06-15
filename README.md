@@ -6,9 +6,9 @@ The project is organized into two main folders:
 - **Audio_Training/** – tools for preparing audio clips, generating spectrograms and training models to classify animal sounds.
 - **Picture_Training/** – scripts for building image datasets and training image recognition models.
 
-For a quick overview of how to set up and run the audio workflow, see **Manuel.txt** at the repository root.
+For a quick overview of how to set up and run the audio workflow, see **Manuel.txt** (French) or **Manual_en.md** at the repository root.
 
-**Documentation language notice**: `Manuel.txt` and the files under `docs/` are written in French. Official English translations are not yet available, so you may wish to use online translation tools if you prefer to read the instructions in another language.
+**Documentation language notice**: French originals are provided along with English translations in `docs/en/` and `Manual_en.md`.
 
 ## VPS setup
 
