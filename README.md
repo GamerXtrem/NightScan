@@ -10,11 +10,11 @@ For a quick overview of how to set up and run the audio workflow, see **Manuel.t
 
 ## VPS setup
 
-Run the setup script to install system packages and create the Python
-environment:
+Run the setup script as a user with **sudo** access (or directly as
+`root`) to install system packages and create the Python environment:
 
 ```bash
-bash setup_vps_infomaniak.sh
+sudo bash setup_vps_infomaniak.sh
 ```
 
 The script clones the repository if needed, installs `git`, `python3`,
