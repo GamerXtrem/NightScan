@@ -33,7 +33,7 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-PREDICT_API_URL = os.environ.get("PREDICT_API_URL", "http://localhost:8000/api/predict")
+PREDICT_API_URL = os.environ.get("PREDICT_API_URL", "http://localhost:8001/api/predict")
 
 
 class User(db.Model, UserMixin):

@@ -12,4 +12,5 @@ python Audio_Training/scripts/api_server.py \
   --csv_dir data/processed/csv
 ```
 
-Par défaut, l'API écoute sur `0.0.0.0:8000`. Les options `--host` et `--port` permettent de changer cette adresse.
+Par défaut, l'API écoute sur `0.0.0.0:8001`. Les options `--host` et `--port` permettent de changer cette adresse.
+Assurez-vous de ne pas utiliser le même port que l'application Flask afin d'éviter les collisions.
