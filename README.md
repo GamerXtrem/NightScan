@@ -48,6 +48,16 @@ database initialization and how to switch to another backend such as MySQL.
 Set the `PREDICT_API_URL` environment variable to point to your
 prediction service. You must also define `SECRET_KEY` to configure the
 Flask session signing; use a random string for production.
+To start a local API using the trained model, run:
+
+```bash
+python Audio_Training/scripts/api_server.py \
+  --model_path models/best_model.pth \
+  --csv_dir data/processed/csv
+```
+
+`web/app.py` expects this API to listen on `http://localhost:8000/api/predict`
+unless you override `PREDICT_API_URL`.
 The home page exposes a form for manual tests.
 When a WAV file is submitted, the server posts it to this API and
 displays the JSON response.

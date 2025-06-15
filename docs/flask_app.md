@@ -64,3 +64,15 @@ export SECRET_KEY="change-me"
 export PREDICT_API_URL="http://monserveur/api/predict"
 python web/app.py
 ```
+
+Avant de lancer l'application Web, assurez-vous que l'API de prédiction est
+active. Elle se démarre avec :
+
+```bash
+python Audio_Training/scripts/api_server.py \
+  --model_path models/best_model.pth \
+  --csv_dir data/processed/csv
+```
+
+Par défaut, l'API écoute sur `0.0.0.0:8000`, ce qui correspond à l'URL utilisée
+par `web/app.py`.
