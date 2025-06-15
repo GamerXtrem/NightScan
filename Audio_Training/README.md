@@ -28,6 +28,7 @@ python -m venv env
 source env/bin/activate  # Sur Windows : env\Scripts\activate
 pip install -r requirements.txt
 cd Audio_Training
+chmod +x setup.sh
 ./setup.sh
 ```
 

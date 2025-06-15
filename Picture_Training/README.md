@@ -27,6 +27,7 @@ cd NightScan
 python -m venv env
 source env/bin/activate  # Sur Windows : env\Scripts\activate
 pip install -r requirements.txt
+chmod +x Picture_Training/setup.sh
 ./Picture_Training/setup.sh
 ```
 
