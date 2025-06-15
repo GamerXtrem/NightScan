@@ -22,7 +22,8 @@ NightScan est un projet de classification de sons d'animaux basé sur des spectr
 Clonez le dépôt puis installez les dépendances dans un environnement virtuel :
 
 ```bash
-git clone https://github.com/votre-utilisateur/NightScan.git
+git clone https://github.com/GamerXtrem/NightScan.git
+# Remplacez "GamerXtrem" par votre nom d'utilisateur si vous utilisez votre propre fork
 cd NightScan
 python -m venv env
 source env/bin/activate  # Sur Windows : env\Scripts\activate
