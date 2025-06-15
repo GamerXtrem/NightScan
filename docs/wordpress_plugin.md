@@ -23,9 +23,11 @@ ajoutés selon vos besoins mais ne sont pas utilisés par le shortcode.
 ## Export des prédictions depuis Flask
 
 L'application Flask stocke les résultats dans la table `prediction` de la
-base `site.db` (SQLite par défaut). Pour alimenter WordPress il suffit de
-copier ces enregistrements dans `ns_predictions`. Un petit script Python peut
-faire le relais :
+base `site.db` (SQLite par défaut). Chaque enregistrement possède un champ
+`result` au format JSON contenant un tableau `predictions` dont le premier
+élément représente la meilleure espèce trouvée. Pour alimenter WordPress il
+suffit de copier ces enregistrements dans `ns_predictions`. Un petit script
+Python peut faire le relais :
 
 ```python
 import sqlite3
@@ -34,7 +36,9 @@ import MySQLdb  # ou pymysql
 sqlite_conn = sqlite3.connect('web/site.db')
 mysql = MySQLdb.connect(host='localhost', user='wpuser', passwd='secret', db='wordpress')
 
-for row in sqlite_conn.execute('SELECT user_id, json_extract(result, "$.best") AS species, id FROM prediction'):
+for row in sqlite_conn.execute(
+    "SELECT user_id, json_extract(result, '$.predictions[0].label') AS species, id FROM prediction"
+):
     with mysql.cursor() as cur:
         cur.execute(
             "INSERT INTO wp_ns_predictions (user_id, species, predicted_at) VALUES (%s, %s, NOW())",
