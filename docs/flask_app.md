@@ -46,3 +46,21 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://nom:motdepasse@hote/bas
 ```
 
 Installez ensuite le connecteur nécessaire (par exemple `pip install pymysql`) et exécutez à nouveau `db.create_all()` dans le contexte de l'application pour créer les tables sur cette nouvelle base.
+
+## Variables d'environnement
+
+Avant de démarrer le serveur Flask, deux variables doivent être définies :
+
+- `SECRET_KEY` : chaîne servant à signer la session. Choisissez une valeur
+  aléatoire pour un déploiement réel.
+- `PREDICT_API_URL` : URL de l'API recevant les fichiers à analyser. Sans
+  configuration explicite, `web/app.py` se rabat sur
+  `http://localhost:8000/api/predict`.
+
+Exemple :
+
+```bash
+export SECRET_KEY="change-me"
+export PREDICT_API_URL="http://monserveur/api/predict"
+python web/app.py
+```
