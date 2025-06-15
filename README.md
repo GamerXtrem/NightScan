@@ -61,3 +61,30 @@ server {
 ```
 
 This forwards HTTP requests to the Flask server running on port 8000.
+
+## Quick prediction test
+
+After running the setup script (`bash setup_vps_infomaniak.sh`) you can
+immediately test the model locally. Activate the virtual environment
+created by `setup_vps_infomaniak.sh`:
+
+```bash
+source env/bin/activate
+```
+
+Ensure you have a trained model (for example
+`models/best_model.pth`) and the CSV directory generated during the
+preprocessing step (typically `data/processed/csv`). You can then run
+the prediction script on one or more WAV files:
+
+```bash
+python Audio_Training/scripts/predict.py \
+  --model_path models/best_model.pth \
+  --csv_dir data/processed/csv \
+  path/to/your_audio.wav
+```
+
+The script prints the three most probable classes for each audio
+segment. Add `--json` to get the result as JSON. No environment
+variables are required for this command, but the dependencies installed
+in `env/` (PyTorch, torchaudio, pydub, etc.) must be available.
