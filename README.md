@@ -8,6 +8,8 @@ The project is organized into two main folders:
 
 For a quick overview of how to set up and run the audio workflow, see **Manuel.txt** at the repository root.
 
+**Documentation language notice**: `Manuel.txt` and the files under `docs/` are written in French. Official English translations are not yet available, so you may wish to use online translation tools if you prefer to read the instructions in another language.
+
 ## VPS setup
 
 Run the setup script as a user with **sudo** access (or directly as
