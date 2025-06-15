@@ -20,7 +20,8 @@ Linux : souvent disponible dans les dépôts (sudo apt install ffmpeg sur Ubuntu
 Créer un dossier pour le projet
 Ouvrir un terminal ou un invite de commandes et saisir :
 
-git clone https://github.com/votre-utilisateur/NightScan.git
+git clone https://github.com/GamerXtrem/NightScan.git
+# Remplacez "GamerXtrem" par votre nom d'utilisateur si vous utilisez votre propre fork
 cd NightScan
 Installer les dépendances du projet
 Toujours dans le terminal, exécuter :

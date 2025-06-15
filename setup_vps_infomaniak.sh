@@ -10,8 +10,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Clone the repository if it is not already present
+# Replace "GamerXtrem" with your GitHub username if using your own fork
+REPO_URL="https://github.com/GamerXtrem/NightScan.git"
 if [ ! -d .git ]; then
-    git clone https://github.com/votre-utilisateur/NightScan.git NightScan
+    git clone "$REPO_URL" NightScan
     cd NightScan
 fi
 
