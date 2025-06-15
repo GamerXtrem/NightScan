@@ -93,3 +93,11 @@ The script prints the three most probable classes for each audio
 segment. Add `--json` to get the result as JSON. No environment
 variables are required for this command, but the dependencies installed
 in `env/` (PyTorch, torchaudio, pydub, etc.) must be available.
+
+## WordPress plugin
+
+A small plugin located in `wp-plugin/prediction-charts` can display
+user prediction statistics inside WordPress. See
+[`docs/wordpress_plugin.md`](docs/wordpress_plugin.md) for the expected
+database structure, how to export data from the Flask app and an example
+of the `[nightscan_chart]` shortcode.
