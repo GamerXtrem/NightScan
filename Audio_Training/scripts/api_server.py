@@ -1,12 +1,16 @@
 import argparse
 import tempfile
+import sys
 from pathlib import Path
 from typing import List, Dict
+import pathlib
 
 from flask import Flask, request, jsonify
 import torch
 from torch.utils.data import DataLoader
 from torchvision import models
+
+sys.path.append(str(pathlib.Path(__file__).resolve().parent))
 
 import predict
 
@@ -80,7 +84,7 @@ def main() -> None:
     parser.add_argument("--model_path", type=Path, required=True, help="Path to trained model")
     parser.add_argument("--csv_dir", type=Path, required=True, help="Directory containing train.csv")
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
     load_model(args.model_path, args.csv_dir)
     app.run(host=args.host, port=args.port)

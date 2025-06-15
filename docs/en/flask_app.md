@@ -52,12 +52,12 @@ Install the required connector (for example `pip install pymysql`) and run `db.c
 Before starting the Flask server, define two variables:
 
 - `SECRET_KEY`: used to sign the session. Choose a random value in production.
-- `PREDICT_API_URL`: URL of the API that receives the files to analyze. If not set, `web/app.py` defaults to `http://localhost:8000/api/predict`.
+- `PREDICT_API_URL`: URL of the API that receives the files to analyze. If not set, `web/app.py` defaults to `http://localhost:8001/api/predict`.
 
 Example:
 
 ```bash
 export SECRET_KEY="change-me"
-export PREDICT_API_URL="http://myserver/api/predict"
+export PREDICT_API_URL="http://myserver:8001/api/predict"
 python web/app.py
 ```

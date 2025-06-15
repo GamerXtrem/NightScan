@@ -55,13 +55,13 @@ Avant de démarrer le serveur Flask, deux variables doivent être définies :
   aléatoire pour un déploiement réel.
 - `PREDICT_API_URL` : URL de l'API recevant les fichiers à analyser. Sans
   configuration explicite, `web/app.py` se rabat sur
-  `http://localhost:8000/api/predict`.
+  `http://localhost:8001/api/predict`.
 
 Exemple :
 
 ```bash
 export SECRET_KEY="change-me"
-export PREDICT_API_URL="http://monserveur/api/predict"
+export PREDICT_API_URL="http://monserveur:8001/api/predict"
 python web/app.py
 ```
 
@@ -74,5 +74,6 @@ python Audio_Training/scripts/api_server.py \
   --csv_dir data/processed/csv
 ```
 
-Par défaut, l'API écoute sur `0.0.0.0:8000`, ce qui correspond à l'URL utilisée
-par `web/app.py`.
+Par défaut, l'API écoute sur `0.0.0.0:8001`. Vérifiez que `PREDICT_API_URL`
+utilise bien ce port ou ajustez-le si nécessaire pour éviter toute collision
+avec l'application Flask.

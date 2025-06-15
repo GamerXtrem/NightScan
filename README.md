@@ -56,7 +56,7 @@ python Audio_Training/scripts/api_server.py \
   --csv_dir data/processed/csv
 ```
 
-`web/app.py` expects this API to listen on `http://localhost:8000/api/predict`
+`web/app.py` expects this API to listen on `http://localhost:8001/api/predict`
 unless you override `PREDICT_API_URL`.
 The home page exposes a form for manual tests.
 When a WAV file is submitted, the server posts it to this API and
