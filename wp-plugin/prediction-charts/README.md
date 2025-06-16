@@ -7,4 +7,4 @@ Usage:
 2. Activate the plugin in WordPress.
 3. Insert the shortcode on any page: `[nightscan_chart]`.
 
-The chart is built with Chart.js loaded from a CDN.
+The chart is built with Chart.js loaded from a CDN. The script URL is scheme-relative (`//cdn.jsdelivr.net/npm/chart.js`) so the plugin works whether your site uses HTTP or HTTPS.

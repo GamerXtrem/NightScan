@@ -58,6 +58,8 @@ python Audio_Training/scripts/api_server.py \
 
 `web/app.py` expects this API to listen on `http://localhost:8001/api/predict`
 unless you override `PREDICT_API_URL`.
+You can point `PREDICT_API_URL` to either an `http://` or `https://` endpoint
+depending on your deployment; the application works with both.
 The home page exposes a form for manual tests.
 When a WAV file is submitted, the server posts it to this API and
 displays the JSON response.

@@ -55,7 +55,8 @@ Avant de démarrer le serveur Flask, deux variables doivent être définies :
   aléatoire pour un déploiement réel.
 - `PREDICT_API_URL` : URL de l'API recevant les fichiers à analyser. Sans
   configuration explicite, `web/app.py` se rabat sur
-  `http://localhost:8001/api/predict`.
+  `http://localhost:8001/api/predict`. Cette variable peut pointer vers un
+  endpoint en `http://` ou `https://` selon votre configuration.
 
 Exemple :
 
