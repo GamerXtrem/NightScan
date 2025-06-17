@@ -6,9 +6,7 @@ The project is organized into two main folders:
 - **Audio_Training/** – tools for preparing audio clips, generating spectrograms and training models to classify animal sounds.
 - **Picture_Training/** – scripts for building image datasets and training image recognition models.
 
-For a quick overview of how to set up and run the audio workflow, see **Manuel.txt** (French) or **Manual_en.md** at the repository root.
-
-**Documentation language notice**: French originals are provided along with English translations in `docs/en/` and `Manual_en.md`.
+For a quick overview of how to set up and run the audio workflow, see **Manual_en.md** at the repository root.
 
 ## VPS setup
 
@@ -24,7 +22,7 @@ The script clones the repository if needed, installs `git`, `python3`,
 requirements (including `pyaudio`).
 
 If you are deploying on a new Infomaniak VPS, see
-[`docs/vps_lite_first_connection.md`](docs/vps_lite_first_connection.md)
+[`docs/en/vps_lite_first_connection.md`](docs/en/vps_lite_first_connection.md)
 for instructions on making the initial SSH connection.
 
 ## Web interface
@@ -42,7 +40,7 @@ python web/app.py
 
 The application creates a local SQLite database on first run and stores
 predictions for each authenticated user. See
-[`docs/flask_app.md`](docs/flask_app.md) for details on the login routes,
+[`docs/en/flask_app.md`](docs/en/flask_app.md) for details on the login routes,
 database initialization and how to switch to another backend such as MySQL.
 
 Set the `PREDICT_API_URL` environment variable to point to your
@@ -112,7 +110,7 @@ in `env/` (PyTorch, torchaudio, pydub, etc.) must be available.
 
 A small plugin located in `wp-plugin/prediction-charts` can display
 user prediction statistics inside WordPress. See
-[`docs/wordpress_plugin.md`](docs/wordpress_plugin.md) for the expected
+[`docs/en/wordpress_plugin.md`](docs/en/wordpress_plugin.md) for the expected
 database structure, how to export data from the Flask app and an example
 of the `[nightscan_chart]` shortcode.
 
@@ -130,5 +128,5 @@ wp option update ns_api_endpoint https://your-vps.example/api/predict
 
 Your WordPress site can run on a different host from the prediction
 server. Enable CORS in `Audio_Training/scripts/api_server.py` so your
-WordPress domain is allowed (see `docs/api_server.md`). HTTPS is also
+WordPress domain is allowed (see `docs/en/api_server.md`). HTTPS is also
 recommended so uploads succeed.
