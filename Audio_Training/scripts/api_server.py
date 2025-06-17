@@ -1,3 +1,16 @@
+"""Minimal Flask API serving model predictions.
+
+If you need to call this endpoint from another domain (for example the
+WordPress uploader plugin), enable Cross‑Origin Resource Sharing. Install
+``flask_cors`` then initialize it like so::
+
+    from flask_cors import CORS
+    CORS(app, origins=["https://your-wordpress.example"])
+
+Replace the URL with your own site so the response includes the correct
+``Access-Control-Allow-Origin`` header.
+"""
+
 import argparse
 import tempfile
 import sys
