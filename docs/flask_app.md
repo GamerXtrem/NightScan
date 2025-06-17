@@ -23,6 +23,11 @@ Deux pages permettent d'enregistrer un nouvel utilisateur ou de se connecter :
 
 L'accès à la page principale (`/`) est protégé par `@login_required` : seul un utilisateur connecté peut envoyer des fichiers et consulter son historique de prédictions.
 
+Pour un déploiement public, vous pouvez aussi transmettre les fichiers depuis
+un site WordPress grâce au plugin d'envoi décrit dans
+`docs/wordpress_plugin.md`. Le formulaire local reste utile pour les tests mais
+n'est pas obligatoire si l'envoi se fait depuis WordPress.
+
 ## Association des prédictions à l'utilisateur
 
 Chaque résultat est enregistré dans la table `prediction` avec la colonne `user_id`. Lorsqu'un utilisateur connecté soumet un fichier :

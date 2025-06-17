@@ -46,3 +46,19 @@ Adjust the connection parameters and fields to match your exact schema. You can 
 3. Insert the `[nightscan_chart]` shortcode into a page or post.
 
 Once activated, each logged‑in user will see a chart showing the number of predictions per hour and species for their own data.
+
+## Audio upload plugin
+
+The repository also ships with **NightScan Audio Upload**. Copy the
+`audio-upload` folder to `wp-content/plugins/` and activate it. Place the
+`[nightscan_uploader]` shortcode in a page to show the upload form. The
+plugin reads the API URL from the `ns_api_endpoint` option, which you can
+set for example with:
+
+```bash
+wp option update ns_api_endpoint https://your-vps.example/api/predict
+```
+
+The API may reside on a different server than WordPress. If so, ensure
+that CORS is allowed and use HTTPS when required so the browser is able to
+post the files successfully.

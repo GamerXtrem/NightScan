@@ -59,3 +59,20 @@ L'opération peut être programmée via `cron` pour une synchronisation réguli�
 Une fois activé, chaque utilisateur connecté verra un graphique représentant
 le nombre de prédictions par heure et par espèce sur les données qui lui
 sont associées.
+
+## Plugin d'envoi de fichiers
+
+Le dépôt contient également un plugin **NightScan Audio Upload** permettant de
+transférer des fichiers WAV vers l'API depuis WordPress. Copiez le dossier
+`audio-upload` dans `wp-content/plugins/` puis activez-le. Placez le
+shortcode `[nightscan_uploader]` dans une page pour afficher le formulaire
+d'envoi. Le plugin lit l'option `ns_api_endpoint` pour connaître l'URL de
+l'API, à configurer par exemple avec :
+
+```bash
+wp option update ns_api_endpoint https://mon-vps.exemple/api/predict
+```
+
+L'API peut être hébergée sur un autre serveur que WordPress. Vérifiez dans ce
+cas que le domaine accepte les requêtes CORS et utilisez HTTPS si nécessaire
+afin que l'envoi fonctionne correctement.

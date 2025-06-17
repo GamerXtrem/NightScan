@@ -23,6 +23,11 @@ Two pages let you create an account or log in:
 
 Access to the main page (`/`) is protected by `@login_required`: only logged‑in users can upload files and view their prediction history.
 
+For public deployments you may instead send files from a WordPress site using
+the upload plugin described in `docs/en/wordpress_plugin.md`. The built‑in form
+is mainly for testing and can be omitted when uploads happen through
+WordPress.
+
 ## Associating predictions with the user
 
 Each result is stored in the `prediction` table with a `user_id` column. When an authenticated user submits a file:

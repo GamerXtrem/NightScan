@@ -115,3 +115,19 @@ user prediction statistics inside WordPress. See
 [`docs/wordpress_plugin.md`](docs/wordpress_plugin.md) for the expected
 database structure, how to export data from the Flask app and an example
 of the `[nightscan_chart]` shortcode.
+
+## Uploading from WordPress
+
+The repository also includes **NightScan Audio Upload**, a plugin that
+lets WordPress send WAV files directly to your prediction API. Copy the
+`wp-plugin/audio-upload` folder into `wp-content/plugins/` and activate
+it from the admin panel. Set the API endpoint with the `ns_api_endpoint`
+option so the plugin knows where to post the files, e.g. using WP‑CLI:
+
+```bash
+wp option update ns_api_endpoint https://your-vps.example/api/predict
+```
+
+Your WordPress site can run on a different host from the prediction
+server. Just make sure the API endpoint is reachable (enable CORS and
+HTTPS if needed) so uploads succeed.
