@@ -129,5 +129,6 @@ wp option update ns_api_endpoint https://your-vps.example/api/predict
 ```
 
 Your WordPress site can run on a different host from the prediction
-server. Just make sure the API endpoint is reachable (enable CORS and
-HTTPS if needed) so uploads succeed.
+server. Enable CORS in `Audio_Training/scripts/api_server.py` so your
+WordPress domain is allowed (see `docs/api_server.md`). HTTPS is also
+recommended so uploads succeed.
