@@ -17,24 +17,24 @@ You may add other fields (confidence score, file name, etc.) as needed, but they
 
 ## Exporting predictions from Flask
 
-The Flask application stores results in the `prediction` table of the `site.db` (SQLite by default). Each entry has a `result` field in JSON format. Its `predictions` array contains the best species in the first element. To populate WordPress, simply copy these records into `ns_predictions`. A small Python script can act as a bridge:
+The Flask application stores results in the `prediction` table of its MySQL database. Each entry has a `result` field in JSON format. Its `predictions` array contains the best species in the first element. To populate WordPress, simply copy these records into `ns_predictions`. A small Python script can act as a bridge:
 
 ```python
-import sqlite3
 import MySQLdb  # or pymysql
 
-sqlite_conn = sqlite3.connect('web/site.db')
-mysql = MySQLdb.connect(host='localhost', user='wpuser', passwd='secret', db='wordpress')
+flask_db = MySQLdb.connect(host='localhost', user='appuser', passwd='secret', db='nightscan')
+wordpress = MySQLdb.connect(host='localhost', user='wpuser', passwd='secret', db='wordpress')
 
-for row in sqlite_conn.execute(
-    "SELECT user_id, json_extract(result, '$.predictions[0].label') AS species, id FROM prediction"
-):
-    with mysql.cursor() as cur:
-        cur.execute(
+with flask_db.cursor() as cur_src, wordpress.cursor() as cur_dest:
+    cur_src.execute(
+        "SELECT user_id, JSON_EXTRACT(result, '$.predictions[0].label') AS species FROM prediction"
+    )
+    for row in cur_src.fetchall():
+        cur_dest.execute(
             "INSERT INTO wp_ns_predictions (user_id, species, predicted_at) VALUES (%s, %s, NOW())",
             (row[0], row[1])
         )
-    mysql.commit()
+    wordpress.commit()
 ```
 
 Adjust the connection parameters and fields to match your exact schema. You can run this via `cron` for regular synchronization.

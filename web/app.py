@@ -26,7 +26,11 @@ secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
     raise RuntimeError("SECRET_KEY environment variable not set")
 app.secret_key = secret_key
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///site.db"
+db_uri = os.environ.get(
+    "SQLALCHEMY_DATABASE_URI",
+    "mysql+pymysql://user:password@localhost/nightscan",
+)
+app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)

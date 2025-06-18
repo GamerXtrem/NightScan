@@ -11,3 +11,4 @@ Flask
 Flask-Login
 Flask-SQLAlchemy
 requests
+pymysql

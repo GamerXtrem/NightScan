@@ -2,16 +2,16 @@
 
 This document briefly explains how the web app in the `web/` folder works.
 
-## Creating the SQLite database
+## Configuring the database
 
-When the app starts (`python web/app.py`), Flask creates a local SQLite database if it does not already exist:
+When the app starts (`python web/app.py`), Flask connects to the database specified by the `SQLALCHEMY_DATABASE_URI` environment variable. By default it uses MySQL:
 
 ```python
 with app.app_context():
     db.create_all()
 ```
 
-The `site.db` file lives in the same folder as the application. The `user` and `prediction` tables are generated from the models defined in `app.py`.
+The `user` and `prediction` tables are generated from the models defined in `app.py`. If you prefer a local SQLite database for testing, set `SQLALCHEMY_DATABASE_URI` to something like `sqlite:///site.db` before running the app.
 
 ## Login and registration routes
 
@@ -44,13 +44,10 @@ The history displayed on the home page therefore only shows the predictions of t
 
 ## Using another database
 
-SQLite is suitable for testing or local use. To switch to MySQL (or any other SQLAlchemy‑supported backend), change the `SQLALCHEMY_DATABASE_URI` configuration in `web/app.py`:
-
-```python
-app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://user:password@host/dbname"
-```
-
-Install the required connector (for example `pip install pymysql`) and run `db.create_all()` again within the application context to create the tables on the new database.
+You may connect to any SQLAlchemy‑supported backend by adjusting the
+`SQLALCHEMY_DATABASE_URI` configuration. After changing the URI, run
+`db.create_all()` within the application context to create the tables on the new
+database.
 
 ## Environment variables
 
