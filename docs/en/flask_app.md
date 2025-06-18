@@ -37,8 +37,13 @@ pred = Prediction(
     user_id=current_user.id,
     filename=file.filename,
     result=json.dumps(result),
+    file_size=file_size,
 )
 ```
+
+`file_size` stores the uploaded file's size in bytes. The application rejects
+files larger than 100 MB and prevents each user from uploading more than
+10 GB in total.
 
 The history displayed on the home page therefore only shows the predictions of the active user.
 
