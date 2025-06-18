@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import List, Dict
 import pathlib
 
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit for uploads
+
 from flask import Flask, request, jsonify
 import torch
 from torch.utils.data import DataLoader
@@ -85,9 +87,15 @@ def api_predict():
         return jsonify({"error": "No file uploaded"}), 400
     if not file.filename.lower().endswith(".wav"):
         return jsonify({"error": "WAV file required"}), 400
+    if request.content_length is not None and request.content_length > MAX_FILE_SIZE:
+        return jsonify({"error": "File exceeds 100 MB limit"}), 400
     with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
         file.save(tmp.name)
         tmp.flush()
+        if request.content_length is None:
+            tmp.seek(0, 2)
+            if tmp.tell() > MAX_FILE_SIZE:
+                return jsonify({"error": "File exceeds 100 MB limit"}), 400
         results = predict_file(Path(tmp.name))
     return jsonify(results)
 

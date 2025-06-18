@@ -24,3 +24,9 @@ CORS(app, origins=["https://my-wordpress.example"])
 ```
 
 Replace the URL with that of your WordPress site. The `Access-Control-Allow-Origin` header will contain this domain so file uploads from the plugin work correctly.
+
+## File size limit
+
+`api_server.py` rejects files larger than 100 MB. The constant `MAX_FILE_SIZE`
+defines this limit and the server checks `request.content_length` before saving
+the upload. Clients should keep individual WAV files under this size.
