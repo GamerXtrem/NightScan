@@ -34,6 +34,10 @@ app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB per upload
+MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB per user
+
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
@@ -57,6 +61,7 @@ class Prediction(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     filename = db.Column(db.String(200))
     result = db.Column(db.Text)
+    file_size = db.Column(db.Integer)
 
     user = db.relationship("User", backref=db.backref("predictions", lazy=True))
 
@@ -118,23 +123,44 @@ def index():
         if not file or not file.filename.lower().endswith(".wav"):
             flash("Please upload a WAV file.")
         else:
-            try:
-                resp = requests.post(
-                    PREDICT_API_URL,
-                    files={"file": (file.filename, file.stream, "audio/wav")},
-                    timeout=30,
+            file_size = request.content_length
+            if file_size is None:
+                pos = file.stream.tell()
+                file.stream.seek(0, os.SEEK_END)
+                file_size = file.stream.tell()
+                file.stream.seek(pos)
+            if file_size > MAX_FILE_SIZE:
+                flash("File exceeds 100 MB limit.")
+            else:
+                total = (
+                    db.session.query(
+                        db.func.coalesce(db.func.sum(Prediction.file_size), 0)
+                    )
+                    .filter_by(user_id=current_user.id)
+                    .scalar()
+                    or 0
                 )
-                resp.raise_for_status()
-                result = resp.json()
-                pred = Prediction(
-                    user_id=current_user.id,
-                    filename=file.filename,
-                    result=json.dumps(result),
-                )
-                db.session.add(pred)
-                db.session.commit()
-            except requests.RequestException as e:
-                flash(f"Prediction error: {e}")
+                if total + file_size > MAX_TOTAL_SIZE:
+                    flash("Upload quota exceeded (10 GB total).")
+                else:
+                    try:
+                        resp = requests.post(
+                            PREDICT_API_URL,
+                            files={"file": (file.filename, file.stream, "audio/wav")},
+                            timeout=30,
+                        )
+                        resp.raise_for_status()
+                        result = resp.json()
+                        pred = Prediction(
+                            user_id=current_user.id,
+                            filename=file.filename,
+                            result=json.dumps(result),
+                            file_size=file_size,
+                        )
+                        db.session.add(pred)
+                        db.session.commit()
+                    except requests.RequestException as e:
+                        flash(f"Prediction error: {e}")
     predictions = (
         Prediction.query.filter_by(user_id=current_user.id)
         .order_by(Prediction.id.desc())
