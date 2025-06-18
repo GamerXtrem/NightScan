@@ -38,10 +38,12 @@ source env/bin/activate
 python web/app.py
 ```
 
-The application creates a local SQLite database on first run and stores
-predictions for each authenticated user. See
-[`docs/en/flask_app.md`](docs/en/flask_app.md) for details on the login routes,
-database initialization and how to switch to another backend such as MySQL.
+The application connects to a MySQL database to store predictions for each
+authenticated user. Configure the connection string with the
+`SQLALCHEMY_DATABASE_URI` environment variable if you need custom credentials or
+want to switch to another backend such as SQLite.
+See [`docs/en/flask_app.md`](docs/en/flask_app.md) for details on the login
+routes and database initialization.
 
 Set the `PREDICT_API_URL` environment variable to point to your
 prediction service. You must also define `SECRET_KEY` to configure the
