@@ -16,6 +16,8 @@ function nsau_render_form() {
             $file = $_FILES['ns_audio_file'];
             if ($file['error'] !== UPLOAD_ERR_OK) {
                 $output .= '<p>File upload error.</p>';
+            } elseif ($file['size'] > 100 * 1024 * 1024) {
+                $output .= '<p>File exceeds 100 MB limit.</p>';
             } else {
                 $endpoint = get_option('ns_api_endpoint');
                 if (!$endpoint) {
@@ -38,9 +40,11 @@ function nsau_render_form() {
     }
     $output .= '<form method="post" enctype="multipart/form-data">';
     $output .= '<input type="file" name="ns_audio_file" accept=".wav" required>';
+    $output .= '<p>Maximum 100 MB per file, 10 GB total for your account. WAV files only.</p>';
     $output .= wp_nonce_field('nsau_upload', 'nsau_nonce', true, false);
     $output .= '<input type="submit" value="Upload">';
     $output .= '</form>';
+    $output .= '<script>document.addEventListener("DOMContentLoaded",function(){var i=document.querySelector("input[name=ns_audio_file]");if(i){i.addEventListener("change",function(){if(this.files.length&&this.files[0].size>104857600){alert("File exceeds 100 MB limit.");this.value="";}});}});</script>';
     return $output;
 }
 add_shortcode('nightscan_uploader', 'nsau_render_form');
