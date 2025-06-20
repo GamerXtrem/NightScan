@@ -33,5 +33,9 @@ Replace the URL with that of your WordPress site. The `Access-Control-Allow-Orig
 defines this limit and the server checks `request.content_length` before saving
 the upload. Clients should keep individual WAV files under this size.
 
+Malformed or truncated WAV files are also rejected. The server attempts to open
+the uploaded data before running the model and returns a 400 error when the file
+cannot be decoded.
+
 Just like the Flask web app, you should place a reverse proxy (for example
 Nginx) in front of Gunicorn and forward requests to port `8001`.
