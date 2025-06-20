@@ -23,16 +23,23 @@ function nsau_render_form() {
                 if (!$endpoint) {
                     $output .= '<p>API endpoint not configured.</p>';
                 } else {
-                    $body = file_get_contents($file['tmp_name']);
-                    $response = wp_remote_post($endpoint, array(
-                        'headers' => array('Content-Type' => 'audio/wav'),
-                        'body'    => $body,
-                    ));
-                    if (is_wp_error($response)) {
-                        $output .= '<p>Request error: '.esc_html($response->get_error_message()).'</p>';
+                    $endpoint = trim($endpoint);
+                    $validated = function_exists('wp_http_validate_url') ? wp_http_validate_url($endpoint) : filter_var($endpoint, FILTER_VALIDATE_URL);
+                    $scheme = parse_url($endpoint, PHP_URL_SCHEME);
+                    if (!$validated || strtolower($scheme) !== 'https') {
+                        $output .= '<p>Invalid or non-HTTPS API endpoint.</p>';
                     } else {
-                        $json = wp_remote_retrieve_body($response);
-                        $output .= '<pre>'.esc_html($json).'</pre>';
+                        $body = file_get_contents($file['tmp_name']);
+                        $response = wp_remote_post($endpoint, array(
+                            'headers' => array('Content-Type' => 'audio/wav'),
+                            'body'    => $body,
+                        ));
+                        if (is_wp_error($response)) {
+                            $output .= '<p>Request error: '.esc_html($response->get_error_message()).'</p>';
+                        } else {
+                            $json = wp_remote_retrieve_body($response);
+                            $output .= '<pre>'.esc_html($json).'</pre>';
+                        }
                     }
                 }
             }
