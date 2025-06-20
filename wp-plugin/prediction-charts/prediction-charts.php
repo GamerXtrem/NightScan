@@ -8,8 +8,8 @@ Version: 1.0
 if (!defined('ABSPATH')) exit;
 
 function pc_enqueue_scripts() {
-    // Load Chart.js with a scheme-relative URL so the plugin works on HTTP and HTTPS
-    wp_enqueue_script('chartjs', '//cdn.jsdelivr.net/npm/chart.js', array(), null, true);
+    // Load Chart.js explicitly over HTTPS to avoid scheme-relative URLs
+    wp_enqueue_script('chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', array(), null, true);
 }
 add_action('wp_enqueue_scripts', 'pc_enqueue_scripts');
 
