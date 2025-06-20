@@ -74,3 +74,9 @@ gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 
 In production you should place a reverse proxy such as Nginx in front of the
 Gunicorn workers and forward requests to port `8000`.
+
+The command above binds the server to `0.0.0.0`, which makes the application
+reachable from any network interface. When you deploy behind a reverse proxy or
+have a firewall restricting access, this is normally fine. If you want the
+service to be accessible only locally, change the host to `127.0.0.1` or add
+appropriate firewall rules.
