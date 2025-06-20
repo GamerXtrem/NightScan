@@ -36,6 +36,8 @@ Launch it inside the virtual environment:
 ```bash
 source env/bin/activate
 python web/app.py
+# or with Gunicorn for production
+gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
 
 The application connects to a MySQL database to store predictions for each

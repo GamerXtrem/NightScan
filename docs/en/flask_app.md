@@ -69,4 +69,6 @@ Example:
 export SECRET_KEY="change-me"
 export PREDICT_API_URL="http://myserver:8001/api/predict"
 python web/app.py
+# or start with Gunicorn
+gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
