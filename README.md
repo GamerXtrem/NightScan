@@ -43,6 +43,8 @@ export PREDICT_API_URL="http://myserver:8001/api/predict"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
 
+The command above binds the web server to `0.0.0.0`, exposing it on every network interface. This is typical when running behind a reverse proxy or with firewall rules in place. If you prefer to keep the service private, bind to `127.0.0.1` or block the port using a firewall such as `ufw`.
+
 The application connects to a MySQL database to store predictions for each
 authenticated user. Configure the connection string with the
 `SQLALCHEMY_DATABASE_URI` environment variable if you need custom credentials or
@@ -62,7 +64,10 @@ export MODEL_PATH="models/best_model.pth"
 export CSV_DIR="data/processed/csv"
 gunicorn -w 4 -b 0.0.0.0:8001 \
   Audio_Training.scripts.api_server:application
+
 ```
+
+Like the web app, this command listens on `0.0.0.0` so the API is reachable from any interface. Behind a proxy or with firewall rules this is fine. Otherwise consider binding to `127.0.0.1` or restricting the port with a firewall.
 
 `web/app.py` expects this API to listen on `http://localhost:8001/api/predict`
 unless you override `PREDICT_API_URL`.
