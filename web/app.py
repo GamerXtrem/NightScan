@@ -169,7 +169,15 @@ def index():
     return render_template("index.html", result=result, predictions=predictions)
 
 
-if __name__ == "__main__":
+def create_app():
+    """Initialize the database and return the Flask app."""
     with app.app_context():
         db.create_all()
-    app.run(host="0.0.0.0", port=8000)
+    return app
+
+
+application = create_app()
+
+
+if __name__ == "__main__":
+    create_app().run(host="0.0.0.0", port=8000)
