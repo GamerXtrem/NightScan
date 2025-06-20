@@ -143,9 +143,9 @@ wp option update ns_api_endpoint https://your-vps.example/api/predict
 ```
 
 Your WordPress site can run on a different host from the prediction
-server. Enable CORS in `Audio_Training/scripts/api_server.py` so your
-WordPress domain is allowed (see `docs/en/api_server.md`). HTTPS is also
-recommended so uploads succeed.
+server. Set the `API_CORS_ORIGINS` environment variable so the API
+allows requests from your WordPress domain (see
+`docs/en/api_server.md`). HTTPS is also recommended so uploads succeed.
 
 WordPress may enforce stricter file size limits via PHP. In `php.ini`,
 set `upload_max_filesize` and `post_max_size` to at least `100M` so the
