@@ -4,15 +4,14 @@ This module provides a small Flask server exposing the `POST /api/predict` endpo
 
 ## Launch the server
 
-Activate the virtual environment then run:
+Activate the virtual environment. Install `gunicorn` if needed and then run:
 
 ```bash
-python Audio_Training/scripts/api_server.py \
-  --model_path models/best_model.pth \
-  --csv_dir data/processed/csv
-# or start with Gunicorn
-gunicorn -w 4 -b 0.0.0.0:8001 Audio_Training.scripts.api_server:application
-```
+pip install gunicorn
+export MODEL_PATH="models/best_model.pth"
+export CSV_DIR="data/processed/csv"
+gunicorn -w 4 -b 0.0.0.0:8001 \
+  Audio_Training.scripts.api_server:application
 ```
 
 By default the API listens on `0.0.0.0:8001`. The `--host` and `--port` options let you change this address. Make sure not to reuse the Flask app's port to avoid conflicts.
@@ -33,3 +32,6 @@ Replace the URL with that of your WordPress site. The `Access-Control-Allow-Orig
 `api_server.py` rejects files larger than 100 MB. The constant `MAX_FILE_SIZE`
 defines this limit and the server checks `request.content_length` before saving
 the upload. Clients should keep individual WAV files under this size.
+
+Just like the Flask web app, you should place a reverse proxy (for example
+Nginx) in front of Gunicorn and forward requests to port `8001`.

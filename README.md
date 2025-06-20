@@ -31,12 +31,15 @@ A minimal Flask application in `web/` forwards
 uploaded audio clips to a prediction API. The endpoint URL is
 read from the `PREDICT_API_URL` environment variable.
 
-Launch it inside the virtual environment:
+Launch it inside the virtual environment. Install `gunicorn` if it is not
+already available (it is listed in `requirements.txt`) and start the server
+with Gunicorn rather than the built in Flask runner:
 
 ```bash
 source env/bin/activate
-python web/app.py
-# or with Gunicorn for production
+pip install gunicorn
+export SECRET_KEY="change-me"
+export PREDICT_API_URL="http://myserver:8001/api/predict"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
 
@@ -50,14 +53,15 @@ routes and database initialization.
 Set the `PREDICT_API_URL` environment variable to point to your
 prediction service. You must also define `SECRET_KEY` to configure the
 Flask session signing; use a random string for production.
-To start a local API using the trained model, run:
+To start the prediction API, define the path to the trained model and the
+directory containing the training CSV files, then launch the server with
+Gunicorn:
 
 ```bash
-python Audio_Training/scripts/api_server.py \
-  --model_path models/best_model.pth \
-  --csv_dir data/processed/csv
-# or with Gunicorn for production
-gunicorn -w 4 -b 0.0.0.0:8001 Audio_Training.scripts.api_server:application
+export MODEL_PATH="models/best_model.pth"
+export CSV_DIR="data/processed/csv"
+gunicorn -w 4 -b 0.0.0.0:8001 \
+  Audio_Training.scripts.api_server:application
 ```
 
 `web/app.py` expects this API to listen on `http://localhost:8001/api/predict`
@@ -87,7 +91,9 @@ server {
 }
 ```
 
-This forwards HTTP requests to the Flask server running on port 8000.
+This forwards HTTP requests to the Gunicorn workers listening on port 8000.
+Use a similar block for the API server on port 8001 so all traffic goes
+through the reverse proxy.
 
 ## Quick prediction test
 
