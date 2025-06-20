@@ -63,8 +63,10 @@ depending on your deployment; the application works with both.
 The home page exposes a form for manual tests.
 When a WAV file is submitted, the server posts it to this API and
 displays the JSON response.
-Uploads larger than 100 MB are rejected and each user may store up to
-10 GB of audio in the database.
+
+Each upload may be up to 100 MB. The server also keeps track of the
+storage used by every account and refuses new files once a user reaches
+10 GB in total.
 
 ### Example Nginx configuration
 
