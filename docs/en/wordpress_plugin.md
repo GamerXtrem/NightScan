@@ -62,3 +62,7 @@ wp option update ns_api_endpoint https://your-vps.example/api/predict
 The API may reside on a different server than WordPress. If so, ensure
 that CORS is allowed and use HTTPS when required so the browser is able to
 post the files successfully.
+
+Uploads are subject to the same limits as the Flask form: each WAV file
+may be up to 100\u00a0MB and a given user cannot store more than
+10\u00a0GB in total.
