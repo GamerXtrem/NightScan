@@ -12,3 +12,4 @@ Flask-Login
 Flask-SQLAlchemy
 requests
 pymysql
+gunicorn
