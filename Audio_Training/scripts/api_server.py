@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import pathlib
 import os
+from pydub import AudioSegment
+from pydub.exceptions import CouldntDecodeError
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit for uploads
 
@@ -125,6 +127,10 @@ def api_predict():
         tmp.flush()
         if request.content_length is None and total > MAX_FILE_SIZE:
             return jsonify({"error": "File exceeds 100 MB limit"}), 400
+        try:
+            AudioSegment.from_file(tmp.name)
+        except CouldntDecodeError:
+            return jsonify({"error": "Invalid WAV file"}), 400
         results = predict_file(Path(tmp.name))
     return jsonify(results)
 
