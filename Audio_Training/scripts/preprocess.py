@@ -243,8 +243,8 @@ def split_and_save(
 
     splits = {
         "train": files[:n_train],
-        "val": files[n_train : n_train + n_val],
-        "test": files[n_train + n_val :],
+        "val": files[n_train:n_train + n_val],
+        "test": files[n_train + n_val:],
     }
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -300,7 +300,7 @@ def main() -> None:
 
     copy_wav_files(args.input_dir, wav_dir)
 
-    processed_paths = process_wav_files(
+    process_wav_files(
         wav_dir,
         processed_dir,
         args.workers,

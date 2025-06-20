@@ -20,9 +20,6 @@ import pathlib
 import os
 from pydub import AudioSegment
 from pydub.exceptions import CouldntDecodeError
-
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit for uploads
-
 from flask import Flask, request, jsonify
 import torch
 from torch.utils.data import DataLoader
@@ -32,11 +29,13 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parent))
 
 import predict
 
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit for uploads
+
 app = Flask(__name__)
 
-model: torch.nn.Module
-labels: List[str]
-device: torch.device
+model: torch.nn.Module | None = None
+labels: List[str] | None = None
+device: torch.device | None = None
 
 
 def load_model(model_path: Path, csv_dir: Path) -> None:

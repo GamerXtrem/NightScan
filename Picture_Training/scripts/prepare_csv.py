@@ -34,8 +34,8 @@ def split_files(files: Sequence[Path], train: float, val: float, *, seed: int | 
     n_val = int(n_total * val)
     return {
         "train": files[:n_train],
-        "val": files[n_train : n_train + n_val],
-        "test": files[n_train + n_val :],
+        "val": files[n_train:n_train + n_val],
+        "test": files[n_train + n_val:],
     }
 
 
