@@ -9,6 +9,7 @@
   {% if current_user.is_authenticated %}
   <p>Logged in as {{ current_user.username }} | <a href="{{ url_for('logout') }}">Logout</a></p>
   <form action="/" method="post" enctype="multipart/form-data">
+    {{ csrf_token() }}
     <input type="file" name="file" accept="audio/wav" required>
     <p>Maximum 100 MB per file, 10 GB total for your account. WAV files only.</p>
     <input type="submit" value="Analyze">

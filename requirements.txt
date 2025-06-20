@@ -10,6 +10,7 @@ tqdm
 Flask
 Flask-Login
 Flask-SQLAlchemy
+Flask-WTF
 requests
 pymysql
 gunicorn
