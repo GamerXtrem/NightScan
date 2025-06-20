@@ -63,12 +63,14 @@ Before starting the Flask server, define two variables:
 - `SECRET_KEY`: used to sign the session. Choose a random value in production.
 - `PREDICT_API_URL`: URL of the API that receives the files to analyze. If not set, `web/app.py` defaults to `http://localhost:8001/api/predict`. This variable may use either `http://` or `https://` depending on your API's configuration.
 
-Example:
+Example (install `gunicorn` if it is not already available):
 
 ```bash
+pip install gunicorn
 export SECRET_KEY="change-me"
 export PREDICT_API_URL="http://myserver:8001/api/predict"
-python web/app.py
-# or start with Gunicorn
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
+
+In production you should place a reverse proxy such as Nginx in front of the
+Gunicorn workers and forward requests to port `8000`.
