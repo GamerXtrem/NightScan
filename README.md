@@ -39,6 +39,7 @@ with Gunicorn rather than the built in Flask runner:
 source env/bin/activate
 pip install gunicorn
 export SECRET_KEY="change-me"
+export WTF_CSRF_SECRET_KEY="$SECRET_KEY"  # optional
 export PREDICT_API_URL="http://myserver:8001/api/predict"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
@@ -55,6 +56,8 @@ routes and database initialization.
 Set the `PREDICT_API_URL` environment variable to point to your
 prediction service. You must also define `SECRET_KEY` to configure the
 Flask session signing; use a random string for production.
+`Flask-WTF` provides CSRF protection. It will reuse `SECRET_KEY` unless you
+set a dedicated `WTF_CSRF_SECRET_KEY` variable.
 To start the prediction API, define the path to the trained model and the
 directory containing the training CSV files, then launch the server with
 Gunicorn:

@@ -11,6 +11,7 @@ from flask import (
     url_for,
 )
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 from flask_login import (
     LoginManager,
     login_user,
@@ -26,6 +27,8 @@ secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
     raise RuntimeError("SECRET_KEY environment variable not set")
 app.secret_key = secret_key
+app.config["WTF_CSRF_SECRET_KEY"] = os.environ.get("WTF_CSRF_SECRET_KEY", secret_key)
+csrf = CSRFProtect(app)
 db_uri = os.environ.get(
     "SQLALCHEMY_DATABASE_URI",
     "mysql+pymysql://user:password@localhost/nightscan",
