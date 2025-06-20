@@ -1,14 +1,14 @@
 """Minimal Flask API serving model predictions.
 
 If you need to call this endpoint from another domain (for example the
-WordPress uploader plugin), enable Cross‑Origin Resource Sharing. Install
-``flask_cors`` then initialize it like so::
+WordPress uploader plugin), set the ``API_CORS_ORIGINS`` environment
+variable to a comma separated list of allowed origins. When this
+variable is defined the server expects ``flask_cors`` to be installed and
+initializes it automatically so that the responses include the correct
+``Access-Control-Allow-Origin`` header::
 
-    from flask_cors import CORS
-    CORS(app, origins=["https://your-wordpress.example"])
-
-Replace the URL with your own site so the response includes the correct
-``Access-Control-Allow-Origin`` header.
+    export API_CORS_ORIGINS="https://your-wordpress.example"
+    gunicorn Audio_Training.scripts.api_server:application
 """
 
 import argparse
@@ -65,6 +65,16 @@ def create_app(model_path: Optional[Path] = None, csv_dir: Optional[Path] = None
             raise RuntimeError("CSV_DIR environment variable not set")
         csv_dir = Path(csv_env)
     load_model(model_path, csv_dir)
+    cors_origins = os.environ.get("API_CORS_ORIGINS")
+    if cors_origins:
+        origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
+        try:
+            from flask_cors import CORS
+        except ImportError as exc:
+            raise RuntimeError(
+                "API_CORS_ORIGINS is set but flask_cors is not installed"
+            ) from exc
+        CORS(app, origins=origins)
     return app
 
 

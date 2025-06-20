@@ -18,14 +18,19 @@ By default the API listens on `0.0.0.0:8001`. The `--host` and `--port` options 
 
 ## Allow the WordPress domain
 
-If the API is called from a third-party site, the browser will reject the request without CORS headers. Install `flask_cors` then add the following in `Audio_Training/scripts/api_server.py`:
+If the API is called from a third-party site, the browser will reject the
+request without CORS headers. Set the `API_CORS_ORIGINS` environment
+variable to a comma separated list of allowed origins before starting the
+server and make sure `flask_cors` is installed:
 
-```python
-from flask_cors import CORS
-CORS(app, origins=["https://my-wordpress.example"])
+```bash
+pip install flask_cors
+export API_CORS_ORIGINS="https://my-wordpress.example"
 ```
 
-Replace the URL with that of your WordPress site. The `Access-Control-Allow-Origin` header will contain this domain so file uploads from the plugin work correctly.
+The server automatically enables CORS for these domains and the
+`Access-Control-Allow-Origin` header will contain your WordPress URL so file
+uploads from the plugin work correctly.
 
 ## File size limit
 
