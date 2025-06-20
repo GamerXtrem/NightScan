@@ -66,3 +66,8 @@ post the files successfully.
 Uploads are subject to the same limits as the Flask form: each WAV file
 may be up to 100\u00a0MB and a given user cannot store more than
 10\u00a0GB in total.
+
+WordPress itself can block large uploads if PHP is configured with small
+limits. Check the `upload_max_filesize` and `post_max_size` values in your
+`php.ini`. Both must be set to at least `100M` so the plugin can accept
+files up to 100 MB.
