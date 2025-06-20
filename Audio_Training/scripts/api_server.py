@@ -15,8 +15,9 @@ import argparse
 import tempfile
 import sys
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 import pathlib
+import os
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit for uploads
 
@@ -47,6 +48,25 @@ def load_model(model_path: Path, csv_dir: Path) -> None:
     model.load_state_dict(state)
     model.to(device)
     model.eval()
+
+
+def create_app(model_path: Optional[Path] = None, csv_dir: Optional[Path] = None) -> Flask:
+    """Load the model and return the Flask application."""
+    if model_path is None:
+        mp_env = os.environ.get("MODEL_PATH")
+        if not mp_env:
+            raise RuntimeError("MODEL_PATH environment variable not set")
+        model_path = Path(mp_env)
+    if csv_dir is None:
+        csv_env = os.environ.get("CSV_DIR")
+        if not csv_env:
+            raise RuntimeError("CSV_DIR environment variable not set")
+        csv_dir = Path(csv_env)
+    load_model(model_path, csv_dir)
+    return app
+
+
+application = create_app()
 
 
 def predict_file(path: Path) -> List[Dict]:
@@ -111,13 +131,12 @@ def api_predict():
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Start prediction API server")
-    parser.add_argument("--model_path", type=Path, required=True, help="Path to trained model")
-    parser.add_argument("--csv_dir", type=Path, required=True, help="Directory containing train.csv")
+    parser.add_argument("--model_path", type=Path, help="Path to trained model")
+    parser.add_argument("--csv_dir", type=Path, help="Directory containing train.csv")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
-    load_model(args.model_path, args.csv_dir)
-    app.run(host=args.host, port=args.port)
+    create_app(args.model_path, args.csv_dir).run(host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

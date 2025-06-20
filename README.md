@@ -56,6 +56,8 @@ To start a local API using the trained model, run:
 python Audio_Training/scripts/api_server.py \
   --model_path models/best_model.pth \
   --csv_dir data/processed/csv
+# or with Gunicorn for production
+gunicorn -w 4 -b 0.0.0.0:8001 Audio_Training.scripts.api_server:application
 ```
 
 `web/app.py` expects this API to listen on `http://localhost:8001/api/predict`

@@ -10,6 +10,9 @@ Activate the virtual environment then run:
 python Audio_Training/scripts/api_server.py \
   --model_path models/best_model.pth \
   --csv_dir data/processed/csv
+# or start with Gunicorn
+gunicorn -w 4 -b 0.0.0.0:8001 Audio_Training.scripts.api_server:application
+```
 ```
 
 By default the API listens on `0.0.0.0:8001`. The `--host` and `--port` options let you change this address. Make sure not to reuse the Flask app's port to avoid conflicts.
