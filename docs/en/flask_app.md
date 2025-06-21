@@ -12,6 +12,7 @@ with app.app_context():
 ```
 
 The `user` and `prediction` tables are generated from the models defined in `app.py`. If you prefer a local SQLite database for testing, set `SQLALCHEMY_DATABASE_URI` to something like `sqlite:///site.db` before running the app.
+For public deployments supply secure credentials in `SQLALCHEMY_DATABASE_URI` so the database cannot be accessed with default passwords.
 
 ## Login and registration routes
 
@@ -61,14 +62,14 @@ database.
 Before starting the Flask server, define two variables:
 
 - `SECRET_KEY`: used to sign the session. Choose a random value in production.
-- `PREDICT_API_URL`: URL of the API that receives the files to analyze. If not set, `web/app.py` defaults to `http://localhost:8001/api/predict`. This variable may use either `http://` or `https://` depending on your API's configuration.
+- `PREDICT_API_URL`: URL of the API that receives the files to analyze. If not set, `web/app.py` defaults to `http://localhost:8001/api/predict`. The application accepts either scheme, but in production use an `https://` endpoint.
 
 Example (install `gunicorn` if it is not already available):
 
 ```bash
 pip install gunicorn
 export SECRET_KEY="change-me"
-export PREDICT_API_URL="http://myserver:8001/api/predict"
+export PREDICT_API_URL="https://myserver.example/api/predict"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
 
@@ -79,4 +80,6 @@ The command above binds the server to `0.0.0.0`, which makes the application
 reachable from any network interface. When you deploy behind a reverse proxy or
 have a firewall restricting access, this is normally fine. If you want the
 service to be accessible only locally, change the host to `127.0.0.1` or add
-appropriate firewall rules.
+appropriate firewall rules. When the app is accessible on the public Internet
+you should enable HTTPS so login credentials and uploads are protected in
+transit.

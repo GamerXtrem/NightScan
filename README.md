@@ -40,16 +40,16 @@ source env/bin/activate
 pip install gunicorn
 export SECRET_KEY="change-me"
 export WTF_CSRF_SECRET_KEY="$SECRET_KEY"  # optional
-export PREDICT_API_URL="http://myserver:8001/api/predict"
+export PREDICT_API_URL="https://myserver.example/api/predict"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
 
 The command above binds the web server to `0.0.0.0`, exposing it on every network interface. This is typical when running behind a reverse proxy or with firewall rules in place. If you prefer to keep the service private, bind to `127.0.0.1` or block the port using a firewall such as `ufw`.
 
 The application connects to a MySQL database to store predictions for each
-authenticated user. Configure the connection string with the
-`SQLALCHEMY_DATABASE_URI` environment variable if you need custom credentials or
-want to switch to another backend such as SQLite.
+authenticated user. Provide strong credentials via the
+`SQLALCHEMY_DATABASE_URI` environment variable and adjust the URI if you want to
+switch to another backend such as SQLite.
 See [`docs/en/flask_app.md`](docs/en/flask_app.md) for details on the login
 routes and database initialization.
 
@@ -74,8 +74,8 @@ Like the web app, this command listens on `0.0.0.0` so the API is reachable from
 
 `web/app.py` expects this API to listen on `http://localhost:8001/api/predict`
 unless you override `PREDICT_API_URL`.
-You can point `PREDICT_API_URL` to either an `http://` or `https://` endpoint
-depending on your deployment; the application works with both.
+For production deployments set `PREDICT_API_URL` to an `https://` endpoint so
+uploads are encrypted in transit.
 The home page exposes a form for manual tests.
 When a WAV file is submitted, the server posts it to this API and
 displays the JSON response.
@@ -102,6 +102,8 @@ server {
 This forwards HTTP requests to the Gunicorn workers listening on port 8000.
 Use a similar block for the API server on port 8001 so all traffic goes
 through the reverse proxy.
+When exposing the service to the internet, terminate HTTPS at the proxy so both
+the web app and prediction API are accessed securely.
 
 ## Quick prediction test
 
