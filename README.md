@@ -132,6 +132,22 @@ segment. Add `--json` to get the result as JSON. No environment
 variables are required for this command, but the dependencies installed
 in `env/` (PyTorch, torchaudio, pydub, etc.) must be available.
 
+## Updating dependencies
+
+All packages in `requirements.txt` are pinned to the versions verified by the
+tests. When a dependency needs an upgrade, activate the virtual environment and
+install the new versions with `pip --upgrade`. After verifying that `pytest`
+passes, regenerate the file using `pip freeze`:
+
+```bash
+source env/bin/activate
+pip install -U -r requirements.txt
+pytest
+pip freeze > requirements.txt
+```
+
+Commit the updated `requirements.txt` once the tests succeed.
+
 ## WordPress plugin
 
 A small plugin located in `wp-plugin/prediction-charts` can display
