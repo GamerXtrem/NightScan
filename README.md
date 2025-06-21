@@ -46,10 +46,10 @@ gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 
 The command above binds the web server to `0.0.0.0`, exposing it on every network interface. This is typical when running behind a reverse proxy or with firewall rules in place. If you prefer to keep the service private, bind to `127.0.0.1` or block the port using a firewall such as `ufw`.
 
-The application connects to a MySQL database to store predictions for each
-authenticated user. Provide strong credentials via the
-`SQLALCHEMY_DATABASE_URI` environment variable and adjust the URI if you want to
-switch to another backend such as SQLite.
+The application connects to a database using the URL in
+`SQLALCHEMY_DATABASE_URI`. This variable is **mandatory**—`create_app()` raises
+`RuntimeError` when it is missing. Provide secure credentials in the URI and
+adjust it if you want to switch to another backend such as SQLite.
 See [`docs/en/flask_app.md`](docs/en/flask_app.md) for details on the login
 routes and database initialization.
 
