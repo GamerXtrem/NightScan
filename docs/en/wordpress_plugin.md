@@ -71,3 +71,7 @@ WordPress itself can block large uploads if PHP is configured with small
 limits. Check the `upload_max_filesize` and `post_max_size` values in your
 `php.ini`. Both must be set to at least `100M` so the plugin can accept
 files up to 100 MB.
+
+Uploaded files must be WAV audio. The plugin verifies the MIME type using
+`finfo_file` or `wp_check_filetype` and rejects any other format before it
+sends the data to the API endpoint.
