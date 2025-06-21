@@ -4,7 +4,7 @@ This document briefly explains how the web app in the `web/` folder works.
 
 ## Configuring the database
 
-When the app starts (`python web/app.py`), Flask connects to the database specified by the `SQLALCHEMY_DATABASE_URI` environment variable. By default it uses MySQL:
+When the app starts (`python web/app.py`) it expects the `SQLALCHEMY_DATABASE_URI` environment variable to be defined. `create_app()` raises `RuntimeError` if it is missing. Use a URI containing secure credentials appropriate for your database backend:
 
 ```python
 with app.app_context():

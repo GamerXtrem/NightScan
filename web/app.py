@@ -29,14 +29,9 @@ if not secret_key:
 app.secret_key = secret_key
 app.config["WTF_CSRF_SECRET_KEY"] = os.environ.get("WTF_CSRF_SECRET_KEY", secret_key)
 csrf = CSRFProtect(app)
-db_uri = os.environ.get(
-    "SQLALCHEMY_DATABASE_URI",
-    "mysql+pymysql://user:password@localhost/nightscan",
-)
-app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-db = SQLAlchemy(app)
+db = SQLAlchemy()
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB per upload
 MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB per user
@@ -174,6 +169,11 @@ def index():
 
 def create_app():
     """Initialize the database and return the Flask app."""
+    db_uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
+    if not db_uri:
+        raise RuntimeError("SQLALCHEMY_DATABASE_URI environment variable not set")
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+    db.init_app(app)
     with app.app_context():
         db.create_all()
     return app
