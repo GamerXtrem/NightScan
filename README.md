@@ -10,8 +10,9 @@ For a quick overview of how to set up and run the audio workflow, see **Manual_e
 
 ## VPS setup
 
-Run the setup script as a user with **sudo** access (or directly as
-`root`) to install system packages and create the Python environment:
+Run the setup script with root privileges so that `apt` can install the
+required system packages. The script attempts to use `sudo` when it is not
+executed as `root` and will exit if neither root nor `sudo` is available:
 
 ```bash
 sudo bash setup_vps_infomaniak.sh
