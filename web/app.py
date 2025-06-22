@@ -120,6 +120,8 @@ def index():
         file = request.files.get("file")
         if not file or not file.filename.lower().endswith(".wav"):
             flash("Please upload a WAV file.")
+        elif file.mimetype not in ("audio/wav", "audio/x-wav"):
+            flash("Invalid file type. Only WAV files are accepted.")
         else:
             file_size = request.content_length
             if file_size is None:
