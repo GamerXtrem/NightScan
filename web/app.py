@@ -158,7 +158,8 @@ def index():
                         db.session.add(pred)
                         db.session.commit()
                     except requests.RequestException as e:
-                        flash(f"Prediction error: {e}")
+                        app.logger.error("Prediction request failed: %s", e)
+                        flash("Prediction failed. Please try again later.")
     predictions = (
         Prediction.query.filter_by(user_id=current_user.id)
         .order_by(Prediction.id.desc())
