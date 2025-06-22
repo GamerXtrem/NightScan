@@ -64,3 +64,41 @@ def test_index_rejects_bad_mimetype(monkeypatch, tmp_path):
         flashes = sess.get("_flashes", [])
     assert any("Invalid file type" in f[1] for f in flashes)
     assert not called
+
+
+def test_register_password_validation(monkeypatch, tmp_path):
+    monkeypatch.setenv("SECRET_KEY", "test")
+    monkeypatch.setenv("SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path/'db.sqlite'}")
+    module = load_app_module()
+    app = module.create_app()
+    app.config["WTF_CSRF_ENABLED"] = False
+    client = app.test_client()
+    client.environ_base["wsgi.url_scheme"] = "https"
+    client.environ_base["HTTP_X_FORWARDED_PROTO"] = "https"
+
+    resp = client.post("/register", data={"username": "u", "password": "short"})
+    assert resp.status_code == 200
+    assert b"Password must" in resp.data
+
+
+def test_login_rate_limiting(monkeypatch, tmp_path):
+    monkeypatch.setenv("SECRET_KEY", "test")
+    monkeypatch.setenv("SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path/'db.sqlite'}")
+    module = load_app_module()
+    app = module.create_app()
+    app.config["WTF_CSRF_ENABLED"] = False
+    with app.app_context():
+        user = module.User(username="user")
+        user.set_password("pass1234")
+        module.db.session.add(user)
+        module.db.session.commit()
+
+    client = app.test_client()
+    client.environ_base["wsgi.url_scheme"] = "https"
+    client.environ_base["HTTP_X_FORWARDED_PROTO"] = "https"
+
+    for _ in range(5):
+        client.post("/login", data={"username": "user", "password": "wrong"})
+
+    resp = client.post("/login", data={"username": "user", "password": "wrong"})
+    assert resp.status_code == 429

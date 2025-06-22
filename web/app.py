@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import requests
 
 from flask import (
@@ -21,6 +22,8 @@ from flask_login import (
     UserMixin,
 )
 from flask_talisman import Talisman
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -41,6 +44,12 @@ MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB per user
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
+
+# Rate limiter for login attempts
+limiter = Limiter(app=app, key_func=get_remote_address)
+
+# At least 8 characters and one digit
+PASSWORD_RE = re.compile(r"^(?=.*\d).{8,}$")
 
 PREDICT_API_URL = os.environ.get("PREDICT_API_URL", "http://localhost:8001/api/predict")
 
@@ -81,6 +90,8 @@ def register():
         password = request.form.get("password")
         if not username or not password:
             flash("Please provide username and password")
+        elif not PASSWORD_RE.match(password):
+            flash("Password must be at least 8 characters long and include a digit")
         elif User.query.filter_by(username=username).first():
             flash("Username already exists")
         else:
@@ -94,6 +105,7 @@ def register():
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
