@@ -20,6 +20,7 @@ from flask_login import (
     current_user,
     UserMixin,
 )
+from flask_talisman import Talisman
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -32,6 +33,8 @@ csrf = CSRFProtect(app)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy()
+csp = {"default-src": "'self'"}
+Talisman(app, force_https=True, frame_options="DENY", content_security_policy=csp)
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB per upload
 MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB per user

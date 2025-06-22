@@ -38,6 +38,8 @@ def test_index_rejects_bad_mimetype(monkeypatch, tmp_path):
         module.db.session.commit()
 
     client = app.test_client()
+    client.environ_base["wsgi.url_scheme"] = "https"
+    client.environ_base["HTTP_X_FORWARDED_PROTO"] = "https"
     client.post("/login", data={"username": "user", "password": "pass"})
 
     called = False
