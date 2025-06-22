@@ -147,6 +147,28 @@ pytest
 pip freeze > requirements.txt
 ```
 
+
+## Running tests
+
+The automated tests rely on every package listed in `requirements.txt`.
+Install them inside the virtual environment and invoke `pytest`:
+
+```bash
+source env/bin/activate
+pip install -r requirements.txt
+pytest
+```
+
+If you only need to run the suite on a machine without the heavy
+PyTorch stack, use `requirements-ci.txt` instead. The test helper
+automatically provides stub versions of the missing libraries so the
+tests still execute:
+
+```bash
+pip install -r requirements-ci.txt
+pytest
+```
+
 Commit the updated `requirements.txt` once the tests succeed.
 
 ## WordPress plugin
