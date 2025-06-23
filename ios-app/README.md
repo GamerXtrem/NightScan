@@ -2,6 +2,7 @@
 
 This folder contains a React Native application for iOS.
 It provides a basic navigation setup with a home screen and a scan screen.
+Additional placeholders include a map view and a detection list.
 The application can also be extended to support Android.
 
 ## Getting Started

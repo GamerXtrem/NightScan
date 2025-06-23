@@ -9,6 +9,16 @@ export default function HomeScreen({ navigation }) {
         title="Start Scan"
         onPress={() => navigation.navigate('Scan')}
       />
+      <View style={styles.spacing} />
+      <Button
+        title="View Map"
+        onPress={() => navigation.navigate('Map')}
+      />
+      <View style={styles.spacing} />
+      <Button
+        title="View Detections"
+        onPress={() => navigation.navigate('Detections')}
+      />
     </View>
   );
 }
@@ -22,5 +32,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     marginBottom: 12,
+  },
+  spacing: {
+    height: 12,
   },
 });
