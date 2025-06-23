@@ -203,5 +203,6 @@ plugin can accept files up to 100 MB.
 ## App
 
 For instructions on building a mobile client in React Native, see
-[`docs/en/mobile_app.md`](docs/en/mobile_app.md).
+[`docs/en/mobile_app.md`](docs/en/mobile_app.md). A minimal starter
+project is included under [`ios-app/`](ios-app/).
 

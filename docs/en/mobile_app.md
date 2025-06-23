@@ -52,7 +52,9 @@ Ensure `node` and `watchman` are available in your PATH.
 
 ## Project initialization
 
-Create a new project and start the development server:
+Create a new project and start the development server. A very small starter
+project is already available in the repository under `ios-app/` if you want to
+skip this step:
 
 ```bash
 npx react-native init NightScanApp
