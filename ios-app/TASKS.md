@@ -6,3 +6,8 @@
 - [ ] Add push notifications for new detections
 - [ ] Provide offline caching of the detection list
 - [ ] Write basic unit tests for components
+- [ ] Implement a detection detail screen with map and photo
+- [ ] Add search and filtering for the detection list
+- [ ] Create a settings screen and persist preferences
+- [ ] Support dark mode theming across the app
+- [ ] Configure Jest with React Native Testing Library
