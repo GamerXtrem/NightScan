@@ -206,3 +206,23 @@ For instructions on building a mobile client in React Native, see
 [`docs/en/mobile_app.md`](docs/en/mobile_app.md). A minimal starter
 project is included under [`ios-app/`](ios-app/).
 
+### Application objectives and user experience
+
+1. **Easy access to observations**
+   - Display on an interactive map all detections (sounds or photos) reported by field sensors.
+   - Provide a chronological list showing the latest observations with species, time and location.
+2. **Quick review and notifications**
+   - Receive real-time notifications when a new detection is processed.
+   - Filter detections by species or geographic area to obtain relevant results immediately.
+3. **Sharing and export**
+   - Allow users to share detections by e‑mail or export them (CSV/KMZ) for later analysis.
+
+**Target users**: wildlife photographers, amateur naturalists, researchers or anyone interested in tracking nocturnal fauna.
+**Interface**: clean with a bottom navigation bar for the map, detection list, filters and settings.
+**Usage**: familiar gestures (pinch to zoom, scrolling, pull to refresh) so the app remains intuitive on iOS and Android.
+**Simplicity first**: users quickly see when and where animals were observed without viewing the raw media.
+
+French-speaking contributors can refer to
+[`docs/fr/application_objectifs.md`](docs/fr/application_objectifs.md)
+for the original summary in French.
+
