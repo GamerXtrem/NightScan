@@ -2,6 +2,44 @@
 
 This guide summarizes how to develop a React Native client for NightScan.
 
+## Application overview
+
+NightScan for iOS and Android displays the wildlife detections produced by the
+field sensors at night. Acoustic and photo sensors upload raw data to a central
+server via SIM cards. An AI model then identifies the species and stores a JSON
+record (species name, GPS coordinates, timestamp, etc.) in a MySQL database.
+The mobile application fetches these entries and presents them in a clear
+interface without exposing the original audio or images.
+
+### Target users
+
+The app is geared toward wildlife photographers, hobby naturalists and
+researchers who need an intuitive way to review the observations. The interface
+is deliberately straightforward so that anyone can quickly see when and where an
+animal was detected.
+
+### Main features
+
+- **Interactive map** – pins mark each detection on a map background (Google
+  Maps, OpenStreetMap, etc.). Tapping a pin opens a popup showing the detected
+  species and the exact time.
+- **Detection feed** – a chronological list complements the map with the latest
+  observations, including species name and a short location label.
+- **Real-time notifications** – the app can receive push notifications whenever a
+  new detection is processed by the server.
+- **Dynamic filters** – detections can be filtered by species and by geographic
+  area; the map and feed update instantly according to the criteria.
+- **Sharing and export** – each record can be shared by email and the app can
+  export all detections as CSV or KMZ for further analysis.
+
+### User interface
+
+NightScan uses a light theme with a simple bottom navigation bar to access the
+Map, List, Filters and Settings sections. Each entry highlights only the
+essential information—species and time—without revealing the media files. Native
+gestures such as pinch‑to‑zoom and pull‑to‑refresh keep the experience familiar
+on both iOS and Android.
+
 ## Environment setup
 
 Install Node.js along with the React Native CLI. Android development requires the SDK and an emulator from Android Studio. On macOS you may also install Xcode for the iOS simulator.
