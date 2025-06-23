@@ -1,3 +1,10 @@
+"""Predict image classes using a trained ResNet18 model.
+
+Pass image files or directories via ``inputs``. Class names are read from
+``--csv_dir`` and the model checkpoint from ``--model_path``. The evaluation
+batch size can be set with ``--batch_size``.
+"""
+
 import argparse
 from pathlib import Path
 from typing import List
@@ -14,11 +21,15 @@ class ImageDataset(Dataset):
 
     def __init__(self, files: List[Path]) -> None:
         self.files = files
-        self.transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
 
     def __len__(self) -> int:
         return len(self.files)
@@ -55,9 +66,15 @@ def load_labels(csv_dir: Path) -> List[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Predict classes for images")
-    parser.add_argument("--model_path", type=Path, required=True, help="Path to trained model")
-    parser.add_argument("--csv_dir", type=Path, required=True, help="Directory containing train.csv")
-    parser.add_argument("inputs", nargs="+", type=Path, help="Image files or directories")
+    parser.add_argument(
+        "--model_path", type=Path, required=True, help="Path to trained model"
+    )
+    parser.add_argument(
+        "--csv_dir", type=Path, required=True, help="Directory containing train.csv"
+    )
+    parser.add_argument(
+        "inputs", nargs="+", type=Path, help="Image files or directories"
+    )
     parser.add_argument("--batch_size", type=int, default=1)
     args = parser.parse_args()
 
@@ -71,7 +88,11 @@ def main() -> None:
     dataset = ImageDataset(files)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+    device = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else ("mps" if torch.backends.mps.is_available() else "cpu")
+    )
     model = models.resnet18()
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
     state = torch.load(args.model_path, map_location=device)

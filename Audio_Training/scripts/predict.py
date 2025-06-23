@@ -1,3 +1,11 @@
+"""Predict classes for WAV files using a trained ResNet18 model.
+
+Provide one or more audio files or directories via ``inputs``. The mapping
+between label indices and class names is loaded from ``--csv_dir`` and the
+model weights from ``--model_path``. Use ``--json`` to output predictions as
+a JSON object. The batch size can be controlled with ``--batch_size``.
+"""
+
 import argparse
 from pathlib import Path
 import csv
@@ -30,7 +38,9 @@ def iter_wav_files(root: Path):
         yield p
 
 
-def is_silent(segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH) -> bool:
+def is_silent(
+    segment: AudioSegment, threshold_db: float = CHUNK_SILENCE_THRESH
+) -> bool:
     """Return ``True`` if the segment contains almost no sound."""
     return segment.rms == 0 or segment.dBFS < threshold_db
 
@@ -40,7 +50,7 @@ def extract_segments(path: Path, sr: int) -> List[torch.Tensor]:
     try:
         audio = AudioSegment.from_file(path)
     except CouldntDecodeError as e:
-        print(f"\u26A0\ufe0f  {path} ignoré : {e}")
+        print(f"\u26a0\ufe0f  {path} ignoré : {e}")
         return []
     if audio.max_dBFS != float("-inf"):
         audio = audio.apply_gain(-audio.max_dBFS)
@@ -86,14 +96,18 @@ class AudioDataset(Dataset):
         for path in files:
             segments = extract_segments(path, sr)
             for idx, waveform in enumerate(segments):
-                name = f"{path.as_posix()}#{idx}" if len(segments) > 1 else path.as_posix()
+                name = (
+                    f"{path.as_posix()}#{idx}" if len(segments) > 1 else path.as_posix()
+                )
                 self.samples.append((waveform, name))
         self.mel = T.MelSpectrogram(sample_rate=sr)
         self.to_db = T.AmplitudeToDB(top_db=80)
-        self.transform = transforms.Compose([
-            transforms.Lambda(lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9)),
-            transforms.Resize((224, 224)),
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Lambda(lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9)),
+                transforms.Resize((224, 224)),
+            ]
+        )
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -140,8 +154,12 @@ def load_labels(csv_dir: Path) -> List[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Predict top3 classes for audio files")
-    parser.add_argument("--model_path", type=Path, required=True, help="Path to trained model")
-    parser.add_argument("--csv_dir", type=Path, required=True, help="Directory containing train.csv")
+    parser.add_argument(
+        "--model_path", type=Path, required=True, help="Path to trained model"
+    )
+    parser.add_argument(
+        "--csv_dir", type=Path, required=True, help="Directory containing train.csv"
+    )
     parser.add_argument(
         "inputs",
         nargs="+",
@@ -199,7 +217,11 @@ def main() -> None:
                         "time": seg_idx * (TARGET_DURATION_MS / 1000),
                         "predictions": [
                             {
-                                "label": labels[idx.item()] if hasattr(idx, "item") else labels[int(idx)],
+                                "label": (
+                                    labels[idx.item()]
+                                    if hasattr(idx, "item")
+                                    else labels[int(idx)]
+                                ),
                                 "probability": float(val),
                             }
                             for val, idx in zip(vals, idxs)
