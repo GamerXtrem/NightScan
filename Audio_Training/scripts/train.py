@@ -1,3 +1,12 @@
+"""Train a ResNet18 classifier on spectrograms listed in CSV files.
+
+The ``--csv_dir`` option must point to a directory containing ``train.csv``
+and ``val.csv`` with ``path`` and ``label`` columns. The best model is saved
+to ``--model_dir``. Other notable options include ``--epochs``,
+``--batch_size``, ``--lr``, ``--num_workers`` and ``--pretrained`` to use
+ImageNet weights.
+"""
+
 import argparse
 from pathlib import Path
 import csv
@@ -27,10 +36,12 @@ class SpectrogramDataset(Dataset):
                 self.samples.append((Path(row["path"]), int(row["label"])))
 
         # Normalize spectrograms to [0, 1]
-        self.transform = transforms.Compose([
-            transforms.Lambda(lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9)),
-            transforms.Resize((224, 224)),
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Lambda(lambda x: (x - x.min()) / (x.max() - x.min() + 1e-9)),
+                transforms.Resize((224, 224)),
+            ]
+        )
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -45,7 +56,9 @@ class SpectrogramDataset(Dataset):
         return mel, label
 
 
-def train_epoch(model: nn.Module, loader: DataLoader, criterion, optimizer, device: torch.device) -> float:
+def train_epoch(
+    model: nn.Module, loader: DataLoader, criterion, optimizer, device: torch.device
+) -> float:
     model.train()
     running_loss = 0.0
     for inputs, targets in tqdm(loader, desc="Training", leave=False):
@@ -59,7 +72,9 @@ def train_epoch(model: nn.Module, loader: DataLoader, criterion, optimizer, devi
     return running_loss / len(loader.dataset)
 
 
-def evaluate(model: nn.Module, loader: DataLoader, criterion, device: torch.device) -> float:
+def evaluate(
+    model: nn.Module, loader: DataLoader, criterion, device: torch.device
+) -> float:
     model.eval()
     loss = 0.0
     correct = 0
@@ -75,9 +90,18 @@ def evaluate(model: nn.Module, loader: DataLoader, criterion, device: torch.devi
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train ResNet18 on spectrograms")
-    parser.add_argument("--csv_dir", type=Path, required=True, help="Directory containing train.csv and val.csv")
-    parser.add_argument("--model_dir", type=Path, required=True, help="Where to save the trained model")
-    parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
+    parser.add_argument(
+        "--csv_dir",
+        type=Path,
+        required=True,
+        help="Directory containing train.csv and val.csv",
+    )
+    parser.add_argument(
+        "--model_dir", type=Path, required=True, help="Where to save the trained model"
+    )
+    parser.add_argument(
+        "--epochs", type=int, default=10, help="Number of training epochs"
+    )
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument(
@@ -131,7 +155,9 @@ def main() -> None:
     for epoch in range(1, args.epochs + 1):
         train_loss = train_epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc = evaluate(model, val_loader, criterion, device)
-        print(f"Epoch {epoch}: train_loss={train_loss:.4f} val_loss={val_loss:.4f} val_acc={val_acc:.4f}")
+        print(
+            f"Epoch {epoch}: train_loss={train_loss:.4f} val_loss={val_loss:.4f} val_acc={val_acc:.4f}"
+        )
         if val_acc > best_acc:
             best_acc = val_acc
             torch.save(model.state_dict(), args.model_dir / "best_model.pth")
