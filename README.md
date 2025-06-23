@@ -199,3 +199,9 @@ allows requests from your WordPress domain (see
 WordPress may enforce stricter file size limits via PHP. In `php.ini`,
 set `upload_max_filesize` and `post_max_size` to at least `100M` so the
 plugin can accept files up to 100 MB.
+
+## App
+
+For instructions on building a mobile client in React Native, see
+[`docs/en/mobile_app.md`](docs/en/mobile_app.md).
+
