@@ -1,11 +1,12 @@
 # NightScan iOS App
 
-This folder contains a barebones React Native application for iOS. It can also be
-extended to support Android.
+This folder contains a React Native application for iOS.
+It provides a basic navigation setup with a home screen and a scan screen.
+The application can also be extended to support Android.
 
 ## Getting Started
 
-Install dependencies with `npm install` then start the Metro server:
+Install dependencies and run the app using the React Native CLI:
 
 ```bash
 cd ios-app
