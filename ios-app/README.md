@@ -1,8 +1,9 @@
 # NightScan iOS App
 
 This folder contains a React Native application for iOS.
-It provides a basic navigation setup with a home screen and a scan screen.
-Additional placeholders include a map view and a detection list.
+It provides a basic navigation setup with a home screen followed by a bottom tab
+interface. The tabs include the map, the detection list and a scan view.
+Additional placeholders can be filled in with authentication and settings.
 The application can also be extended to support Android.
 
 ## Getting Started
