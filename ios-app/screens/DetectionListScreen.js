@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 
 const detections = [
   {
@@ -29,6 +29,12 @@ const detections = [
 ];
 
 export default function DetectionListScreen({ navigation }) {
+  const [query, setQuery] = useState('');
+
+  const filtered = detections.filter((d) =>
+    d.species.toLowerCase().includes(query.toLowerCase())
+  );
+
   const renderItem = ({ item }) => (
     <TouchableOpacity
       onPress={() => navigation.navigate('DetectionDetail', { detection: item })}
@@ -41,19 +47,34 @@ export default function DetectionListScreen({ navigation }) {
   );
 
   return (
-    <FlatList
-      style={styles.list}
-      data={detections}
-      renderItem={renderItem}
-      keyExtractor={(item) => item.id}
-    />
+    <View style={styles.container}>
+      <TextInput
+        style={styles.search}
+        placeholder="Search species"
+        value={query}
+        onChangeText={setQuery}
+      />
+      <FlatList
+        style={styles.list}
+        data={filtered}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  search: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
   list: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
   },
   item: {
     paddingVertical: 8,
