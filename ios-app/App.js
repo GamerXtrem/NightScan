@@ -6,6 +6,7 @@ import HomeScreen from './screens/HomeScreen';
 import ScanScreen from './screens/ScanScreen';
 import MapScreen from './screens/MapScreen';
 import DetectionListScreen from './screens/DetectionListScreen';
+import DetectionDetailScreen from './screens/DetectionDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -30,6 +31,7 @@ export default function App() {
           component={MainTabs}
           options={{ headerShown: false }}
         />
+        <Stack.Screen name="DetectionDetail" component={DetectionDetailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
