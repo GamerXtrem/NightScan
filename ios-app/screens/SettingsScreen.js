@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { View, Switch, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppContext } from '../AppContext';
 
 const PREFS_KEY = 'settings';
 
 export default function SettingsScreen() {
-  const [darkMode, setDarkMode] = useState(false);
+  const { darkMode, setDarkMode } = useContext(AppContext);
   const [notifications, setNotifications] = useState(false);
 
   useEffect(() => {
@@ -14,7 +15,6 @@ export default function SettingsScreen() {
         const raw = await AsyncStorage.getItem(PREFS_KEY);
         if (raw) {
           const prefs = JSON.parse(raw);
-          setDarkMode(!!prefs.darkMode);
           setNotifications(!!prefs.notifications);
         }
       } catch (e) {
