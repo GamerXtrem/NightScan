@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useContext } from 'react';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -11,6 +11,7 @@ import DetectionDetailScreen from './screens/DetectionDetailScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import { AppProvider, AppContext } from './AppContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -26,9 +27,10 @@ function MainTabs() {
   );
 }
 
-export default function App() {
+function RootNavigator() {
+  const { darkMode } = useContext(AppContext);
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={darkMode ? DarkTheme : DefaultTheme}>
       <Stack.Navigator>
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
@@ -42,5 +44,13 @@ export default function App() {
       </Stack.Navigator>
       <StatusBar style="auto" />
     </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <RootNavigator />
+    </AppProvider>
   );
 }
