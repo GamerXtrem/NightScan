@@ -1,18 +1,43 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 
 const detections = [
-  { id: '1', species: 'Fox', time: '2025-06-01 22:15' },
-  { id: '2', species: 'Deer', time: '2025-06-01 22:30' },
-  { id: '3', species: 'Owl', time: '2025-06-01 23:00' },
+  {
+    id: '1',
+    species: 'Fox',
+    time: '2025-06-01 22:15',
+    latitude: 37.78825,
+    longitude: -122.4324,
+    image: 'https://via.placeholder.com/400',
+  },
+  {
+    id: '2',
+    species: 'Deer',
+    time: '2025-06-01 22:30',
+    latitude: 37.78925,
+    longitude: -122.4344,
+    image: 'https://via.placeholder.com/400',
+  },
+  {
+    id: '3',
+    species: 'Owl',
+    time: '2025-06-01 23:00',
+    latitude: 37.79025,
+    longitude: -122.4354,
+    image: 'https://via.placeholder.com/400',
+  },
 ];
 
-export default function DetectionListScreen() {
+export default function DetectionListScreen({ navigation }) {
   const renderItem = ({ item }) => (
-    <View style={styles.item}>
-      <Text style={styles.species}>{item.species}</Text>
-      <Text style={styles.time}>{item.time}</Text>
-    </View>
+    <TouchableOpacity
+      onPress={() => navigation.navigate('DetectionDetail', { detection: item })}
+    >
+      <View style={styles.item}>
+        <Text style={styles.species}>{item.species}</Text>
+        <Text style={styles.time}>{item.time}</Text>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
