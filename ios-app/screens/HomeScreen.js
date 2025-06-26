@@ -19,6 +19,10 @@ export default function HomeScreen({ navigation }) {
         title="View Detections"
         onPress={() => navigation.navigate('Detections')}
       />
+      <View style={styles.spacing} />
+      <Button title="Login" onPress={() => navigation.navigate('Login')} />
+      <View style={styles.spacing} />
+      <Button title="Register" onPress={() => navigation.navigate('Register')} />
     </View>
   );
 }
