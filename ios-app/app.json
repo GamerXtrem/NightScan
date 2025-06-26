@@ -1,4 +1,9 @@
 {
-  "name": "NightScanApp",
-  "displayName": "NightScan"
+  "expo": {
+    "name": "NightScan",
+    "slug": "nightscan",
+    "version": "0.2.0",
+    "sdkVersion": "53.0.0",
+    "platforms": ["ios", "android"]
+  }
 }

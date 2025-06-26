@@ -8,12 +8,13 @@ The application can also be extended to support Android.
 
 ## Getting Started
 
-Install dependencies and run the app using the React Native CLI:
+Install dependencies and run the app using Expo:
 
 ```bash
 cd ios-app
 npm install
-npm run ios
+npx expo install react-native-maps
+npx expo start
 ```
+After the Metro bundler starts, scan the QR code in your terminal with the Expo Go app to launch NightScan on your device.
 
-This assumes you have the React Native CLI and Xcode installed on your machine.
