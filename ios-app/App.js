@@ -10,6 +10,7 @@ import DetectionListScreen from './screens/DetectionListScreen';
 import DetectionDetailScreen from './screens/DetectionDetailScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import SettingsScreen from './screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -20,6 +21,7 @@ function MainTabs() {
       <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Detections" component={DetectionListScreen} />
       <Tab.Screen name="Scan" component={ScanScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
 }
