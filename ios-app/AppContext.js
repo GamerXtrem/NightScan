@@ -11,13 +11,16 @@ const PREFS_KEY = 'settings';
 export const AppContext = createContext({
   darkMode: false,
   notifications: false,
+  zoneFilter: '',
   setDarkMode: () => {},
   setNotifications: () => {},
+  setZoneFilter: () => {},
 });
 
 export function AppProvider({ children }) {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(false);
+  const [zoneFilter, setZoneFilter] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -27,6 +30,7 @@ export function AppProvider({ children }) {
           const prefs = JSON.parse(raw);
           setDarkMode(!!prefs.darkMode);
           setNotifications(!!prefs.notifications);
+          if (prefs.zoneFilter) setZoneFilter(prefs.zoneFilter);
         }
       } catch {
         // ignore read errors
@@ -36,9 +40,9 @@ export function AppProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const prefs = { darkMode, notifications };
+    const prefs = { darkMode, notifications, zoneFilter };
     AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs)).catch(() => {});
-  }, [darkMode, notifications]);
+  }, [darkMode, notifications, zoneFilter]);
 
   useEffect(() => {
     let timer;
@@ -61,7 +65,16 @@ export function AppProvider({ children }) {
   }, [notifications]);
 
   return (
-    <AppContext.Provider value={{ darkMode, notifications, setDarkMode, setNotifications }}>
+    <AppContext.Provider
+      value={{
+        darkMode,
+        notifications,
+        zoneFilter,
+        setDarkMode,
+        setNotifications,
+        setZoneFilter,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

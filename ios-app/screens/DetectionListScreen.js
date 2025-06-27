@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchDetections } from '../services/api';
+import { AppContext } from '../AppContext';
 
 export default function DetectionListScreen({ navigation }) {
+  const { zoneFilter, setZoneFilter } = useContext(AppContext);
   const [detections, setDetections] = useState([]);
   const [query, setQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -45,8 +47,10 @@ export default function DetectionListScreen({ navigation }) {
     }
   }
 
-  const filtered = detections.filter((d) =>
-    d.species.toLowerCase().includes(query.toLowerCase())
+  const filtered = detections.filter(
+    (d) =>
+      d.species.toLowerCase().includes(query.toLowerCase()) &&
+      (!zoneFilter || (d.zone || '').toLowerCase().includes(zoneFilter.toLowerCase()))
   );
 
   const renderItem = ({ item }) => (
@@ -67,6 +71,12 @@ export default function DetectionListScreen({ navigation }) {
         placeholder="Search species"
         value={query}
         onChangeText={setQuery}
+      />
+      <TextInput
+        style={styles.search}
+        placeholder="Filter by zone"
+        value={zoneFilter}
+        onChangeText={setZoneFilter}
       />
       <FlatList
         style={styles.list}
