@@ -20,6 +20,15 @@ npx expo start
 ```
 After the Metro bundler starts, scan the QR code in your terminal with the Expo Go app to launch NightScan on your device.
 
+
+## Testing on iPhone with a QR Code
+1. Install **Expo Go** from the App Store.
+2. Connect your iPhone and development machine to the same Wi-Fi network.
+3. Run `npx expo start` to print a QR code in the terminal.
+4. Open Expo Go and tap **Scan QR Code**, or use the iPhone Camera app.
+5. Point it at the terminal QR code. After a short build step the app loads inside Expo Go.
+6. Keep the terminal window running so code changes reload automatically.
+
 ## Offline caching
 
 The detection list is stored in AsyncStorage so it remains available when the device is offline. Pull down on the list to refresh the cache when a network connection is available.
