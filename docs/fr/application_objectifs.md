@@ -11,7 +11,7 @@ Ce document récapitule les objectifs principaux de NightScan ainsi que la cible
    - Recevoir des notifications en temps réel lorsqu’une nouvelle détection est traitée.
    - Filtrer les données (par espèce ou par zone géographique) afin d’obtenir immédiatement les résultats pertinents.
 3. **Partage et export**
-   - Offrir la possibilité de partager les détections par e‑mail ou de les exporter (CSV/KMZ) pour des analyses ultérieures.
+   - Offrir la possibilité de partager les détections par e‑mail ou de les exporter (CSV/KMZ) pour des analyses ultérieures. Un bouton **Exporter CSV** sur l'écran de liste permet d'en partager l'intégralité.
 
 ## Expérience utilisateur cible
 
