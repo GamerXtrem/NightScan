@@ -1,16 +1,49 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchDetections } from '../services/api';
 
 export default function DetectionListScreen({ navigation }) {
   const [detections, setDetections] = useState([]);
   const [query, setQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const STORAGE_KEY = 'detections';
 
   useEffect(() => {
-    fetchDetections()
-      .then(setDetections)
-      .catch(() => {});
+    async function load() {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          setDetections(JSON.parse(raw));
+        }
+      } catch {
+        // ignore read errors
+      }
+      refresh();
+    }
+    load();
   }, []);
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      const list = await fetchDetections();
+      setDetections(list);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch {
+      // ignore network errors
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const filtered = detections.filter((d) =>
     d.species.toLowerCase().includes(query.toLowerCase())
@@ -40,6 +73,8 @@ export default function DetectionListScreen({ navigation }) {
         data={filtered}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
+        refreshing={refreshing}
+        onRefresh={refresh}
       />
     </View>
   );

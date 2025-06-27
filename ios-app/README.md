@@ -20,3 +20,7 @@ npx expo start
 ```
 After the Metro bundler starts, scan the QR code in your terminal with the Expo Go app to launch NightScan on your device.
 
+## Offline caching
+
+The detection list is stored in AsyncStorage so it remains available when the device is offline. Pull down on the list to refresh the cache when a network connection is available.
+
