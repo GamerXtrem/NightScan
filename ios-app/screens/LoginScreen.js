@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, StyleSheet, Alert } from 'react-native';
-
-const BASE_URL = 'http://localhost:8000';
+import { login as loginRequest } from '../services/api';
 
 export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
@@ -9,21 +8,10 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     try {
-      const resp = await fetch(`${BASE_URL}/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
-        credentials: 'include',
-      });
-      if (resp.ok) {
-        navigation.navigate('Main');
-      } else {
-        Alert.alert('Login failed');
-      }
-    } catch (e) {
-      Alert.alert('Network error');
+      await loginRequest(username, password);
+      navigation.navigate('Main');
+    } catch {
+      Alert.alert('Login failed');
     }
   };
 

@@ -1,35 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
-
-const detections = [
-  {
-    id: '1',
-    species: 'Fox',
-    time: '2025-06-01 22:15',
-    latitude: 37.78825,
-    longitude: -122.4324,
-    image: 'https://via.placeholder.com/400',
-  },
-  {
-    id: '2',
-    species: 'Deer',
-    time: '2025-06-01 22:30',
-    latitude: 37.78925,
-    longitude: -122.4344,
-    image: 'https://via.placeholder.com/400',
-  },
-  {
-    id: '3',
-    species: 'Owl',
-    time: '2025-06-01 23:00',
-    latitude: 37.79025,
-    longitude: -122.4354,
-    image: 'https://via.placeholder.com/400',
-  },
-];
+import { fetchDetections } from '../services/api';
 
 export default function DetectionListScreen({ navigation }) {
+  const [detections, setDetections] = useState([]);
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    fetchDetections()
+      .then(setDetections)
+      .catch(() => {});
+  }, []);
 
   const filtered = detections.filter((d) =>
     d.species.toLowerCase().includes(query.toLowerCase())
@@ -58,7 +39,7 @@ export default function DetectionListScreen({ navigation }) {
         style={styles.list}
         data={filtered}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
       />
     </View>
   );
