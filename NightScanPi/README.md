@@ -30,6 +30,15 @@ Carte microSD 64 Go min.	Stockage des données
 Batterie 18650 + TPL5110	Alimentation et timer
 Panneau solaire 5V 1A	Recharge quotidienne
 (Optionnel) Module SIM	Transfert hors Wi-Fi
+### Informations matérielles complémentaires
+
+Des fiches détaillées se trouvent dans le répertoire `Hardware/` :
+
+- **Raspberry Pi Zero 2 W** : processeur quad‑cœur 1 GHz, 512 Mo de RAM, Wi‑Fi 2,4 GHz et Bluetooth 4.2. Sa consommation varie entre 0,6 W et 3 W.
+- **RPI IR‑CUT Camera** : module caméra CSI avec filtre infrarouge motorisé et LED IR, prévu pour la vision diurne et nocturne. Le courant maximal avoisine 150 mA.
+- **ReSpeaker Mic Array Lite** : carte microphonique double basée sur un chipset XMOS XU316 intégrant l’annulation d’écho et la suppression de bruit, avec une LED RGB.
+
+Ces documents décrivent les schémas de raccordement et les réglages avancés (modes HDR de la caméra, mise à jour du micro, etc.).
 
 ⏱ Fonctionnement
 🕕 De 18h à 10h :
@@ -95,3 +104,14 @@ Le Pi est alimenté uniquement de 18h à 10h
 
 Le traitement des fichiers audio (.wav → .npy) se fait après 12h, pour éviter les pics de charge pendant la collecte
 
+## Aperçu du dépôt NightScan
+
+Ce dossier `NightScanPi/` représente la partie embarquée du projet. À la racine du dépôt, on trouve notamment :
+- `Audio_Training/` et `Picture_Training/` pour la préparation des données et l'entraînement des modèles de reconnaissance.
+- `web/` contenant l'application Flask servant d'interface de téléversement et de consultation des prédictions.
+- `ios-app/` pour un exemple d'application mobile.
+- `wp-plugin/` avec des modules WordPress dédiés aux envois depuis un site et à l'affichage des statistiques.
+- `setup_vps_infomaniak.sh` qui automatise le déploiement d'un VPS configuré pour héberger l'API.
+- `docs/` où se trouvent des guides complémentaires.
+
+Le `README.md` situé à la racine détaille ces répertoires et explique comment installer l'environnement de test.
