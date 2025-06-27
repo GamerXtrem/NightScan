@@ -1,1 +1,22 @@
+Raspberry Pi Zero 2 W
+====================
 
+Le Raspberry Pi Zero 2 W est un nano-ordinateur basse consommation basé sur un processeur quad‑coeur 64‑bits ARM Cortex‑A53 cadencé à 1 GHz et 512 Mo de RAM. Il intègre le Wi‑Fi 2,4 GHz et le Bluetooth 4.2 (BLE).
+
+Caractéristiques principales
+- Ports mini HDMI et micro USB OTG
+- Port micro USB pour l’alimentation 5 V
+- Connecteur HAT 40 broches compatible GPIO
+- Connecteur caméra CSI‑2
+- Dimensions : environ 65 × 30 mm pour moins de 10 g
+
+Consommation
+- ∼0,6–0,9 W au repos
+- 2–3 W typiques en charge
+
+Installation de Raspberry Pi OS
+1. Téléchargez l’outil **Raspberry Pi Imager** depuis le site officiel.
+2. Insérez une carte microSD (≥8 Go) dans votre ordinateur et sélectionnez « Raspberry Pi OS » dans l’imager.
+3. Lancer le flashage puis, si vous souhaitez activer l’accès SSH sans écran, créez un fichier vide nommé `ssh` à la racine de la carte.
+4. Insérez la microSD dans le Pi Zero 2 W et branchez l’alimentation 5 V.
+5. Une fois démarré, connectez-vous via HDMI/USB ou en SSH pour finir la configuration.
