@@ -115,3 +115,14 @@ Ce dossier `NightScanPi/` représente la partie embarquée du projet. À la raci
 - `docs/` où se trouvent des guides complémentaires.
 
 Le `README.md` situé à la racine détaille ces répertoires et explique comment installer l'environnement de test.
+
+## Dossier `Program`
+Ce répertoire contient les scripts Python exécutés sur le Raspberry Pi :
+
+- `main.py` orchestre les captures nocturnes.
+- `audio_capture.py` enregistre 8 s d'audio.
+- `camera_trigger.py` prend une photo infrarouge.
+- `spectrogram_gen.py` convertit les fichiers `.wav` en spectrogrammes `.npy`.
+- `wifi_config.py` écrit la configuration Wi-Fi reçue via l'application mobile.
+- `sync.py` envoie automatiquement les fichiers générés.
+- `utils/energy_manager.py` gère la plage horaire d'activité.
