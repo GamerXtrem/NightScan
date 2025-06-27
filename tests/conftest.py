@@ -5,14 +5,17 @@ from contextlib import contextmanager
 
 def _stub_torch():
     torch = types.ModuleType("torch")
-    torch.utils = types.SimpleNamespace(data=types.SimpleNamespace(Dataset=object, DataLoader=object))
+    torch.utils = types.SimpleNamespace(
+        data=types.SimpleNamespace(Dataset=object, DataLoader=object)
+    )
     torch.nn = types.SimpleNamespace(
         Module=object,
         Linear=object,
         functional=types.SimpleNamespace(pad=lambda *a, **k: None),
         Softmax=lambda *a, **k: lambda x: x,
     )
-    torch.device = lambda *a, **k: None
+    torch.Tensor = object
+    torch.device = type("device", (), {})
     torch.load = lambda *a, **k: {}
     torch.topk = lambda *a, **k: ([], [])
 
@@ -21,6 +24,8 @@ def _stub_torch():
         yield
     torch.no_grad = no_grad
     sys.modules['torch'] = torch
+    sys.modules['torch.utils'] = torch.utils
+    sys.modules['torch.utils.data'] = torch.utils.data
 
 
 def _stub_torchvision():
@@ -47,6 +52,32 @@ def _stub_torchaudio():
     sys.modules['torchaudio'] = torchaudio
 
 
+def _stub_pyaudioop():
+    pyaudioop = types.ModuleType("pyaudioop")
+
+    def _return_zero(*args, **kwargs):
+        return 0
+
+    for name in [
+        "max",
+        "minmax",
+        "avg",
+        "avgpp",
+        "rms",
+        "bias",
+        "ulaw2lin",
+        "lin2ulaw",
+        "lin2lin",
+        "add",
+        "mul",
+        "ratecv",
+        "cross",
+    ]:
+        setattr(pyaudioop, name, _return_zero)
+
+    sys.modules["pyaudioop"] = pyaudioop
+
+
 def pytest_configure(config):
     try:
         import torch  # noqa: F401
@@ -62,3 +93,8 @@ def pytest_configure(config):
         import torchaudio  # noqa: F401
     except Exception:
         _stub_torchaudio()
+
+    try:
+        import pyaudioop  # noqa: F401
+    except Exception:
+        _stub_pyaudioop()
