@@ -11,3 +11,7 @@
 - [x] Create a settings screen and persist preferences
 - [x] Support dark mode theming across the app
 - [x] Configure Jest with React Native Testing Library
+
+- [ ] Implement scanning feature to upload media files using FormData and PREDICT_API_URL
+- [ ] Add geographic filtering by zone on list and map
+- [ ] Enable sharing and export of detections (CSV or KMZ)
