@@ -1,5 +1,10 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  registerForPushNotificationsAsync,
+  checkForNewDetections,
+} from './services/notifications';
+import { fetchDetections } from './services/api';
 
 const PREFS_KEY = 'settings';
 
@@ -34,6 +39,26 @@ export function AppProvider({ children }) {
     const prefs = { darkMode, notifications };
     AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs)).catch(() => {});
   }, [darkMode, notifications]);
+
+  useEffect(() => {
+    let timer;
+    async function poll() {
+      try {
+        const list = await fetchDetections();
+        checkForNewDetections(list);
+      } catch {
+        // ignore errors
+      }
+    }
+    if (notifications) {
+      registerForPushNotificationsAsync().catch(() => {});
+      poll();
+      timer = setInterval(poll, 60000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [notifications]);
 
   return (
     <AppContext.Provider value={{ darkMode, notifications, setDarkMode, setNotifications }}>
