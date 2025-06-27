@@ -1,6 +1,6 @@
 # iOS App Tasks
 
-- [ ] Integrate API service for fetching detections
+- [x] Integrate API service for fetching detections
 - [x] Manage global app state with React context
 - [x] Implement login and registration screens
 - [ ] Add push notifications for new detections

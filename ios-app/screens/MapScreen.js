@@ -1,12 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { fetchDetections } from '../services/api';
 
 export default function MapScreen() {
-  const markers = [
-    { id: 1, title: 'Fox', coordinate: { latitude: 37.78825, longitude: -122.4324 } },
-    { id: 2, title: 'Deer', coordinate: { latitude: 37.78925, longitude: -122.4344 } },
-  ];
+  const [markers, setMarkers] = useState([]);
+
+  useEffect(() => {
+    fetchDetections()
+      .then((list) =>
+        setMarkers(
+          list.map((d) => ({
+            id: d.id,
+            title: d.species,
+            coordinate: { latitude: d.latitude, longitude: d.longitude },
+          }))
+        )
+      )
+      .catch(() => {});
+  }, []);
 
   return (
     <View style={styles.container}>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, StyleSheet, Alert } from 'react-native';
-
-const BASE_URL = 'http://localhost:8000';
+import { register as registerRequest } from '../services/api';
 
 export default function RegisterScreen({ navigation }) {
   const [username, setUsername] = useState('');
@@ -14,22 +13,11 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
     try {
-      const resp = await fetch(`${BASE_URL}/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
-        credentials: 'include',
-      });
-      if (resp.ok) {
-        Alert.alert('Registration complete');
-        navigation.navigate('Login');
-      } else {
-        Alert.alert('Registration failed');
-      }
-    } catch (e) {
-      Alert.alert('Network error');
+      await registerRequest(username, password);
+      Alert.alert('Registration complete');
+      navigation.navigate('Login');
+    } catch {
+      Alert.alert('Registration failed');
     }
   };
 
