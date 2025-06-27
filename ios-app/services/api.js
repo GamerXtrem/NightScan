@@ -1,4 +1,6 @@
 export const BASE_URL = 'http://localhost:8000';
+export const PREDICT_API_URL =
+  process.env.PREDICT_API_URL || 'http://localhost:8001/api/predict';
 
 export async function login(username, password) {
   const resp = await fetch(`${BASE_URL}/login`, {
@@ -35,5 +37,26 @@ export async function fetchDetections() {
   if (!resp.ok) {
     throw new Error('Failed to fetch detections');
   }
+  return resp.json();
+}
+
+export async function uploadMedia(uri, mimeType = 'application/octet-stream') {
+  const form = new FormData();
+  form.append('file', {
+    uri,
+    type: mimeType,
+    name: uri.split('/').pop() || 'upload',
+  });
+
+  const resp = await fetch(PREDICT_API_URL, {
+    method: 'POST',
+    body: form,
+    credentials: 'include',
+  });
+
+  if (!resp.ok) {
+    throw new Error('Upload failed');
+  }
+
   return resp.json();
 }
