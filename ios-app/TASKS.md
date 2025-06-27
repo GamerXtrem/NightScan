@@ -10,4 +10,4 @@
 - [x] Add search and filtering for the detection list
 - [x] Create a settings screen and persist preferences
 - [x] Support dark mode theming across the app
-- [ ] Configure Jest with React Native Testing Library
+- [x] Configure Jest with React Native Testing Library
