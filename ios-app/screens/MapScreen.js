@@ -32,7 +32,12 @@ export default function MapScreen() {
         }}
       >
         {markers.map((m) => (
-          <Marker key={m.id} coordinate={m.coordinate} title={m.title} />
+          <Marker
+            key={m.id}
+            testID={`marker-${m.id}`}
+            coordinate={m.coordinate}
+            title={m.title}
+          />
         ))}
       </MapView>
     </View>

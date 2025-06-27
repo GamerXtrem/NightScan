@@ -1,0 +1,30 @@
+import React from 'react';
+import { render, waitFor } from '@testing-library/react-native';
+import MapScreen from '../screens/MapScreen';
+import * as api from '../services/api';
+
+jest.mock('../services/api');
+jest.mock('react-native-maps', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const MockMapView = (props) => <View {...props} />;
+  const MockMarker = (props) => <View {...props} />;
+  return {
+    __esModule: true,
+    default: MockMapView,
+    Marker: MockMarker,
+  };
+});
+
+test('renders markers from API', async () => {
+  api.fetchDetections.mockResolvedValue([
+    { id: 1, species: 'Bat A', latitude: 1, longitude: 2 },
+    { id: 2, species: 'Bat B', latitude: 3, longitude: 4 },
+  ]);
+  const { queryByTestId } = render(<MapScreen />);
+  await waitFor(() => {
+    expect(api.fetchDetections).toHaveBeenCalled();
+    expect(queryByTestId('marker-1')).toBeTruthy();
+    expect(queryByTestId('marker-2')).toBeTruthy();
+  });
+});

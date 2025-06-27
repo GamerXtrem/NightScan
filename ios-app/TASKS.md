@@ -5,7 +5,7 @@
 - [x] Implement login and registration screens
 - [x] Add push notifications for new detections
 - [x] Provide offline caching of the detection list
-- [ ] Write basic unit tests for components
+- [x] Write basic unit tests for components
 - [x] Implement a detection detail screen with map and photo
 - [x] Add search and filtering for the detection list
 - [x] Create a settings screen and persist preferences
