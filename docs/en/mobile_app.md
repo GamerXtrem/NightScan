@@ -31,6 +31,8 @@ animal was detected.
   area; the map and feed update instantly according to the criteria.
 - **Sharing and export** – each record can be shared by email and the app can
   export all detections as CSV or KMZ for further analysis.
+  Use the **Export CSV** button at the top of the detection list to share the
+  full dataset.
 
 ### User interface
 

@@ -6,6 +6,8 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
+  Button,
+  Share,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchDetections } from '../services/api';
@@ -53,6 +55,19 @@ export default function DetectionListScreen({ navigation }) {
       (!zoneFilter || (d.zone || '').toLowerCase().includes(zoneFilter.toLowerCase()))
   );
 
+  async function handleExport() {
+    const header = 'id,species,time,latitude,longitude,zone';
+    const rows = detections.map((d) =>
+      [d.id, d.species, d.time, d.latitude, d.longitude, d.zone || ''].join(',')
+    );
+    const csv = [header, ...rows].join('\n');
+    try {
+      await Share.share({ message: csv });
+    } catch {
+      // ignore share errors
+    }
+  }
+
   const renderItem = ({ item }) => (
     <TouchableOpacity
       onPress={() => navigation.navigate('DetectionDetail', { detection: item })}
@@ -78,6 +93,7 @@ export default function DetectionListScreen({ navigation }) {
         value={zoneFilter}
         onChangeText={setZoneFilter}
       />
+      <Button title="Export CSV" onPress={handleExport} />
       <FlatList
         style={styles.list}
         data={filtered}

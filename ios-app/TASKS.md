@@ -14,4 +14,4 @@
 
 - [x] Implement scanning feature to upload media files using FormData and PREDICT_API_URL
 - [x] Add geographic filtering by zone on list and map
-- [ ] Enable sharing and export of detections (CSV or KMZ)
+- [x] Enable sharing and export of detections (CSV or KMZ)
