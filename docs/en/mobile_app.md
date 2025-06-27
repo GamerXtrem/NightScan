@@ -42,7 +42,7 @@ on both iOS and Android.
 
 ## Environment setup
 
-Install Node.js along with the React Native CLI. Android development requires the SDK and an emulator from Android Studio. On macOS you may also install Xcode for the iOS simulator.
+Install Node.js along with the React Native CLI. Android development requires the SDK and an emulator from Android Studio. On macOS you can use the built-in iOS simulator.
 
 ```bash
 npm install -g react-native-cli
@@ -97,5 +97,5 @@ Use the Android or iOS simulator for manual checks and run your preferred test f
 
 ## Publishing
 
-Generate release builds following the standard React Native commands. For Android run `npx react-native run-android --variant=release` and sign the APK. For iOS build through Xcode or `npx react-native run-ios --configuration Release`.
+Generate release builds following the standard React Native commands. For Android run `npx react-native run-android --variant=release` and sign the APK. For iOS run `npx react-native run-ios --configuration Release`.
 
