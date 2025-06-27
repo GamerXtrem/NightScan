@@ -1,0 +1,1643 @@
+RPi IR-CUT Camera
+RPi IR-CUT Camera
+RPi IR-CUT Camera
+Hardware Connection
+To test the Camera, you need to connect a HDMI display or a DIS display for previewing.
+The connectors of the DSI interface (display) and the CSI interface (camera) look the same, please take care of it when you connect the camera. The CSI interface is placed between the Audio jack and the HDMI port. The CSI connector of Pi zero series is beside the Power interface. If you use the Compute Module, please check the actual place of the carrier board.
+
+Connect to Raspberry Pi 5
+Place the metal surface of the FPC cable towards the wired network port, then connect to the CSI port. The Pi 5 has two CSI ports; either port can be used for connection.
+Pi5-IMX219-77-details-5.jpg
+Connect to Raspberry Pi Zero Series
+Place the metal surface of the cable downward, then connect it to the CSI port.
+RPi-IR-CUT-Camera-6.jpg
+Connect to other Raspberry Pi boards
+Place the metal surface of the cable towards the HDMI port and connect to the CSI port.
+RPi-IR-CUT-Camera-7.jpg
+
+
+About the model
+Photosensitive Chip Model	Raspberry Pi Board Model Supported	Driver Type Supported
+OV5647	All Raspberry Pi boards	libcamera/Raspicam
+OV9281	All Raspberry Pi boards	libcamera
+IMX219 (Official Raspberry Pi)	All Raspberry Pi boards	libcamera/Raspicam
+IMX219 (Third party)	Raspberry Pi Compute Module	libcamera
+IMX290/IMX327	All Raspberry Pi boards	libcamera
+IMX378	All Raspberry Pi boards	libcamera
+IMX477 (Official Raspberry Pi)	All Raspberry Pi boards	libcamera/Raspicam
+IMX477 (Third party)	Raspberry Pi Compute Module	libcamera
+IMX519	All Raspberry Pi boards	libcamera (driver required)
+IMX708 (Raspberry Pi Camera Module 3)	All Raspberry Pi boards	libcamera
+IMX296 (Raspberry Pi Global Camera)	All Raspberry Pi boards	libcamera
+Test Camera
+Software Configuration
+If you are using the latest Raspberry Pi Camera Module 3 or Raspberry Pi Global Shutter Camera, you need to run the following commands to update the system (network connection is required).
+
+sudo apt-get update -y
+sudo apt-get upgrade -y
+If only one camera is invoked, connect the camera to the CAM1 port.
+If you do not use an official Raspberry Pi camera, you need to configure the "config.txt " file. If you use the latest Bookworm system, you need to configure /boot/firmware/config.txt.
+
+sudo nano /boot/config.txt
+#If using the bookworm system
+sudo nano /boot/firmware/config.txt
+Find "camera-auto-detect=1" and modify it to "camera_auto_detect=0".
+
+At the end of the file, add the following setting statements according to the camera model.
+
+Model	Set Statement
+OV9281	dtoverlay=ov9281
+IMX290/IMX327	dtoverlay=imx290, clock-frequency=37125000
+IMX378	dtoverlay=imx378
+IMX219	dtoverlay=imx219
+IMX477	dtoverlay=imx477
+IMX708	dtoverlay=imx708
+Note: To connect IMX290 to Raspberry Pi 5, it is necessary to add a json file to the command directory. The operation is as follows:
+
+sudo wget https://www.waveshare.net/w/upload/7/7a/Imx290.zip
+sudo unzip Imx290.zip
+sudo cp imx290.json /usr/share/libcamera/ipa/rpi/pisp
+Binocular Camera Configuration
+
+Currently, both the CM4 carrier board and Raspberry Pi 5 support the connection of two cameras.
+If you want to simultaneously connect to two cameras, you can designate the cameras by adding 'cam0' and 'cam1' after the corresponding camera configuration statements.
+For example, the imx219 is connected to the cam0 interface and the ov5647 camera is connected to the cam1 interface.
+dtoverlay=imx219,cam0
+dtoverlay=ov5647,cam1
+Test Camera Commands
+Enter the Raspberry Pi terminal and enable the camera to preview:
+
+sudo libcamera-hello -t 0
+If you want to close the preview window, you can directly press the keys "Alt + F4", or click "X" to close. Also, you can return to the terminal interface and press "Ctrl + c" to end the demo.
+Note: If using "Camera Module 3", the auto-focus function is enabled.
+Test Binocular Camera
+
+When testing the binocular camera, you need to add "--camera" to specify the camera. If you do not add this parameter, "cam0" is specified by default.
+sudo libcamera-hello -t 0 --camera 0
+sudo libcamera-hello -t 0 --camera 1
+Preface
+To check what version of the system you are using, run sudo cat /etc/os-release to see if there is any information about the following two images, and then select.
+
+The Raspberry Pi OS Bookworm changed the camera capture application from libcamera-* to rpicam-*, which currently allows users to continue using the old libcamera, but libcamera will be deprecated in the future, so please use rpicam as soon as possible.
+If you are using the Raspberry Pi OS Bullseye system, please scroll down the page to use this tutorial's libcamera-* section.
+RPicam
+When running the latest version of Raspberry Pi OS, rpicam-apps already has five basic features installed. In this case, the official Raspberry Pi camera will also be detected and automatically enabled.
+You can check if everything is working by inputting the following:
+
+rpicam-hello 
+You should see a camera preview window for about five seconds.
+Users of Bullseye's Raspberry Pi 3 or earlier devices will need to enable Glamor in order for this example script using X Windows to work. Input the command sudo raspi-config in the terminal window, then select Advanced Options, Glamor, and Yes. Exit and restart your Raspberry Pi. By default, Raspberry Pi 3 and earlier devices running Bullseye may not be using the correct display driver. Please refer to the /boot/firmware/config.txt file and make sure that dtoverlay=vc4-fkms-v3d or dtoverlay=vc4-kms-v3d is currently active. If you need to change this setting, please restart.
+
+rpicam-hello
+It is equivalent to the camera's "hello world", it starts the camera preview stream and displays it on the screen, which can be stopped by clicking the window's Close button or by using ctrl^C in the terminal.
+rpicam-hello -t 0
+Tuning file
+The libcamera for Raspberry Pi has tuning files for each type of camera module. The parameters in the file are passed to the algorithm and hardware to produce the best quality image. libcamera can only automatically determine the image sensor being used, not the entire module, even if the entire module affects the "tuning". As a result, it is sometimes necessary to override the default tuning file for a particular sensor.
+For example, a sensor without an infrared filter (NoIR) version requires a different AWB (white balance) setting than the standard version, so an IMX219 NoIR used with a Pi 4 or earlier device should operate as follows:
+
+rpicam-hello --tuning-file /usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json
+The Raspberry Pi 5 uses different tuning files in different folders, so here you will use:
+
+rpicam-hello --tuning-file /usr/share/libcamera/ipa/rpi/pisp/imx219_noir.json
+This also means that users can copy existing tuning files and modify them according to their preferences, as long as the parameter --tuning-file points to the new version.
+The --tuning-file parameter is applicable to all rpicam-apps just like other command-line options.
+
+rpicam-jpeg
+rpicam-jpeg is a simple static image capture application.
+To capture a full-resolution JPEG image, use the following command. This will display a preview for approximately five seconds, then capture the full-resolution JPEG image to the file test.jpg.
+
+rpicam-jpeg -o test.jpg
+The -t <duration> option is used to change the duration of the preview display, and the --width and --height options will alter the resolution of the captured static images. For example:
+
+rpicam-jpeg -o test.jpg -t 2000 --width 640 --height 480
+Exposure control
+All of this rpicam-apps allow the user to run the camera with a fixed shutter speed and gain. Capture an image with an exposure time of 20ms and a gain of 1.5x. This gain will be used as an analog gain within the sensor until it reaches the maximum analog gain allowed by the core sensor driver. After that, the rest will be used as a digital gain
+
+rpicam-jpeg -o test.jpg -t 2000 --shutter 20000 --gain 1.5
+The AEC/AGC algorithm for the Raspberry Pi enables application-defined exposure compensation, allowing images to be made darker or brighter through a specified number of stops.
+
+rpicam-jpeg --ev -0.5 -o darker.jpg
+rpicam-jpeg --ev 0 -o normal.jpg
+rpicam-jpeg --ev 0.5 -o brighter.jpg
+Digital gain
+The digital gain is applied by the ISP, not by the sensor. The digital gain will always be very close to 1.0 unless:
+
+The total gain requested (via the option --gain or via the exposure profile in the camera adjustment) exceeds the gain that can be used as an analog gain within the sensor. Only the extra gain required will be used as a digital gain.
+One of the color gains is less than 1 (note that the color gain is also used as a digital gain). In this case, the published digital gain will stabilize at 1 / min (red gain, blue gain). This means that one of the color channels (instead of the green channel) has a single-digit gain applied.
+AEC/AGC is changing. When AEC/AGC moves, the digital gain typically changes to some extent in an attempt to eliminate any fluctuations, but it quickly returns to its normal value.
+rpicam-still
+It emulates many features of the original app raspistill.
+
+rpicam-still -o test.jpg
+Encoder
+rpicam-still allows files to be saved in a number of different formats. It supports PNG and BMP encoding. It also allows the file to be saved as a binary dump of RGB or YUV pixels with no encoding or file format. In the latter case, the application that reads the file must be aware of its own pixel arrangement.
+
+rpicam-still -e png -o test.png
+rpicam-still -e bmp -o test.bmp
+rpicam-still -e rgb -o test.data
+rpicam-still -e yuv420 -o test.data
+Note: The format in which the image is saved depends on the -e (equivalent to encoding) option and is not automatically selected based on the output file name.
+
+Raw image capture
+The raw image is an image that is produced directly by an image sensor, before any processing of it by the ISP (Image Signal Processor) or any CPU core. For color image sensors, these are usually Bayer format images. Note that the original image is very different from the processed but unencoded RGB or YUV images we saw before.
+Get the raw image:
+
+rpicam-still --raw --output test.jpg
+Here, the -r option (also known as raw) indicates capturing the raw image and JPEG. In fact, the original image is the raw image that generates a JPEG. The original images are saved in DNG (Adobe Digital Negative) format and are compatible with many standard applications such as draw or RawTherapee. The original image is saved to a file with the same name but an extension of .ng, thus becoming test.dng.
+These DNG files contain metadata related to image capture, including black level, white balance information, and the color matrix used by the ISP to generate JPEGs. This makes these DNG files more convenient to use for "manual" original conversion with some of the above tools in the future. Use exiftool to display all metadata encoded into a DNG file:
+
+File Name                       : test.dng
+Directory                       : .
+File Size                       : 24 MB
+File Modification Date/Time     : 2021:08:17 16:36:18+01:00
+File Access Date/Time           : 2021:08:17 16:36:18+01:00
+File Inode Change Date/Time     : 2021:08:17 16:36:18+01:00
+File Permissions                : rw-r--r--
+File Type                       : DNG
+File Type Extension             : dng
+MIME Type                       : image/x-adobe-dng
+Exif Byte Order                 : Little-endian (Intel, II)
+Make                            : Raspberry Pi
+Camera Model Name               : /base/soc/i2c0mux/i2c@1/imx477@1a
+Orientation                     : Horizontal (normal)
+Software                        : rpicam-still
+Subfile Type                    : Full-resolution Image
+Image Width                     : 4056
+Image Height                    : 3040
+Bits Per Sample                 : 16
+Compression                     : Uncompressed
+Photometric Interpretation      : Color Filter Array
+Samples Per Pixel               : 1
+Planar Configuration            : Chunky
+CFA Repeat Pattern Dim          : 2 2
+CFA Pattern 2                   : 2 1 1 0
+Black Level Repeat Dim          : 2 2
+Black Level                     : 256 256 256 256
+White Level                     : 4095
+DNG Version                     : 1.1.0.0
+DNG Backward Version            : 1.0.0.0
+Unique Camera Model             : /base/soc/i2c0mux/i2c@1/imx477@1a
+Color Matrix 1                  : 0.8545269369 -0.2382823821 -0.09044229197 -0.1890484985 1.063961506 0.1062747385 -0.01334283455 0.1440163847 0.2593136724
+As Shot Neutral                 : 0.4754476844 1 0.413686484
+Calibration Illuminant 1        : D65
+Strip Offsets                   : 0
+Strip Byte Counts               : 0
+Exposure Time                   : 1/20
+ISO                             : 400
+CFA Pattern                     : [Blue,Green][Green,Red]
+Image Size                      : 4056x3040
+Megapixels                      : 12.3
+Shutter Speed                   : 1/20
+We have noticed that there is only one calibration light source (determined by the AWB algorithm, although it is always labeled as "D65"), and dividing the ISO number by 100 gives the analog gain being used.
+
+Ultra-long exposure
+In order to capture long-exposure images, disable AEC/AGC and AWB, as these algorithms will force the user to wait many frames while converging.
+The way to disable them is to provide explicit values. Additionally, the immediate option can be used to skip the entire preview phase that is captured.
+Therefore, to perform an exposure capture of 100 seconds, use:
+
+rpicam-still -o long_exposure.jpg --shutter 100000000 --gain 1 --awbgains 1,1 --immediate
+For reference, the maximum exposure times of the three official Raspberry Pi cameras can be found in this table.
+
+rpicam-vid
+rpicam-vid can help us capture video on our Raspberry Pi device. Rpicam-vid displays a preview window and writes the encoded bitstream to the specified output. This will produce an unpacked video bitstream that is not packaged in any container format (such as an mp4 file).
+
+rpicam-vid uses H.264 encoding
+For example, the following command writes a 10-second video to a file named test.h264:
+
+rpicam-vid -t 10s -o test.h264
+You can use VLC and other video players to play the result files:
+
+VLC test.h264
+On the Raspberry Pi 5, you can output directly to the MP4 container format by specifying the MP4 file extension of the output file:
+
+rpicam-vid -t 10s -o test.mp4
+Encoder
+rpicam-vid supports dynamic JPEG as well as uncompressed and unformatted YUV420:
+
+rpicam-vid -t 10000 --codec mjpeg -o test.mjpeg
+rpicam-vid -t 10000 --codec yuv420 -o test.data
+The codec option determines the output format, not the extension of the output file.
+The segment option splits the output file into segments-sized chunks (in milliseconds). By specifying extremely short segments (1 millisecond), this allows for the convenient decomposition of a moving JPEG stream into individual JPEG files. For example, the following command combines a 1 millisecond segment with a counter in the output filename to generate a new filename for each segment:
+
+rpicam-vid -t 10000 --codec mjpeg --segment 1 -o test%05d.jpeg
+Capture high frame rate video
+To minimize frame loss for high frame rate (> 60fps) video, try the following configuration adjustments:
+
+Set the target level of H.264 to 4.2 with the parameter --level 4.2
+Disable software color denoising processing by setting the denoise option to cdn_off.
+Disable the display window for nopreview to release additional CPU cycles.
+Set force_turbo=1 in /boot/firmware/config.txt to ensure that the CPU clock is not throttled during video capture. For more information, see the force_turbo documentation.
+Adjust the ISP output resolution parameter to --width 1280 --height 720 or lower to achieve the frame rate target.
+On the Raspberry Pi 4, you can overclock the GPU to improve performance by adding a frequency of gpu_freq=550 or higher in /boot/firmware/config.txt. For detailed information, please refer to the Overclocking documentation.
+The following command demonstrates how to implement a 1280×720 120fps video:
+
+rpicam-vid --level 4.2 --framerate 120 --width 1280 --height 720 --save-pts timestamp.pts -o video.264 -t 10000 --denoise cdn_off -n
+Integration of Libav with picam-vid
+Rpicam-vid can encode audio and video streams using the ffmpeg/libav codec backend. You can save these streams to a file, or stream them over the network.
+To enable the libav backend, pass libav to the codec option:
+
+rpicam-vid --codec libav --libav-format avi --libav-audio --output example.avi
+UDP
+To use a Raspberry Pi as a server for streaming video over UDP, use the following command, replacing the < IP -addr> placeholder with the IP address of the client or multicast address, and replacing the <port> placeholder with the port you wish to use for streaming:
+
+rpicam-vid -t 0 --inline -o udp://<ip-addr>:<port>
+Use a Raspberry Pi as a client to view video streams over UDP, using the following command, replace the <port> placeholder with the port you want to stream:
+
+vlc udp://@:<port> :demux=h264
+Alternatively, use ffplay on the client side to stream with the following command:
+
+ffplay udp://<ip-addr-of-server>:<port> -fflags nobuffer -flags low_delay -framedrop
+TCP
+Video can also be transmitted over TCP. Use Raspberry Pi as a server:
+
+rpicam-vid -t 0 --inline --listen -o tcp://0.0.0.0:<port>
+Use the Raspberry Pi as the client to view the video stream over TCP, use the following command:
+
+vlc tcp/h264://<ip-addr-of-server>:<port>
+Alternatively, use the ffplay stream at 30 frames per second on the client side with the following command:
+
+ffplay tcp://<ip-addr-of-server>:<port> -vf "setpts=N/30" -fflags nobuffer -flags low_delay -framedrop
+RTSP
+To transfer video via RTSP using VLC, using the Raspberry Pi as the server, use the following command:
+
+rpicam-vid -t 0 --inline -o - | cvlc stream:///dev/stdin --sout '#rtp{sdp=rtsp://:8554/stream1}' :demux=h264
+To view the video stream on the RTSP using the Raspberry Pi as a client, use the following command:
+
+ffplay rtsp://<ip-addr-of-server>:8554/stream1 -vf "setpts=N/30" -fflags nobuffer -flags low_delay -framedrop
+Or on the client side use the following command to stream with VLC:
+
+vlc rtsp://<ip-addr-of-server>:8554/stream1
+If you need to close the preview window on the server, use the nopreview command.
+Use inline flags to enforce stream header information into each inner frame, which helps the client understand the stream when the beginning is missed.
+
+rpicam-raw
+rpicam-raw records the video directly from the sensor as the original Bayer frame. It doesn't show the preview window. To record a two-second raw clip to a file called test.raw, run the following command:
+
+rpicam-raw -t 2000 -o test.raw
+RPICAM-RAW outputs raw frames without any format information. The application prints the pixel format and image size to the terminal window to help the user parse the pixel data.
+By default, rpicam-raw outputs raw frames in a single, potentially very large file. Use the segment option to direct each raw frame to a separate file, using the %05d directive to make each frame filename unique:
+
+rpicam-raw -t 2000 --segment 1 -o test%05d.raw
+Using a fast storage device, rpicam-raw can write 18MB frames from a 12-megapixel HQ camera at a speed of 10fps to the disk. rpicam-raw is unable to format the output frame as a DNG file; To do this, use the rpicam-still option at a frame rate lower than 10 to avoid frame drops:
+
+rpicam-raw -t 5000 --width 4056 --height 3040 -o test.raw --framerate 8
+For more information on the original format, see mode documentation.
+
+rpicam-detect
+Note: The Raspberry Pi operating system does not include rpicam-detect. If you already have TensorFlow Lite installed, you can build rpicam-detect. For more information, see the instructions on building rpicam-apps in build. Don't forget to pass -DENABLE_TFLITE=1 when running cmake.
+rpicam-detect displays a preview window and monitors the content using a Google MobileNet v1 SSD (Single Shot Detector) neural network that has been trained to recognize about 80 classes of objects using the Coco dataset. Rpicam-detect can recognize people, cars, cats and many other objects.
+Whenever rpicam-detect detects a target object, it captures a full-resolution JPEG. Then return to monitoring preview mode.
+For general information about model usage, please refer to the TensorFlow Lite Object Detector section. For example, when you are out, you can keep an eye on your cat:
+
+rpicam-detect -t 0 -o cat%04d.jpg --lores-width 400 --lores-height 300 --post-process-file object_detect_tf.json --object cat
+rpicam Parameter Settings
+--help -h prints all the options, along with a brief description of each option
+rpicam-hello -h
+--version outputs the version strings for libcamera and rpicam-apps
+rpicam-hello --version
+Example output:
+
+rpicam-apps build: ca559f46a97a 27-09-2021 (14:10:24)
+libcamera build: v0.0.0+3058-c29143f7
+--list-cameras lists the cameras connected to the Raspberry Pi and their available sensor modes
+rpicam-hello --list-cameras
+The identifier for the sensor mode has the following form:
+
+S<Bayer order><Bit-depth>_<Optional packing> : <Resolution list>
+Cropping is specified in the native sensor pixels (even in pixel binning mode) as (<x>， <y>)/<Width>×<Height>。 (x, y) specifies the position of the width × height clipping window in the sensor array.
+For example, the following output shows information for an IMX219 sensor with index 0 and an IMX477 sensor with index 1:
+
+Available cameras
+-----------------
+0 : imx219 [3280x2464] (/base/soc/i2c0mux/i2c@1/imx219@10)
+    Modes: 'SRGGB10_CSI2P' : 640x480 [206.65 fps - (1000, 752)/1280x960 crop]
+                             1640x1232 [41.85 fps - (0, 0)/3280x2464 crop]
+                             1920x1080 [47.57 fps - (680, 692)/1920x1080 crop]
+                             3280x2464 [21.19 fps - (0, 0)/3280x2464 crop]
+           'SRGGB8' : 640x480 [206.65 fps - (1000, 752)/1280x960 crop]
+                      1640x1232 [41.85 fps - (0, 0)/3280x2464 crop]
+                      1920x1080 [47.57 fps - (680, 692)/1920x1080 crop]
+                      3280x2464 [21.19 fps - (0, 0)/3280x2464 crop]
+1 : imx477 [4056x3040] (/base/soc/i2c0mux/i2c@1/imx477@1a)
+    Modes: 'SRGGB10_CSI2P' : 1332x990 [120.05 fps - (696, 528)/2664x1980 crop]
+           'SRGGB12_CSI2P' : 2028x1080 [50.03 fps - (0, 440)/4056x2160 crop]
+                             2028x1520 [40.01 fps - (0, 0)/4056x3040 crop]
+                             4056x3040 [10.00 fps - (0, 0)/4056x3040 crop]
+--camera selects the camera you want to use. Specify an index from the list of available cameras.
+rpicam-hello --list-cameras 0 
+rpicam-hello --list-cameras 1 
+--config -c specifies a file that contains the command parameter options and values. Typically, a file named example_configuration.txt specifies options and values as key-value pairs, with each option on a separate line.
+timeout=99000
+verbose=
+Notice: Omission of prefixes -- for parameters is typically used in command lines. For flags that are missing values, such as verbose in the example above, a trailing = must be included.
+Then you can run the following command to specify a timeout of 99,000 milliseconds and detailed output:
+
+rpicam-hello --config example_configuration.txt 
+--time -t, the default delay of 5000 milliseconds
+rpicam-hello -t  
+Specifies how long the application runs before shutting down. This applies to both the video recording and preview windows. When capturing a still image, the application displays a preview window with a timeout millisecond before outputting the captured image.
+
+rpicam-hello -t 0
+--preview sets the position (x,y coordinates) and size (w,h dimensions) of the desktop or DRM preview window. There is no impact on the resolution or aspect ratio of the image requested from the camera
+Pass the preview window dimensions in the following comma-separated form: x,y,w,h
+
+rpicam-hello --preview 100,100,500,500
+--fullscreen -f forces the preview window to use the entire screen, with no borders or title bars. Scale the image to fit the entire screen. Values are not accepted.
+rpicam-hello -f
+--qt-preview uses the Qt preview window, which consumes more resources than other options, but supports X window forwarding. Not compatible with full-screen flags. Values are not accepted.
+rpicam-hello --qt-preview
+--nopreview makes the application not display a preview window. Values are not accepted.
+rpicam-hello --nopreview
+--info-text
+Default values: "#%frame (%fps fps) exp %exp ag %ag dg %dg"
+When running in a desktop environment, set the provided string as the title of the preview window. The following image metadata substitutions are supported:
+
+Command	Description
+%frame	Frame sequence number
+%fps	Instantaneous frame rate
+%exp	Shutter speed at which an image is captured, in ms
+%ag	Image analog gain controlled by photosensitive chip
+%dg	Image number gain controlled by ISP
+%rg	Gain of the red component of each pixel point
+%bg	Gain of the blue component of each pixel point
+%focus	The corner point measure of the image, the larger the value, the clearer the image
+%lp	Diopter of the current lens (distance in 1/meter)
+%afstate	Autofocus status (idle, scanning, focused, failed)
+rpicam-hello --info-test "Focus measure: %focus" 
+--width
+--height
+Each parameter accepts a number that defines the size of the image displayed in the preview window in pixels.
+For rpicam-still, rpicam-jpeg, and rpicam-vid, specify the output resolution.
+For rpicam-raw, specify the original frame resolution. For a camera with a 2×2 bin readout mode, specify a resolution that is equal to or less than the bin mode to capture 2×2 bin original frames.
+For rpicam-hello, there is no effect.
+Record a 1080p video
+
+rpicam-vid -o test.h264 --width 1920 --height 1080
+Capture a JPEG at a resolution of 2028×1520. If used with an HQ camera, the 2×2 bin mode is used, so the original file (test. ng) contains 2028×1520 original Bayer images.
+
+rpicam-still -r -o test.jpg --width 2028 --height 1520
+--viewfinder-width
+--viewfinder-height
+Each parameter accepts a number that defines the size of the image displayed in the preview window in pixels. The size of the preview window is not affected, as the image is resized to fit. Captured still images or videos are not affected.
+
+rpicam-still --viewfinder-width 1920 --viewfinder-height 1080
+--mode allows the camera mode to be specified in the following colon-separated format: <width>:<height>:<bit-depth>:<packing> and if the provided values do not match exactly, the system will select the closest available option for the sensor. You can use the packed(P) or unpacked(U) packaging format, which affects the format of the stored video and static images, but does not affect the format of the frames transmitted to the preview window.
+Bit-depth and packing are optional. By default, Bit-depth is 12, and Packing is set to P (packed).
+For information on the bit depth, resolution, and packing options available for the sensors, please refer to list-cameras.
+As shown below:
+
+4056:3040:12:P - 4056×3040 resolution, 12 bits/pixel, packed.
+1632:1224:10 - 1632×1224 resolution, 10 bits/pixel.
+2592:1944:10:U - 2592×1944 resolution, 10 bits/pixel, unpacked.
+3264:2448 - 3264×2448 resolution.
+--viewfinder-mode is the same as the mode option, but it applies to the data passed to the preview window. For more information, see mode documentation.
+--lores-width and --lores-height
+Provide a second low-resolution image stream from the camera, scaled down to a specified size. Each accepts a number to define the dimensions of a low-resolution stream (in pixels). Available in preview and video modes. Static capture is not provided. For RPICAM-vid, disable additional color denoising processing. It is useful for image analysis combined with Image post-processing.
+
+rpicam-hello --lores-width 224 --lores-height 224
+--hflip flips the image horizontally. Values are not accepted.
+rpicam-hello --hflip -t 0
+--vflip flips the image vertically. Values are not accepted.
+ rpicam-hello --vflip -t 0
+--rotation rotates the image extracted from the sensor. Only values of 0 or 180 are accepted.
+rpicam-hello  --rotation 0
+--ROI crops the image extracted from the entire sensor domain. Accepts four decimal values, ranged 0 to 1, in the following format: <x>,<y>,<w>,<h>. Each of these values represents the percentage of available width and height as a decimal between 0 and 1.
+These values define the following proportions:
+<x>: X coordinates to skip before extracting an image
+<y>: Y coordinates to skip before extracting an image
+<w>: image width to extract
+<h>: image height to extract
+The default is 0,0,1,1 (starting with the first X coordinate and the first Y coordinate, using 100% of the image width and 100% of the image height).
+Examples:
+rpicam-hello --roi 0.25, 0.25, 0.5, 0.5 selects half of the total number of pixels cropped from the center of the image (skips the first 25% of the X coordinates and the first 25% of the Y coordinates, uses 50% of the total width of the image and 50% of the total height of the image).
+rpicam-hello --roi 0,0,0.25,0.25 selects a quarter of the total number of pixels cropped from the top left corner of the image (skips the first 0% of the X coordinate and the first 0% of the Y coordinate, uses 25% of the width of the image and 25% of the height of the image).
+
+--HDR default: Off, run the camera in HDR mode. If no value is passed, it is assumed to be auto. Accept one of the following values:
+off - disables HDR.
+auto - enables HDR on supported devices. If available, use the sensor's built-in HDR mode. If the sensor does not have a built-in HDR mode, the onboard HDR mode is used (if available).
+single-exp enables HDR on supported devices. If available, use the sensor's built-in HDR mode. If the sensor does not have a built-in HDR mode, the onboard HDR mode is used (if available).
+rpicam-hello --hdr
+Use the onboard HDR mode, if available, even if the sensor has a built-in HDR mode. If the onboard HDR mode is not available, HDR is disabled.
+Raspberry Pi 5 and higher versions of devices have the onboard HDR mode.
+To check the HDR mode built into the sensor, add this option to the list of cameras.
+
+Camera Control Options
+The following options control the image processing and algorithms that affect the image quality of the camera.
+
+sharpness
+Sets the image clarity. Values from the following ranges are accepted:
+
+0.0 refers to not applying sharpening
+Values greater than 0.0 but less than 1.0 apply less sharpening than the default value
+1.0 applies the default sharpening amount
+Values greater than 1.0 apply additional sharpening
+rpicam-hello --sharpness 0.0
+contrast
+Specifies the image contrast. Values from the following ranges are accepted:
+
+0.0 applies minimum contrast ratio
+Values greater than 0.0 but less than 1.0 apply a contrast that is less than the default value
+1.0 applies the default contrast ratio
+Values greater than 1.0 apply additional contrast
+rpicam-hello --contrast 0.0
+brightness
+Specifies the image brightness, which is added as an offset of all pixels in the output image. Values from the following ranges are accepted:
+
+-1.0 refers to minimum brightness (black)
+0.0 applies standard brightness
+1.0 applies maximum brightness (white)
+For more uses, refer to ev.
+
+rpicam-hello --brightness 1.0
+saturation
+Specifies the image color saturation. Values from the following ranges are accepted:
+
+0.0 applies minimum saturation (grayscale)
+Values greater than 0.0 but less than 1.0 apply saturation less than the default value
+1.0 applies the default saturation
+Values greater than 1.0 apply additional saturation
+rpicam-hello --saturation  0.6
+ev
+Specifies the exposure value (EV) compensation for the image. A numeric value is accepted that is passed along the following spectrum to the target value of the automatic exposure/gain control (AEC/AGC) processing algorithm:
+
+-10.0 applies the minimum target value
+0.0 applies standard target value
+10.0 applies the maximum target value
+rpicam-hello --ev  10.0
+shutter
+Specifies the exposure time using the shutter, measured in microseconds. When you use this option, the gain can still be varied. If the camera's frame rate is too high, it doesn't allow the specified exposure time (for example, with a frame rate of 1 fps and an exposure time of 10,000 microseconds), the sensor will use the maximum exposure time allowed by the frame rate.
+For a list of minimum and maximum shutter times for official cameras, see camera hardware documentation. Values higher than the maximum will result in undefined behavior.
+
+rpicam-hello --shutter 10000
+gain
+The effect of analoggain and gain is the same
+Sets the combined analog and digital gain. When the sensor drive can provide the required gain, only analog gain is used. When the analog gain reaches its maximum, the ISP applies the digital gain. Accepts a numeric value.
+For a list of analogue gain limits, for official cameras, see the camera hardware documentation.
+Sometimes, digital gain can exceed 1.0 even when the analogue gain limit is not exceeded. This can occur in the following situations:
+Either of the colour gains drops below 1.0, which will cause the digital gain to settle to 1.0/min(red_gain,blue_gain). This keeps the total digital gain applied to any colour channel above 1.0 to avoid discolouration artefacts.
+Slight variances during Automatic Exposure/Gain Control (AEC/AGC) changes.
+
+rpicam-hello --gain 0.8
+metering default value: centre
+Sets the metering mode of the Automatic Exposure/Gain Control (AEC/AGC) algorithm. Accepts the following values:
+
+centre - centre weighted metering
+spot - spot metering
+average - average or whole frame metering
+custom - custom metering mode defined in the camera tuning file
+For more information on defining a custom metering mode, and adjusting region weights in existing metering modes, see the Raspberry Tuning guide for the Raspberry Pi cameras and libcamera.
+
+rpicam-hello --metering centre
+exposure
+Sets the exposure profile. Changing the exposure profile should not affect the image exposure. Instead, different modes adjust gain settings to achieve the same net result. Accepts the following values:
+
+sport: short exposure, larger gains
+normal: normal exposure, normal gains
+long: long exposure, smaller gains
+You can edit exposure profiles using tuning files. For more information, see the Tuning guide for the Raspberry Pi cameras and libcamera.
+
+rpicam-hello --exposure sport
+awb
+Sets the exposure profile. Changing the exposure profile should not affect the image exposure. Instead, different modes adjust gain settings to achieve the same final result. Accepts the following values: Available white balance modes:
+
+Mode	Color temperature
+auto	2500K ~ 8000K
+incadescent	2500K ~ 3000K
+tungsten	3000K ~3500K
+fluorescent	4000K ~ 4700K
+indoor	3000K ~ 5000K
+daylight	5500K ~ 6500 K
+cloudy	7000K ~ 8500K
+custom	A custom range defined in the tuning file
+These values are only approximate: values could vary according to the camera tuning.
+No mode fully disables AWB. Instead, you can fix colour gains with awbgains.
+For more information on AWB modes, including how to define a custom one, see the Tuning guide for the Raspberry Pi cameras and libcamera.
+
+rpicam-hello --awb auto
+awbgains
+Sets a fixed red and blue gain value to be used instead of an Auto White Balance (AWB) algorithm. Set non-zero values to disable AWB. Accepts comma-separated numeric input in the following format: <red_gain>，<blue_gain>
+
+rpicam-jpeg -o test.jpg --awbgains 1.5,2.0
+denoise
+Default value: auto
+Sets the denoising mode. Accepts the following values:
+
+auto: Enables standard spatial denoise. Uses extra-fast colour denoise for video, and high-quality colour denoise for images. Enables no extra colour denoise in the preview window.
+off: Disables spatial and colour denoise.
+cdn_off: Disables colour denoise.
+cdn_fast: Uses fast colour denoise.
+cdn_fast: Uses high-quality colour denoise. Not appropriate for video/viewfinder due to reduced throughput.
+Even fast colour denoise can lower framerates. High quality colour denoise significantly lowers framerates.
+
+rpicam-hello --denoise off
+tuning-file
+Specifies the camera tuning file. The tuning file allows you to control many aspects of image processing, including the Automatic Exposure/Gain Control (AEC/AGC), Auto White Balance (AWB), colour shading correction, colour processing, denoising and more. Accepts a tuning file path as input. For more information about tuning files, see Tuning Files.
+
+autofocus-mode
+Default value: default Specifies the autofocus mode. Accepts the following values:
+
+default: puts the camera into continuous autofocus mode unless lens-position or autofocus-on-capture override the mode to manual
+manual: does not move the lens at all unless manually configured with lens-position
+auto: only moves the lens for an autofocus sweep when the camera starts or just before capture if autofocus-on-capture is also used
+continuous: adjusts the lens position automatically as the scene changes
+This option is only supported for certain camera modules.
+
+rpicam-hello --autofocus-mode auto
+autofocus-range
+Default value: normal
+Specifies the autofocus range. Accepts the following values:
+
+normal: focuses from reasonably close to infinity
+macro: focuses only on close objects, including the closest focal distances supported by the camera
+full: focus on the entire range, from the very closest objects to infinity
+This option is only supported for certain camera modules.
+
+rpicam-hello autofocus-range normal
+autofocus-speed
+Default value: normal
+Specifies the autofocus speed. Accepts the following values:
+
+normal: changes the lens position at normal speed
+fast: changes the lens position quickly
+This option is only supported for certain camera modules.
+
+rpicam-hello --autofocus-speed normal
+autofocus-window
+Specifies the autofocus window within the full field of the sensor. Accepts four decimal values, ranged 0 to 1, in the following format: <x>,<y>,<w>,<h>. Each of these values represents the percentage of available width and height as a decimal between 0 and 1.
+These values define the following proportions:
+<x>: X coordinates to skip before applying autofocus
+<y>: Y coordinates to skip before applying autofocus
+<w>:autofocus area width
+<w>:autofocus area height
+The default value uses the middle third of the output image in both dimensions (1/9 of the total image area).
+Examples:
+
+rpicam-hello—autofocus-window 0.25,0.25,0.5,0.5
+selects exactly half of the total number of pixels cropped from the centre of the image (skips the first 25% of X coordinates, skips the first 25% of Y coordinates, uses 50% of the total image width, uses 50% of the total image height).
+
+rpicam-hello—autofocus-window 0,0,0.25,0.25
+selects exactly a quarter of the total number of pixels cropped from the top left of the image (skips the first 0% of X coordinates, skips the first 0% of Y coordinates, uses 25% of the image width, uses 25% of the image height).
+This option is only supported for certain camera modules.
+
+lens-position
+Default value: default Moves the lens to a fixed focal distance, normally given in dioptres (units of 1 / distance in metres). Accepts the following spectrum of values:
+
+0.0: moves the lens to the "infinity" position
+Any other number: moves the lens to the 1 / number position. For example, the value 2.0 would focus at approximately 0.5m
+normal: move the lens to a default position which corresponds to the hyperfocal position of the lens
+Lens calibration is imperfect, so different camera modules of the same model may vary.
+
+verbose
+Alias: -v
+Default value: 1 Sets the verbosity level. Accepts the following values:
+
+0: no output
+1: normal output
+2: verbose output
+rpicam-hello --verbose 1
+For more details, click here for reference.
+
+libcamera/libcamera Usage
+Introduction
+After the Bullseye version, the underlying Raspberry Pi driver for the Raspberry Pi image has been switched from Raspicam to libcamera. Libcamera is an open-source software stack (referred to as a driver later for ease of understanding) that is convenient for third-party porting and developing their own camera drivers. As of December 11, 2023, the official picamera2 library has been provided for libcamera, making it easier for users to call Python demos.
+
+Call Camera
+The libcamera software stack provides six commands for users to preview and test the camera interface.
+
+libcamera-hello
+This is a simple "hello world" program that previews the camera and displays the camera image on the screen.
+Example
+
+libcamera-hello
+This command will preview the camera on the screen for about 5 seconds. The user can use the "-t <duration>" parameter to set the preview time, where the unit of <duration> is milliseconds. If it is set to 0, it will keep previewing all the time. For example:
+
+libcamera-hello -t 0
+Tuning File
+The libcamera driver of the Raspberry Pi will call a tuning file for different camera modules. The tuning file provides various parameters. When calling the camera, libcamera will call the parameters in the tuning file, and process the image in combination with the algorithm. The final output is the preview screen. Since the libcamera driver can only automatically receive the signal of the chip, the final display effect of the camera will also be affected by the entire module. The use of the tuning file is to flexibly handle the cameras of different modules and adjust to improve the image quality.
+If the output image of the camera is not ideal after using the default tuning file, the user can adjust the image by calling the custom tuning file. For example, if you are using the official NOIR version of the camera, the NOIR camera may require different white balance parameters compared with the regular Raspberry Pi Camera V2. In this case, you can switch by calling the tuning file.
+
+libcamera-hello --tuning-file /usr/share/libcamera/ipa/raspberrypi/imx219_noir.json
+Users can copy the default tuning files and modify them according to their needs.
+Note: The use of tuning files applies to other libcamera commands, and will not be introduced in subsequent commands.
+
+Preview Window
+Most libcamera commands will display a preview window on the screen. Users can customize the title information of the preview window through the --info-text parameter, and can also call some camera parameters through %directives and display them on the window.
+For example, if you use HQ Camera: You can display the focal length of the camera on the window through --info-txe "%focus".
+
+libcamera-hello --info-text "focus %focus".
+Note: For more information on parameter settings, please refer to the following chapters.
+
+libcamera-jpeg
+libcamera-jpeg is a simple static picture shooting program, different from the complex functions of libcamera-still, libcamera-jpeg code is more concise and has many of the same functions to complete picture shooting.
+Take a JPEG image of full pixel
+
+libcamera-jpeg -o test.jpg
+This shooting command will display a preview serial port for about 5 seconds, and then shoot a full-pixel JPEG image and save it as test.jpg.
+Users can set the preview time through the -t parameter and can set the resolution of the captured image through --width and --height. E.g.:
+
+libcamera-jpeg -o test.jpg -t 2000 --width 640 --height 480
+Exposure control
+All libcamera commands allow the user to set the shutter time and gain themselves, such as:
+
+libcamera-jpeg -o test.jpg -t 2000 --shutter 20000 --gain 1.5
+This command will capture an image with 20ms exposure and camera gain set to 1.5x. The gain parameter set will first set the analog gain parameter inside the photosensitive chip. If the set gain exceeds the maximum built-in analog gain value of the driver, the maximum analog gain of the chip will be set first, and then the remaining gain multiples will be used as digital gains to take effect.
+Note: The digital gain is realized by ISP (image signal processing), not directly adjusting the built-in register of the chip. Under normal circumstances, the default digital gain is close to 1.0, unless there are the following three situations.
+
+Overall gain parameter requirements, that is, when the analog gain cannot meet the set gain parameter requirements, the digital gain will be needed for compensation.
+One of the color gains is less than 1 (the color gain is achieved by digital gain), in this case, the final gain is stabilized at 1/min(red_gain, blue_gain), that is, a uniform digital gain is applied, and is the gain value for one of the color channels (not the green channel).
+AEC/AGC was modified. If there is a change in AEC/AGC, the digital gain will also change to a certain extent to eliminate any fluctuations, this change will be quickly restored to the "normal" value.
+The Raspberry Pi's AEC/AGX algorithm allows the program to specify exposure compensation, which is to adjust the brightness of the image by setting the aperture value, for example:
+
+libcamera-jpeg --ev -0.5 -o darker.jpg
+libcamera-jpeg --ev 0 -o normal.jpg
+libcamera-jpeg --ev 0.5 -o brighter.jpg
+libcamera-still
+libcamera-still and libcamera-jpeg are very similar, the difference is that libcamera inherits more functions of raspistill. As before, users can take a picture with the following command.
+Test Command
+
+libcamera-still -o test.jpg
+Encoder
+libcamea-still supports image files in different formats, can support png and bmp encoding, and also supports saving binary dumps of RGB or YUV pixels as files without encoding or in any image format. If you save RGB or YUV data directly, the program must understand the pixel arrangement of the file when reading such files.
+
+libcamera-still -e png -o test.png
+libcamera-still -e bmp -o test.bmp
+libcamera-still -e rgb -o test.data
+libcamera-still -e yuv420 -o test.data
+Note: The format of image saving is controlled by the -e parameter. If the -e parameter is not called, it will be saved in the format of the output file name by default.
+Raw Image Capture
+The raw image is the image output by the direct image sensor without any ISP or CPU processing. For color camera sensors, the output format of the raw image is generally Bayer. Note that the raw image is different from the bit-encoded RGB and YUV images we said earlier, and RGB and YUV are also ISP-processed images.
+A command to take a raw image:
+
+libcamera-still -r -o test.jpg
+The raw image is generally saved in DNG (Adobe Digital Negative) format, which is compatible with most standard programs, such as dcraw or RawTherapee. The raw image will be saved as a file of the same name with the .dng suffix, for example, if you run the above command, it will be saved as a test.dng, and generate a jpeg file at the same time. The DNG file contains metadata related to image acquisition, such as white balance data, ISP color matrix, etc. The following is the metadata encoding information displayed by the exiftool:
+
+File Name                       : test.dng
+Directory                       : .
+File Size                       : 24 MB
+File Modification Date/Time     : 2021:08:17 16:36:18+01:00
+File Access Date/Time           : 2021:08:17 16:36:18+01:00
+File Inode Change Date/Time     : 2021:08:17 16:36:18+01:00
+File Permissions                : rw-r--r--
+File Type                       : DNG
+File Type Extension             : dng
+MIME Type                       : image/x-adobe-dng
+Exif Byte Order                 : Little-endian (Intel, II)
+Make                            : Raspberry Pi
+Camera Model Name               : /base/soc/i2c0mux/i2c@1/imx477@1a
+Orientation                     : Horizontal (normal)
+Software                        : libcamera-still
+Subfile Type                    : Full-resolution Image
+Image Width                     : 4056
+Image Height                    : 3040
+Bits Per Sample                 : 16
+Compression                     : Uncompressed
+Photometric Interpretation      : Color Filter Array
+Samples Per Pixel               : 1
+Planar Configuration            : Chunky
+CFA Repeat Pattern Dim          : 2 2
+CFA Pattern 2                   : 2 1 1 0
+Black Level Repeat Dim          : 2 2
+Black Level                     : 256 256 256 256
+White Level                     : 4095
+DNG Version                     : 1.1.0.0
+DNG Backward Version            : 1.0.0.0
+Unique Camera Model             : /base/soc/i2c0mux/i2c@1/imx477@1a
+Color Matrix 1                  : 0.8545269369 -0.2382823821 -0.09044229197 -0.1890484985 1.063961506 0.1062747385 -0.01334283455 0.1440163847 0.2593136724
+As Shot Neutral                 : 0.4754476844 1 0.413686484
+Calibration Illuminant 1        : D65
+Strip Offsets                   : 0
+Strip Byte Counts               : 0
+Exposure Time                   : 1/20
+ISO                             : 400
+CFA Pattern                     : [Blue, Green][Green, Red]
+Image Size                      : 4056x3040
+Megapixels                      : 12.3
+Shutter Speed                   : 1/20
+Long Exposure
+If we want to take a super long exposure picture, we need to disable AEC/AGC and white balance, otherwise, these algorithms will cause the picture to wait for a lot of frame data when it converges. Disabling these algorithms requires another explicit value to be set. Additionally, the user can skip the preview process with the --immediate setting.
+Here is the command to take an image with an exposure of 100 seconds:
+
+libcamera-still -o long_exposure.jpg --shutter 100000000 --gain 1 --awbgains 1,1 --immediate
+Remarks: Reference table for the longest exposure time of several official cameras.
+
+Module	Maximum exposure time (s)
+V1 (OV5647)	6
+V2 (IMX219)	11.76
+V3 (IMX708)	112
+HQ (IMX477)	670
+libcamera-vid
+libcamera-vid is a video recording demo that uses the Raspberry Pi hardware H.264 encoder by default. After the program runs, a preview window will be displayed on the screen, and simultaneously the bitstream encoding will be output to the specified file. For example, record a 10s video.
+
+libcamera-vid -t 10000 -o test.h264
+If you want to view the video, you can use vlc to play it.
+
+vlc test.h264
+Note: The recorded video stream is unpacked. Users can use --save-pts to set the output timestamp to facilitate the subsequent conversion of the bit stream to other video formats.
+
+libcamera-vid -o test.h264 --save-pts timestamps.txt
+If you want to output the mkv file, you can use the following command:
+
+mkvmerge -o test.mkv --timecodes 0:timestamps.txt test.h264
+Encoder
+Raspberry Pi supports JPEG format and YUV420 without compression and format:
+
+libcamera-vid -t 10000 --codec mjpeg -o test.mjpeg
+libcamera-vid -t 10000 --codec yuv420 -o test.data
+The --codec option sets the output format, not the output file extension.
+Use the --segment parameter to split the output file into segments (unit is ms), which is suitable for JPEG files that need to split the JPEG video stream into separate short (about 1ms) JPEG files.
+
+libcamera-vid -t 10000 --codec mjpeg --segment 1 -o test%05d.jpeg
+UDP Video Streaming Transmission
+UDP can be used for video streaming transmission, and the Raspberry Pi runs (server):
+
+libcamera-vid -t 0 --inline -o udp://<ip-addr>:<port>
+Among them, <ip-addr> needs to be replaced with the actual client IP address or multicast address. On the client (client), enter the following commands to obtain and display the video stream (you can use one of the two commands):
+
+vlc udp://@:<port> :demux=h264
+vlc udp://@:<port> :demux=h264
+Note: The port needs to be the same as the one you set on the Raspberry Pi.
+TCP Video Streaming Transmission
+You can use TCP for video streaming Transmission, and the Raspberry Pi runs (server):
+
+libcamera-vid -t 0 --inline --listen -o tcp://0.0.0.0:<port>
+The client runs:
+
+vlc tcp/h264://<ip-addr-of-server>:<port> #Select one of the two commands
+ffplay tcp://<ip-addr-of-server>:<port> -vf "setpts=N/30" -fflags nobuffer -flags low_delay -framedrop
+RTSP Video Streaming Transmission
+On the Raspberry Pi, vlc is usually used to process the RTSP video stream:
+
+libcamera-vid -t 0 --inline -o - | cvlc stream:///dev/stdin --sout '#rtp{sdp=rtsp://:8554/stream1}' :demux=h264
+On the playback side, you can run any of the following commands:
+
+vlc rtsp://<ip-addr-of-server>:8554/stream1
+ffplay rtsp://<ip-addr-of-server>:8554/stream1 -vf "setpts=N/30" -fflags nobuffer -flags low_delay -framedrop
+In all preview commands, if you want to turn off the preview window on the Raspberry Pi, you can use the parameter -n (--nopreview) to set it. Also, pay attention to the setting of the --inline parameter. Changing the setting will force the header information of the video stream to be included in each I (intra) frame. This setting allows the client to correctly parse the video stream even if the video header is lost.
+High Frame Rate Mode
+If you use the libcamera-vid command to record high frame rate video (generally higher than 60fps) while reducing frame loss, you need to pay attention to the following points:
+
+The target level of H.264 needs to be set to 4.2, which can be set with the --level 4.2 parameter.
+The color noise reduction function must be turned off, which can be set with the --denoise cdn_off parameter.
+If the set frame rate is higher than 100fps, close the preview window to release more CPU resources and avoid frame loss, which can be set with the -n parameter.
+It is recommended to add the setting force_turbo=1 in the /boot/config.txt file to ensure that the CPU clock will not be limited in the video stream.
+Adjust the ISP output resolution, use -width 1280 --height 720 to set the resolution, or set it to a lower resolution, depending on the camera model.
+If you are using Pi 4 or higher-performance model, you can add the setting gpu_freq=550 or higher in the /boot/config.txt file to overclock the motherboard GPU to achieve higher performance.
+For example, record 1280x720 120fps video.
+
+libcamera-vid --level 4.2 --framerate 120 --width 1280 --height 720 --save-pts timestamp.pts -o video.264 -t 10000 --denoise cdn_off -n
+libcamera-raw
+Libcamera-raw is similar to a video recording demo. The difference is, libcamera-raw records the Bayer format data output by the direct sensor, that is, the raw image data. Libcamera-raw doesn't show a preview window. For example, record a 2-second piece of raw data.
+
+libcamera-raw -t 2000 -o test.raw
+The demo will directly dump the raw frame without format information, the program will directly print the pixel format and image size on the terminal, and the user can view the pixel data according to the output data.
+By default, the program will save the raw frame as a file, the file is usually large, and the user can divide the file by the --segement parameter.
+
+libcamera-raw -t 2000 --segment 1 -o test%05d.raw
+If the memory is large (such as using SSD), libcamera-raw can write the official HQ Camera data (about 18MB per frame) to the hard disk at a speed of about 10 frames per second. To achieve this speed, the demo writes the unformatted raw frames, there is no way to save them as DNG files like libcamera-still does. If you want to ensure that there are no dropped frames, you can use --framerate to reduce the frame rate.
+
+libcamera-raw -t 5000 --width 4056 --height 3040 -o test.raw --framerate 8
+Common Command Setting Options
+Common command setting options apply to all libcamera commands:
+
+--help, -h
+Print program help information, you can print the available setting options for each program command, and then exit.
+
+--version
+Print the software version, print the software version of libcamera and libcamera-app, then exit.
+
+--list-cameras
+Display the recognized supported cameras. For example:
+
+Available cameras
+-----------------
+0 : imx219 [3280x2464] (/base/soc/i2c0mux/i2c@1/imx219@10)
+    Modes: 'SRGGB10_CSI2P': 640x480 [206.65 fps - (1000, 752)/1280x960 crop]
+                             1640x1232 [41.85 fps - (0, 0)/3280x2464 crop]
+                             1920x1080 [47.57 fps - (680, 692)/1920x1080 crop]
+                             3280x2464 [21.19 fps - (0, 0)/3280x2464 crop]
+           'SRGGB8' : 640x480 [206.65 fps - (1000, 752)/1280x960 crop]
+                      1640x1232 [41.85 fps - (0, 0)/3280x2464 crop]
+                      1920x1080 [47.57 fps - (680, 692)/1920x1080 crop]
+                      3280x2464 [21.19 fps - (0, 0)/3280x2464 crop]
+1 : imx477 [4056x3040] (/base/soc/i2c0mux/i2c@1/imx477@1a)
+    Modes: 'SRGGB10_CSI2P': 1332x990 [120.05 fps - (696, 528)/2664x1980 crop]
+           'SRGGB12_CSI2P': 2028x1080 [50.03 fps - (0, 440)/4056x2160 crop]
+                             2028x1520 [40.01 fps - (0, 0)/4056x3040 crop]
+                             4056x3040 [10.00 fps - (0, 0)/4056x3040 crop]
+According to the printed information, the IMX219 camera has a suffix of 0, and the IM new 477 camera has a suffix of 1. When calling the camera, you can specify the corresponding suffix.
+
+--camera
+Specify the camera, and the corresponding suffix can refer to the print information of the command --list-camera.
+For example: libcamera-hello -c config.txt
+In the setting file, set parameters one line at a time, in the format of key=value:
+
+timeout=99000
+verbose=
+--config,	-c
+Under normal circumstances, we can directly set the camera parameters through commands. Here we use the --config parameter to specify the setting file and directly read the setting parameters in the file to set the camera preview effect.
+
+--timeout, -t
+The "-t" option sets the runtime of the libcamera demo. If the video recording command is run, the timeout option sets the recording duration. If the image capture command is run, the timeout sets the preview time before the image is captured and output.
+If "timeout" is not set when running the libcamera demo, the default timeout value is 5000 (5 seconds). If the timeout is set to 0, the demo will continue to run.
+Example: libcamera-hello -t 0
+
+--preview, -p
+"-p" sets the size and position of the preview window (the qualified settings are valid in both X and DRM version windows), and the format is --preview <x. y, w, h> where "x", "y" sets the preview window coordinates, "w" and "h" set the width and length of the preview window.
+The settings of the preview serial port will not affect the resolution and aspect ratio of the camera image preview. The demo will scale the preview image to display in the preview window and adapt it according to the original image aspect ratio.
+Example: libcamera-hello -p 100,100,500,500
+
+--fullscreen, -f
+The "-f" option sets the preview window full screen, the preview window and the border in full-screen mode. Like "-p", it does not affect the resolution and aspect ratio, and will automatically adapt.
+Example: libcamera-still -f -o test.jpg
+
+--qt-preview
+Using the preview window based on the QT framework, this setting is not recommended under normal circumstances, because the preview demo will not use zero-copy buffer sharing and GPU acceleration, which will occupy more resources. The QT preview window supports X forwarding (the default preview program does not).
+The Qt preview serial port does not support the "--fullscreen" setting option. If the user wants to use the Qt preview, it is recommended to keep a small preview window to avoid excessive resource usage and affecting the normal operation of the system.
+Example: libcamera-hello --qt-preview
+
+--nopreview, -n
+Images are not previewed. This setting will turn off the image preview function.
+Example: libcamera-hello -n
+
+--info-text
+Set the title and information display of the preview window (only available in the X graphics window) using the format --info-text <string>. When calling this option, multiple parameters can be set, and the parameters are usually called in the % command format. The demo will call the corresponding value in the graphics metadata according to the instructions.
+If no window info is specified, the default --info-text is set to "#%frame (%fps fps) exp %exp ag %ag dg %dg" .
+Example: libcamera-hello --info-test "Focus measure: %focus
+Available parameters:
+
+Instructions	Instructions
+%frame	Frame sequence number
+%fps	Instantaneous frame rate
+%exp	Shutter speed when capturing the image, in ms
+%ag	Image analog gain controlled by the sensor chip
+%dg	Image value gain controlled by ISP
+%rg	Gain of the red component of each pixel
+%bg	Gain of the blue component of each pixel
+%focus	Corner detection of the image, the larger the value, the clearer the image
+%lp	Diopter of the current lens (1/distance in meters)
+%afstate	Autofocus state (idle, scanning, focused, failed)
+--width
+--height
+These two parameters set the width and height of the image respectively. For libcamera-still, libcamera-jpeg, and libcamera-vid commands, these two parameters can set the resolution of the output image/video.
+If the libcamera-raw command is used, these two parameters will affect the size of the obtained metadata frame. The camera has a 2 x 2 block reading mode. If the set resolution is smaller than the split mode, the camera will obtain the metadata frame according to the 2 x 2 block size.
+libcamera-hello cannot specify the resolution.
+Example:
+libcamera-vid -o test.h264 --width 1920 --height 1080 Record a 1080p video
+libcamera-still -r -o test.jpg --width 2028 --height 1520 Take a 2028 x 1520 JPEG image
+
+--viewfinder-width
+--viewfinder-height
+This setting option is also used to set the resolution of the image, the difference is only the image size of the preview. It does not affect the final output image or video resolution.The size of the preview image will not affect the size of the preview window and it will be adapted according to the window.
+Example: libcamera-hello --viewfinder-width 640 --viewfinder-height 480
+
+--rawfull
+This setting forces the sensor chip to activate --width and --height settings to output still images and video in full-resolution reading mode. This setting libcamera-hello is invalid.
+With this setting, the framerate will be affected. In full-resolution mode, frame reading will be slower.
+Example: libcamera-raw -t 2000 --segment 1 --rawfull -o test%03d.raw
+The example command will capture multiple Metadata frames in full-resolution mode. If you are using an HQ camera, the size of each frame is 18MB, and if --rawfull is not set, the HQ camera defaults to 2 x 2 mode, and the data size of each frame is only 4.5MB.
+
+--mode
+This parameter is more general than rawfull. It is used to set the camera mode. When using it, you need to specify the width, height, bit depth and packing mode, and separate them with colons. The set value does not have to be completely accurate, the system will automatically match the closest value, and the bit depth and packing mode can be set (the default is 12 and P means packing).
+
+4056:3040:12:P - 4056x3040 resolution, 12 bits per pixel, packing. Packing means that the raw image data will be packed in the buffer. In this case, two pixels will only occupy 3 bytes, which can save memory.
+1632:1224:10 - 1632x1224 resolution, 10 bits per pixel, packing by default. In 10-bit packing mode, 4-pixel data will occupy 5 bytes.
+2592:1944:10:U - 2592x1944 resolution, 10 bits per pixel, no packing. In the case of unpacking, each pixel will occupy 2 bytes of memory, in this case, the highest 6 bits will be set to 0.
+3262:2448 - 3264x2448 resolution, 12 bits and packing mode are used by default. However, if the camera model, such as Camera V2 (IMX219), does not support 12-bit mode, the system will automatically select 10-bit mode.
+--viewfinder-mode       #Specify sensor mode, given as <width>:<height>:<bit-depth>:<packing>
+The --mode parameter is used to set the camera mode when recording video and shooting still images. If you want to set it when previewing, you can use the --viewfinder-mode parameter.
+
+--lores-width
+--lores-height
+These two options set low-resolution images. The low-resolution data stream compresses the image, causing the aspect ratio of the image to change. When using libcamera-vid to record video, if a low resolution is set, functions such as color image denoising will be disabled.
+Example: libcamera-hello --lores-width 224 --lores-height 224
+Note that low-resolution settings are often used in conjunction with image postprocessing, otherwise it has little effect.
+
+--hflip #Flip the image horizontally
+--vflip #Flip the image vertically
+--rotation #Flip the image horizontally or vertically according to the given angle <angle>
+These three options are used to flip the image. The parameters of --rotation currently only support 0 and 180, which are equivalent to --hflip and --vflip.
+Example: libcamera-hello --vflip --hflip
+
+--roi #Crop image <x, y, w, h>
+The --roi parameter allows the user to crop the image area they want according to the coordinates from the complete image provided by the sensor, that is digital scaling, note that the coordinate values should be within the valid range. For example --roi 0, 0, 1, 1 is an invalid instruction.
+Example: libcamera-hello --roi 0.25,0.25,0.5,0.5
+The example command will crop 1/4 of the image from the center of the image.
+
+--hdr #Run the camera in HDR mode (supported cameras only)
+The --hdr parameter is used to set the wide dynamic mode of the camera. This setting will only take effect if the camera supports a wide dynamic range. You can use --list-camera to see if the camera supports hdr mode.
+
+--sharpness #Set the sharpness of the image <number>
+Adjust the sharpness of the image by the value of <number>. If set to 0, sharpening will be applied. If you set a value above 1.0, an extra sharpening amount will be used.
+Example: libcamera-still -o test.jpg --sharpness 2.0
+
+--contrast #Set image contrast <number>
+Example: libcamera-still -o test.jpg --contrast 1.5
+
+--brightness #Set image brightness <number>
+The setting range is -1.0 ~ 1.0
+Example: libcamera-still -o test.jpg --brightness 0.2
+
+--saturation #Set image color saturation <number>
+Example: libcamera-still -o test.jpg --saturation 0.8
+
+--ev #Set EV compensation <number>
+Set the EV compensation of the image in units of aperture, the setting range is -10 ~ 10, the default value is 0. The program runs using the AEC/AGC algorithm.
+Example: libcamera-still -o test.jpg --ev 0.3
+
+--shutter #Set the exposure time, the unit is ms <number>
+Note: If the frame rate of the camera is too fast, it may not work according to the set shutter time. If this happens, you can try to use --framerate to reduce the frame rate.
+Example: libcamera-hello --shutter 30000
+
+--gain #Set gain value (combination of numerical gain and analog gain) <number>
+--analoggain #--gain synonym
+--analoggain is the same as --gain, the use of analoggain is only for compatibility with raspicam programs.
+
+--metering #Set metering mode <string>
+Set the metering mode of the AEC/AGC algorithm, the available parameters are:
+
+centre - Center metering (default)
+spot - spot metering
+average - average or full frame metering
+custom - custom metering mode, can be set via tuning file
+Example: libcamera-still -o test.jpg --metering spot
+
+--exposure #Set exposure profile <string>
+The exposure mode can be set to normal or sport. The report profile for these two modes does not affect the overall exposure of the image, but in the case of sport mode, the program will shorten the exposure time and increase the gain to achieve the same exposure effect.
+
+sport: Short exposure, larger gains
+normal: Normal expoeure, normal gains
+long: Long exposure, smaller gains
+Example: libcamera-still -o test.jpg --exposure sport
+
+--awb #Set white balance mode <string>
+Available white balance modes:
+
+Mode	Color Temperature
+auto	2500K ~ 8000K
+incadescent	2500K ~ 3000K
+tungsten	3000K ~3500K
+fluorescent	4000K ~ 4700K
+indoor	3000K ~ 5000K
+daylight	5500K ~ 6500K
+cloudy	7000K ~ 8500K
+custom	Custom range, set via tuning file
+Example: libamera-still -o test.jpg --awb tungsten
+
+--awbgains #Set a fixed color gain <number,number>
+Set red and blue gain.
+Example: libcamera-still -o test.jpg --awbgains 1.5, 2.0
+
+--denoise #Set denoising mode <string>
+Supported denoising modes:
+
+auto - Default mode, use standard spatial denoising. If it is a video, fast color denoising will be used, and high-quality color denoising will be used when taking still images. Previewing images will not use any color denoising.
+off - Turn off spatial denoising and color denoising.
+cdn_off - Turn off color denoising.
+cdn_fast - Use fast color denoising.
+cdn_hq - Use high-quality color denoising, not suitable for video recording.
+Example: libcamera-vid -o test.h264 --denoise cdn_off
+
+--tuning-file #Specify camera tuning file <string>
+For more instructions on tuning files, you can refer to official tutorial.
+Example: libcamera-hello --tuning-file ~/my~camera-tuning.json
+
+--autofocus-mode #Specify the autofocus mode <string>
+Set the autofocus mode.
+
+default - By default, the camera will use continuous autofocus mode, unless --lens-position or --autofocus-on-capture manual focus is set.
+manual - Manual focus mode, the focus position can be set by --lens-position.
+auto - Focusing will only be done once when the camera is turned on, and will not be adjusted in other cases. (If you use the libcamera-still command, only when --autofocus-on-capture is used, it will focus once before taking a photo).
+continuous - The camera will automatically adjust the focus position according to the scene changes.
+--autofocus-range #Specify the autofocus range <string>
+Set the autofocus range.
+
+normal -- The default mode, from nearest to infinity.
+macro - The macro mode, only focus on nearby objects.
+full - The full distance mode, adjusted to infinity for the closest object.
+--autofocus-speed #Specify the autofocus speed <string>
+Set the focus speed.
+
+normal - The default item, normal speed.
+fast - The fast focus mode.
+--autofocus-window   --autofocus-window
+To display the focus window, you need to set x, y, width and height, and the coordinate value setting is based on the ratio of the image. For example --autofocus-window 0.25,0.25,0.5,0.5 would set a window that is half the size of the image and centered.
+
+--lens-position #Set the lens to a given position <string>
+Set the focus position.
+
+0.0 -- Set the focus position to infinity.
+number -- Set the focus position to 1/number, number is any value you set, for example, if you set 2, it means that it will focus on the position of 0.5m.
+default -- Focus on the default position relative to the hyperfocal distance of the lens.
+--output, -o #Output file name <string>
+Set the filename of the output image or video. In addition to setting the file name, you can also specify the output udp or tcp server address to output the image to the server. If you are interested, you can check the relevant setting instructions of the subsequent tcp and udp.
+Example: libcamera-vid -t 100000 -o test.h264
+
+--wrap #Wrap the output file counter <number>
+Example: libcamera-vid -t 0 --codec mjpeg --segment 1 --wrap 100 -o image%d.jpg
+
+--flush #Flush the output file immediately
+The --flush parameter will immediately update each frame of the image to the hard disk at the same time as it is written, reducing latency.
+Example: libcamera-vid -t 10000 --flush -o test.h264
+
+Still Image Shooting Setting Parameters
+--quality, -q            #Set JPEG image quality <0 ~ 100>
+--exif, -x               #Add extra EXIF flags
+--timelapse              #Time interval of time-lapse photography, the unit is ms
+--framestart             #Start value of frame count
+--datetime               #Name the output file with date format
+--timestamp              #Name the output file with the system timestamp
+-- restart               #Set the JPEG restart interval
+--keypress, -k           #Set the Enter key photo mode
+--signal, -s             #Set the signal to trigger the photo mode
+--thumb                  #Set thumbnail parameters <w:h:q>
+--ebcoding, -e           #Set the image encoding type: jpg/png/bmp/rgb/yuv420
+--raw, -r                #Save raw image
+--latest                 #Associate symbols to the latest saved file
+--autofocus-on-capture   #Set to do a focus action before taking a photo
+Video Recording Image Setting Parameters
+--quality, -q   #Set JPEG commands <0 - 100>
+--bitrate, -b   #Set H.264 bitrate
+--intra, -g     #Set the internal frame period (only supports H.264)
+--profile       #Set H.264 configuration
+--level         #Set H.264 level
+--codec         #Set encoding type h264 / mjpeg / yuv420
+--keypress, -k  #Set Enter key to pause and record
+--signal, -s    #Set signal pause and record
+--initial       #Start the program in the recording or paused state
+--split         #Split video and save to another file
+--segment       #Split video into multiple video segments
+--circular      #Write video to the circular buffer
+--inline        #Write header in each I frame (only supports H.264)
+--listen        #Wait for a TCP connection
+--frames        #Set the number of frames recorded
+For more camera setup instructions, please refer to Official Camera Documentation.
+Raspicam User Guide
+Introduction
+If you are using the Buster version of the image, the Raspicam driver is installed by default in the system, you can directly turn on the camera and use it.
+If you are using the latest Bullseye system, you need to install and configure it separately.
+Applicable to OV5647, official IMX219, official IMX477.
+
+Install Raspicam (optional)
+Open the Raspberry Pi terminal, and enter the following command to install the driver. Note: This driver cannot support a 64-bit Raspberry Pi system temporarily.
+
+sudo apt-get update
+cd
+sudo apt install cmake
+git clone https://github.com/raspberrypi/userland
+cd userland
+./buildme
+cp build/bin/* ~/bin/
+Restart the system after installation.
+
+sudo reboot
+Call camera
+raspistill
+The raspistill command is used to take still pictures. Example: raspistill -o cam.jpg
+
+raspivid
+The raspivid command is used to record video. Example: raspivid -o vid.h264
+
+raspiyuv
+The raspiyuv command has the same function as raspisitll, the difference is that raspiyuv dosen't output jpgs and other standard image files, but generate YUV420 or RGB888 image files from the camera's ISP output.
+In most cases, it is better to use raspistill to capture images, but if you want to use uncompressed black and white images, you can choose to use the raspiyuv command. Example: raspiyuv -o cam.jpg
+
+Instruction Setting Options
+When the raspicam command is used, the final imaging effect can be adjusted by setting options. The available setting options are listed below for reference.
+
+--preview, -p #Set the preview window <x, y, w, h>
+The user can set the position of the preview window by setting the values ​​of x and y, and adjust the resolution of the preview image by setting the values ​​of w and h.
+
+--fullscreen, -f #Fullscreen preview window
+Display the preview window in full screen.
+
+--nopreview, -n #Do not display the preview window
+Close the preview window and the command will output the image or video directly to a file.
+
+--opacity, -op #Set the transparency of the preview window
+Set the transparency of the preview window, 0 is invisible, and 255 is fully transparent.
+
+--sharpness, -sh #Set image sharpness (-100 - 100)
+The default sharpening value is 0.
+
+--contrast. -co #Set image contrast (-100 - 100)
+The default contrast is 0.
+
+--brightness, -br #Set image contrast (0 - 100)
+The default brightness is 50, 0 is fully black, and 100 is full white.
+
+--saturation, -sa #Set image saturation (-100 - 100)
+The default saturation is 0.
+
+--ISO #Set shutter sensitivity (100 - 800)
+Set sensitivity when taking pictures.
+
+--vstab, -vs #Enable video stabilization
+Only the video recording mode is valid, and video stabilization is enabled.
+
+--ev #Set EV compensation
+Set the EV compensation value of the image, default 0.
+
+--exposure, -ex #Set exposure mode
+Configurable exposure options:
+
+auto: automatic exposure mode
+night: night shooting mode
+nightpreview
+backlight: backlight mode
+spotlight
+sports: sports mode (the shutter time will be shortened in sports mode)
+snow: snow mode
+beach: beach mode
+verylong: long exposure mode
+fixedfps: fixed fps
+antishake: anti-shake mode
+fireworks: fireworks mode
+Note: Depending on the camera model, some modes are not available.
+
+--flicker, -fli #Flicker avoidance
+Configurable modes:
+
+off: turn off anti-flicker mode
+auto: automatic detection of injection frequency
+50Hz: set the anti-flicker frequency to 50Hz
+60Hz: set the anti-flicker frequency to 60Hz
+--awb, #Set auto white balance mode
+off: disable auto white balance
+auto: auto white balance mode (default)
+sun: sunny mode (5000K ~ 6500K)
+cloud: cloudy mode (6500K ~ 12000K)
+shade: shadow mode
+tungsten: Tungsten mode (2500K ~ 3500K)
+incadescent: Incadescent mode (2500K ~ 4500K)
+flash: flash mode
+horizon: horizon mode
+greyworld: If you are using a camera without an IR filter (eg NoIR), you can fix the white balance misalignment caused by the lack of an IR filter.
+Note: Depending on the camera model, some modes are not available.
+
+--imfx, -ifx #Set image filter effect
+Configurable image filter effects:
+
+none: no effect (default)
+negative: color flip
+solarise: sunlight effect
+posterise: poster effect
+whiteboard: whiteboard effect
+backboard: blackboard effect
+sketch: sketch
+denoise: denoise
+emboss: emboss
+oilpaint: oil painting
+hatch: texture
+gpen: pencil sketch
+pastel: colored pencils
+watercolour: watercolor
+film: film
+blur: blur
+saturation: saturation
+Note: Depending on the camera model, some modes are not available.
+
+--colfx, -cfx #Set color effect <U:V>
+The setting range of the U and V parameters is 0 ~ 255, which are used to adjust the values ​​of the U and Y channels. For example --colfx 128:128 will set the image to monochrome.
+
+--metering, -mm #Set metering mode
+Configurable options:
+
+average: average or full frame metering
+spot: spot metering
+backlit: preset a backlight image
+matrix: matrix metering
+--rotation, -rot #Set image rotation (0 - 359)
+The image rotation angle can be set by the angle parameter.
+
+--hflip, -hf #Set the image to flip horizontally
+Set the image to be flipped horizontally.
+
+--vflip, -vf #Set the image to flip vertically
+Flip the image vertically.
+
+--roi, #Crop image <x, y, w, h>
+Crop the image according to the parameters, note that the parameters are all planned in (0,0 ~ 1.0), for example, if you want to crop 1/4 of the image, you can use the command - roi 0.5,0.5,0.25,0.25.
+
+--shutter, --ss set shutter speed/time
+Set the shutter time (unit: ms). The maximum shutter time that can be set is different depending on the photosensitive chip.
+
+Model	Max Digit (ms)
+V1 (OV5647)	6000000 (6s)
+V2 (IMX219)	10000000 (10s)
+HQ (IMX477)	200000000 (200s)
+--drc, -drc #Enable/disable dynamic range compression
+off (default)
+low
+med
+high
+--stats, -st #Statistics images by static image frames
+--awbgains, -awbg
+Set blue and green gain, which takes effect if --awb off is set.
+
+--analoggain, -ag
+Set the analog gain value
+
+--digitalgain, -dg
+Set digital gain value
+
+--mode, -md
+Set sensor mode:
+
+OV5647
+Mode	Resolution	Aspect Ratio	Frame Rate	FoV
+0	Automatic selection			
+1	1920 x 1080	16:9	1-30fps	Partial
+2	2592 x 1944	4:3	1-15fps	Full Frame
+3	2592 x 1944	4:3	0.1666 - 1fps	Full Frame
+4	1296 x 972	4:3	1 - 42fps	Full Frame
+5	1296 x 730	16:9	1- 49fps	Full Frame
+6	640 x 480	4:3	42.1 - 60fps	Full Frame
+7	640 x 480	4:3	60.1 - 90fps	Full Frame
+IMX219
+Mode	Resolution	Aspect Ratio	Frame Rate	FoV
+0	Automatic selection			
+1	1920 x 1080	16:9	0.1-30fps	Partial
+2	3280 x 2464	4:3	0.1-15fps	Full Frame
+3	3280 x 2464	4:3	0.1 - 15fps	Full Frame
+4	1640 x 972	4:3	1 - 42fps	Full Frame
+5	1296 x 730	16:9	1- 49fps	Full Frame
+6	640 x 480	4:3	42.1 - 60fps	Full Frame
+7	640 x 480	4:3	60.1 - 90fps	Full Frame
+HQ Camera
+Mode	Resolution	Aspect Ratio	Frame Rate	FoV
+0	Automatic selection			
+1	2028 x 1080	169:90	0.1-50fps	Partial
+2	2028 x 1080	4:3	0.1-50fps	Full Frame
+3	4056 x 3040	4:3	0.005 - 10fps	Full Frame
+4	1332 x 990	74:55	50.1-120 fps	Partial
+--camselect, -cs
+When multiple cameras are connected to the system, select camera, 0 or 1.
+
+--annotate, -a #enable/set annotations
+The parameters are represented by bit masks in the metadata, which can be directly represented by addition. For example, 12 can represent the display time (4) and the display date (8), which is represented by the addition of 4+8 =12.
+Configurable options
+
+Value	Parameter description
+-a 4	Time
+-a 8	Date
+-a 12	Time and date, actually 4 + 8
+-a 16	Shutter setting
+-a 32	CAF settings
+-a 64	Gain setting
+-a 128	Lens settings
+-a 256	Animation settings
+-a 512	Number of frames
+-a 1024	Black background
+-a "ABC %Y-%m-%d %X"	Display text
+-a 4 -a "ABC %Y-%m-%d %X"	Display time/date in custom format
+-a 8 -a "ABC %Y-%m-%d %X"	Display time/date in custom format
+--annotateex, -ae #Set additional annotation parameters
+--stereo, -3d
+Set the binocular mode.
+
+sbs - Side-by-side mode
+tb: - Portrait mode
+off - turn off binocular mode (default)
+--decimate, -dec
+Halve the width and height of the binocular image.
+
+--setting, -set
+Output current camera settings.
+
+raspistill setting parameters
+--width, -w         #Set image width
+--height, -h        #Set image height
+--quality, 0q       #Set JPEG quality <0 ~ 100>
+--raw, -r           #Add raw Bayer data to JPEG metadata
+--output, -o        #Output file <filename>
+--latest, -l        #Associate the last frame image to the file <filename>
+--verbose, -v       #Print details
+--timeout, -t       #Set the program preview time
+--timelapse, -tl    #Set up demo photography
+--framestart, -fs   #Save the number of the first frame
+--datetime, -dt     #Name the file with DateTime
+--timestamp, -ts    #Name files with timestamps
+--thumb, -th        #Set thumbnail parameters <x:y:quility>, the default is (64:48:35)
+--demo, -d          #Run demo mode <ms>
+--encoding, -e      #Encode according to the specified format, jpg, BMP, or png
+--restart, -rs      #Set JPEG restart flag
+--exif, -x          #Set EXIF ​​flag
+--gpsdexif, -gps    #Set real-time Exif time (requires GPS Dongle access)
+--fullpreview, -fg  #Fullscreen preview
+--keypress, -k      #Keypress camera mode
+--signal, -s        #Signal mode
+--burst, -bm        #Snapshot mode
+raspivid setting parameters
+--width, -w         #Set the video width
+--height, -h        #Set the video height
+--bitrate, -b       #Set bitrate
+--output, -o        #Set the output filename <filename>
+--listen, -l        #When using a network connection, wait for a network connection
+--versbose, -v      #Print details
+--timeout, -t       #Set preview time
+--demo, -d          #Run demo <ms>
+--framerate, -fs    #Set frame rate
+--penc, -e          #Display the encoded preview image
+--intra, -g         #Set the internal refresh cycle
+--qp, -qp           #Set quantization parameters
+--profile, -pf      #Specify H264 profile, baseline/main/high
+--level, -lev       #Set H264 encoding level
+--irefresh, -if     #Set H264 internal refresh type cyclic/adaptive/both/cyclicrows
+--inline, -ih       #Insert PPS, SPS header
+--spstimings, -stm  #Insert timing information into SPS blocks
+--timed, -td        #Timed switch recording and pause function
+--keypress, -k      #Keypress to pause recording
+--signal, -s        #Switch pause and record state according to SIGUSR1
+--split, -sp        #In signal and keypress mode, the file will be recreated every time you re-record
+--vectors, -x       #Vector output
+--flush, -fl        #Force the output data buffer to be flushed immediately after writing video data, bypassing any OS cache for written data and reducing latency
+--save-pts, -pts    #Save timestamp information to the specified file
+--codec, -cd        #Specify encoder H264 / MJPEG
+--initial, -i       #Set the initial state of startup
+--segment, -sg      #Split video stream into multiple files
+--wrap, -wr         #Set the maximum value of the split
+--start, -sn        #Set the initial split encoding
+--raw, -r           #Set metadata file name
+--raw-format, -rf   #Specify metadata format yuv/rgb/grey
+Code call camera
+The Raspberry Pi official provides the picamera2 library, which is a Python library for the libcamera driver.
+Note: Picamera2 only supports Raspberry Pi OS Bullseye mirroring.
+
+Install libraries
+Install picamera2, Picamera2 is now pre-installed in the latest versions of the Raspberry Pi OS Bullseye image, you can update the library via the terminal by doing the following:
+
+sudo apt update
+sudo apt upgrade
+sudo apt install -y python3-picamera2
+Use CSI camera
+Test CSI camera
+Before use, you need to open the terminal and enter the following command to check whether the camera is working properly
+
+libcamera-hello -t 0 
+Implement preview window
+Preview window parameters
+x - the x-offset of the preview window
+y - the y-offset of the preview window
+width - the width of the preview window
+height - the height of the preview window
+transform - allows camera images to be horizontally and/or vertically flipped on the display
+All parameters are optional, and if omitted, the default value will be chosen. The following example will place an 800x600 pixel preview window at (100,200) on the display and will mirror the camera preview image horizontally:
+
+from picamera2 import Picamera2, Preview
+from libcamera import Transform
+picam2 = Picamera2()
+picam2.start_preview(Preview.QTGL, x=100, y=200, width=800, height=600,
+transform=Transform(hflip=1))
+picam2.start()
+Supported transformations
+Transform () - the identity transformation, which is the default
+Transform (hflip=1) - flip horizontally
+Transform (vflip=1) - flip vertically
+Transform（hflip=1） - flip horizontally and vertically (equivalent to 180-degree rotation)
+Notice: The display transformation here has no effect on the actual image. In the example above, the start_preview() function must be called before calling picam2.start(). If the camera's image aspect ratio is different from that of the preview window, they will be transformed into letter-boxed or pillar-boxed styles to maintain the appropriate aspect ratio.
+
+Null preview interface
+Normally it is the preview window that actually drives the libcamera system by receiving camera images, passing themto the application, and then recycling those buffers back to libcamera once the user no longer needs them. Theconsequence is then that even when no preview images are being displayed, something still has to run in order toreceive and then return those camera images. This is exactly what the NULL preview does. It displays nothing; it merely drives the camera system. The NULL preview is in fact started automatically whenever the camera system is started (picam2.start()) if no preview is yet running, which is why alternative preview windows must be started earlier. You can start the NULL preview explicitly like this:
+
+from picamera2 import Picamera2, Preview
+picam2 = Picamera2()
+picam2.start_preview(Preview.NULL)
+Start and stop previews
+The first parameter to the start_preview function can take the following values:
+
+None - no preview of any kind is started. The application would have to supply its own code to drive the camera system.
+False - the NULL preview is started.
+True - one of the three other previews is started.
+It is not recommended to start and stop the preview window simultaneously, as frames from the camera are likely to be discarded during this period. The Start function accepts a show_preview parameter which can take on any one of these same values. This is just a convenient shorthand that allows the amount of boilerplate code to be reduced. Note that stopping the camera(Picamera2.stop) does not stop the preview window, so the stop_preview function would have to be called explicitly before it. For example, the following script would start the camera system running, run for a short while, and then attempt to auto detect which preview window to use in order actually to start displaying the images:
+
+from picamera2 import Picamera2, Preview
+import time
+picam2 = Picamera2()
+config = picam2.create_preview_configuration()
+picam2.configure(config)
+picam2.start() #Start camera capture
+time.sleep(2) #Delay of 2 seconds for camera initialization completion
+picam2.stop_preview() #Stop the camera preview to prevent the camera from being used up and the camera fails to be turned on
+picam2.start_preview(True) #Start camera preview
+time.sleep(2) #Close the camera in two seconds
+Picamera2's high-level API
+Picamera2 has some high-level and very convenient functions for capturing images and video recordings. You can capture an image with just a few lines of code:
+
+from picamera2 import Picamera2
+picam2 = Picamera2()
+picam2.start_and_capture_file("test.jpg")
+You can also capture multiple images with the start_and_capture_files function. Or, to record a five-second video:
+
+from picamera2 import Picamera2
+picam2 = Picamera2()
+picam2.start_and_record_video("test.mp4", duration=5)
+If you want to understand the underlying code, you can refer to the following code:
+
+from picamera2 import Picamera2, Preview
+import time
+picam2 = Picamera2() #Create an instance of Picamera2
+camera_config = picam2.create_preview_configuration() # Create camera preview configuration
+picam2.configure(camera_config) # Configure the camera
+picam2.start_preview(Preview.QTGL) # Start camera preview (using QTGL preview window manager)
+picam2.start() # Start the camera
+time.sleep(2) # Wait for 2 seconds to ensure the camera has started
+picam2.capture_file("test.jpg")  # Take a photo and save it as "test.jpg"
+Configure the camera
+Picamera2 provides a number of configuration-generating methods that can be used to provide suitable configurationsfor common use cases:
+
+Picamera2. create_preview_configuration will generate a configuration suitable for displaying camera preview images on the display, or prior to capturing a still image
+Picamera2. create_still_configuration will generate a configuration suitable for capturing a high-resolution still image
+Picamera2. create_video_configuration will generate a configuration suitable for recording video files
+So, for example, to set up the camera to start delivering a stream of preview images you might use:
+
+from picamera2 import Picamera2
+picam2 = Picamera2()
+config = picam2.create_preview_configuration()
+picam2.configure(config)
+picam2.start()
+General parameter configuration
+transform - whether camera images are horizontally or vertically mirrored, or both (giving a 180 degree rotation).
+Transforms can be passed to all the configuration-generating methods using the transform keyword parameter. Picamera2 only supports the transforms shown above. Other transforms (involving image transposition) exist butare not supported. If unspecified, the transform always defaults to the identity transform. The code is as follows:
+from picamera2 import Picamera2
+from libcamera import Transform
+picam2 = Picamera2()
+preview_config = picam2.create_preview_configuration(transform=Transform(hflip=True))
+
+colour_space - the colour space of the output images. The main and lores streams must always share the samecolour space. The raw stream is always in a camera-specific colour space.
+The implementation of colour spaces in libcamera follows that of the Linux V4L2 API quite closely. Specific choices are provided for each of colour primaries, the transfer function, the YCbCr encoding matrix and the quantisation (or range). In addition, libcamera provides convenient shorthand forms for commonly used colour spaces:
+>>> from libcamera import ColorSpace
+>>> ColorSpace.Sycc()
+<libcamera.ColorSpace 'sYCC'>
+>>> ColorSpace.Rec709()
+<libcamera.ColorSpace 'Rec709'>
+These are in fact the only colour spaces supported by the Pi’s camera system. The required choice can be passed to all the configuration-generating methods using the colour_space keyword parameter:
+
+from picamera2 import Picamera2
+from libcamera import ColorSpace
+picam2 = Picamera2()
+preview_config = picam2.create_preview_configuration(colour_space=ColorSpace.Sycc())
+When omitted, Picamera2 will choose a default according to the use case: •create_preview_configuration and create_still_configuration will use the sYCC colour space by default (by which we mean sRGB primaries and transfer function and full-range BT.601 YCbCr encoding). •create_video_configuration will choose sYCC if the main stream is requesting an RGB format. For YUV formats it will choose SMPTE 170M if the resolution is less than 1280x720, otherwise Rec.709.
+
+buffer_count - the number of buffers allocated for the camera system. A set of buffers represents that each requested stream has a buffer.
+The number defines how many sets of buffers (one for each requested stream) are allocated for the camera system to use. Allocating more buffers can mean that the camera will run more smoothly and drop fewer frames, though the downside is that particularly at high resolutions, there may not be enough memory available. •create_preview_configuration requests four sets of buffers •create_still_configuration requests just one set of buffers (as these are normally large full resolution buffers) •create_video_configuration requests six buffers, as the extra work involved in encoding and outputting the video streams makes it more susceptible to jitter or delays, which is alleviated by the longer queue of buffers. The number of buffers can be overridden in all the configuration-generating methods using the buffer_count keyword parameter:
+from picamera2 import Picamera2
+picam2 = Picamera2()
+preview_config = picam2.create_still_configuration(buffer_count=2)
+queue - whether the system is allowed to queue up a frame ready for a capture request.
+By default, Picamera2 keeps hold of the last frame to be received from the camera and, when you make a capture request, this frame may be returned to you. This can be useful for burst captures, particularly when an application is doing some processing that can take slightly longer than a frame period. In these cases, the queued frame can be returned immediately rather than remaining idle until the next camera frame arrives. But this does mean that the returned frame can come from slightly before the moment of the capture request, by up to a frame period. If this behaviour is not wanted, please set the queue parameter to False. For example:
+from picamera2 import Picamera2
+picam2 = Picamera2()
+preview_config = picam2.create_preview_configuration(queue=False)
+Note that, when the buffer_count is set to one, as is the case by default for still capture configurations, then no frames are ever queued up (because holding on to the only buffer would completely stall the camera pipeline).
+
+display - this names which (if any) of the streams are to be shown in the preview window. It does not actually affect the camera images in any way, only what Picamera2 does with them.
+Normally we would display the main stream in the preview window. In some circumstances it may be preferable to display a lower resolution image (from the lores stream) instead. We could use:
+from picamera2 import Picamera2
+picam2 = Picamera2()
+config = picam2.create_still_configuration(lores={"size": (320, 240)}, display="lores")
+This would request a full resolution main stream, but then also a QVGA lores stream which would be displayed (recall that the main stream is always defined even when the application does not explicitly request it). The display parameter may take the value None which means that no images will be rendered to the preview window. In fact this is the default choice of the create_still_configuration method.
+
+encode - this names which (if any) of the streams are to be encoded if a video recording is started. This too does not affect the camera images in any way, only what Picamera2 does with them.
+This is similar to the display parameter, in that it names the stream (main or lores) that will be encoded if a video recording is started. By default we would normally encode the main stream, but a user might have an application where they want to record a low resolution video stream instead:
+from picamera2 import Picamera2
+picam2 = Picamera2()
+config = picam2.create_video_configuration(main={"size": (2048, 1536)}, lores={"size": (320,
+240)}, encode="lores")
+This would enable a QVGA stream to be recorded, while allowing 2048x1536 still images to be captured simultaneously. The encode parameter may also take the value None, which is again the default choice of the create_still_configuration method.
+
+Autofocus function
+Only applicable to cameras with autofocus
+Autofocus controls obey the same general rules as all other controls. These controls should work correctly so long as the version of libcamera being used (such as that supplied by Raspberry Pi) implements libcamera's published autofocus API correctly, and the attached camera module actually has autofocus (such as the Raspberry Pi Camera Module 3). Camera modules that do not support autofocus (including earlier Raspberry Pi camera modules and the HQ camera) will not advertise these options as being available (in the Picamera2.camera_controls property), and attempting to set them will fail. For example, to put the camera into continuous autofocus mode:
+
+from picamera2 import Picamera2
+from libcamera import controls
+import time
+picam2 = Picamera2()
+config = picam2.create_preview_configuration()
+picam2.configure(config)
+picam2.start(show_preview=True)
+picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+time.sleep(2)
+USB camera
+Picamera2 has limited supported for USB cameras such as webcams. You can connect several USB cameras and CSI2cameras (the latter to a Pi’s dedicated camera ports) at the same time. You can create the Picamera2 object in the usual way, but only the main stream will be available. The supported formats will depend on the camera, but Picamera2 can in principle deal with both MJPEG and YUYV cameras, and where the camera supports both you can select by requesting the format "MJPEG" or "YUYV". USB cameras can only use the software-rendered Qt preview window (Preview.QT). None of the hardware assisted rendering is supported. MJPEG streams can be rendered directly, but YUYV would require OpenCV to be installed in order to convert the image into a format that Qt understands. Both cases will use a significant extra amount of CPU. The capture_buffer method will give you the raw camera data for each frame (a JPEG bitstream from an MJPEG camera, or an uncompressed YUYV image from a YUYV camera). A simple example:
+
+from picamera2 import Picamera2, Preview
+picam2 = Picamera2()
+config = picam2.create_preview_configuration({"format": "MJPEG"})
+picam2.configure(config)
+picam2.start_preview(Preview.QT)
+picam2.start()
+jpeg_buffer = picam2.capture_buffer()
+If you have multiple cameras and need to discover which camera to open, please use the Picamera2.global_camera_info method. In general, users should assume that other features, such as video recording, camera controls that are supported on Raspberry Pi cameras, and so forth, are not available. Hot-plugging of USB cameras is also not supported - Picamera2 should be completely shut down and restarted when cameras are added or removed.
+
+For more details, please click Picamera2 manual
+Resources
+User manual
+FAQ
+Question:If the picture taken, the white balance effect is not normal?
+ Answer:
+In different shooting environments, the white balance effect may not be normal. Users can adjust the white balance parameters according to the actual usage.
+The following opencv adjustment code is for reference only. (The code is shared by RPi Camera (G) users)
+import picamera
+import picamera.array
+import cv2
+from time import sleep
+import numpy as np
+
+def test_gcamera():   
+    cv2.namedWindow("img",0)
+    with picamera.PiCamera() as camera:
+        camera.resolution = (1920, 1080)
+        camera.awb_mode = 'off'
+        rg, bg = (1.8, 1.4)
+        camera.awb_gains = (rg, bg)
+        with picamera.array.PiRGBArray(camera) as output:
+            for foo in camera.capture_continuous(output, 'rgb', use_video_port=True):
+                img = cv2.cvtColor(output.array, cv2.COLOR_RGB2BGR)
+                cv2.imshow("img", img)
+                cv2.waitKey(1)
+                cv2.imwrite("test.jpg",img)
+                r, g, b = (np.mean(output.array[..., i]) for i in range(3))
+                if abs(r - g) > 2:
+                    if r > g:
+                        rg -= 0.1
+                    else:
+                        rg += 0.1
+                if abs(b - g) > 1:
+                    if b > g:
+                        bg -= 0.1
+                    else:
+                        bg += 0.1
+                camera.awb_gains = (rg, bg)
+                output.seek(0)
+                output.truncate(0)
+if __name__=="__main__":
+    test_gcamera()
+
+
+
+Question:What wavelength of infrared light is recommended for this infrared camera?
+ Answer:
+850nm.
+
+
+
+
+Question: How to toggle the working mode?
+ Answer:
+RPi IR-CUT Camera works on Normal Mode by default. There are two ways to toggle between Normal Mode and Night-vision Mode.
+
+1. By editing the config.txt file:
+
+sudo nano /boot/config.txt
+and add in the last line:
+
+disable_camera_led=1
+exit with save and restart your Pi then the camera will work on Night-vision Mode.
+
+To revert to the Normal Mode, please remove the line disable_camera_led=1 then save and restart your Pi.
+
+2. By changing the level on this position:
+
+Rpi-ir-cut-camera-faq-4.jpg
+
+Thus, you can connect the GPIO from your Pi to this position, and toggle modes by changing the GPIO logic level. (HIGH --> Normal Mode, LOW --> Night-vision Mode)
+
+
+
+
+Question:Is there a structure diagram for RPi IR-CUT Camera?
+ Answer:
+RPi IR-CUT Camera.png
+
+
+
+
+Question:Camera power consumption?
+ Answer:
+Peak current is 0.15A.
+
+
+
+
+Question: What are the operating voltage and polarity of the infrared LED for the camera?
+ Answer:
+Operating voltage: 3.3V. And the polarity is shown in the following image:
+
+RPI CAMERA INFRARED01.jpg
+
+
+
+Question:What is the working temperature?
+ Answer:
+For the camera, the working temperature is 0-50°C.
+
+
+
+
+Question:Is there any way to disable two IR LEDs on the RPi IR_Cut Camera to decrease current consumption?
+ Answer:
+Please check the EN pad on the back side of the LED, you can wire it and connect it to GND for turning it off.
+The consumption for every LED is about 300mA~ 2A with 3V ~ 5V voltage.
+
+
