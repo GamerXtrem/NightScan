@@ -1,17 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useContext } from 'react';
+import { View, StyleSheet, TextInput } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { fetchDetections } from '../services/api';
+import { AppContext } from '../AppContext';
 
 export default function MapScreen() {
-  const [markers, setMarkers] = useState([]);
+  const { zoneFilter, setZoneFilter } = useContext(AppContext);
+  const [allMarkers, setAllMarkers] = useState([]);
 
   useEffect(() => {
     fetchDetections()
       .then((list) =>
-        setMarkers(
+        setAllMarkers(
           list.map((d) => ({
             id: d.id,
+            zone: d.zone,
             title: d.species,
             coordinate: { latitude: d.latitude, longitude: d.longitude },
           }))
@@ -20,8 +23,18 @@ export default function MapScreen() {
       .catch(() => {});
   }, []);
 
+  const markers = allMarkers.filter((m) =>
+    !zoneFilter || (m.zone || '').toLowerCase().includes(zoneFilter.toLowerCase())
+  );
+
   return (
     <View style={styles.container}>
+      <TextInput
+        style={styles.filter}
+        placeholder="Filter by zone"
+        value={zoneFilter}
+        onChangeText={setZoneFilter}
+      />
       <MapView
         style={styles.map}
         initialRegion={{
@@ -47,6 +60,16 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  filter: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    zIndex: 1,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
