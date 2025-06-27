@@ -15,6 +15,7 @@ cd ios-app
 npm install
 npx expo install react-native-maps
 npx expo install @react-native-async-storage/async-storage
+npx expo install expo-notifications expo-device
 npx expo start
 ```
 After the Metro bundler starts, scan the QR code in your terminal with the Expo Go app to launch NightScan on your device.
