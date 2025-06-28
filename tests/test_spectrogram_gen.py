@@ -10,7 +10,7 @@ import NightScanPi.Program.spectrogram_gen as sg
 def test_scheduled_conversion_skips_before_noon(tmp_path, monkeypatch):
     called = False
 
-    def fake_convert(wav_dir, spec_dir, remove=False):
+    def fake_convert(wav_dir, spec_dir, remove=False, *, sr=22050):
         nonlocal called
         called = True
 
@@ -31,7 +31,7 @@ def test_scheduled_conversion_skips_before_noon(tmp_path, monkeypatch):
 def test_scheduled_conversion_deletes_when_threshold(tmp_path, monkeypatch):
     called = False
 
-    def fake_convert(wav_dir, spec_dir, remove=False):
+    def fake_convert(wav_dir, spec_dir, remove=False, *, sr=22050):
         nonlocal called
         called = True
 
