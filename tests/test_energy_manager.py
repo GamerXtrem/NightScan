@@ -49,3 +49,24 @@ def test_cross_midnight(monkeypatch):
     assert mod.within_active_period(datetime(2022, 1, 1, 4, 0, 0))
     assert not mod.within_active_period(datetime(2022, 1, 1, 12, 0, 0))
 
+
+def test_next_stop_time(monkeypatch):
+    mod = reload_energy_manager(stop=10)
+    now = datetime(2022, 1, 1, 9, 0, 0)
+    assert mod.next_stop_time(now) == datetime(2022, 1, 1, 10, 0, 0)
+
+    now_after = datetime(2022, 1, 1, 11, 0, 0)
+    assert mod.next_stop_time(now_after) == datetime(2022, 1, 2, 10, 0, 0)
+
+
+def test_schedule_shutdown(monkeypatch):
+    run_args = []
+
+    def fake_run(cmd, check=False):
+        run_args.append(cmd)
+
+    mod = reload_energy_manager(stop=10)
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    mod.schedule_shutdown(datetime(2022, 1, 1, 9, 0, 0))
+    assert run_args == [["sudo", "shutdown", "-h", "10:00"]]
+
