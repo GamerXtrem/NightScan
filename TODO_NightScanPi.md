@@ -9,13 +9,14 @@ Cette liste regroupe les actions à mettre en œuvre pour les scripts de `NightS
 - [ ] Installer les modules Python : `numpy`, `opencv-python`, `soundfile`, `flask`.
 
 ## 2. Scripts principaux
-- [ ] **main.py** : orchestrer le fonctionnement global (capture sur détection, horaires d'activité, appel des autres scripts).
-- [ ] **audio_capture.py** : enregistrer 8 s de son à chaque détection (PIR ou seuil audio) et sauvegarder en `.wav`.
-- [ ] **camera_trigger.py** : prendre une photo infrarouge lors de la détection (PIR ou audio).
+- [x] **main.py** : orchestrer le fonctionnement global (capture sur détection, horaires d'activité, appel des autres scripts).
+- [x] **audio_capture.py** : enregistrer 8 s de son à chaque détection (PIR ou seuil audio) et sauvegarder en `.wav`.
+- [x] **camera_trigger.py** : prendre une photo infrarouge lors de la détection (PIR ou audio).
 - [x] **spectrogram_gen.py** : après 12 h, convertir les `.wav` en spectrogrammes `.npy` et supprimer les `.wav` si la carte SD dépasse 70 % de remplissage.
 - [x] **wifi_config.py** : récupérer les paramètres Wi-Fi envoyés par l'application mobile et les appliquer.
-- [ ] **sync.py** : envoyer automatiquement spectrogrammes et photos via Wi-Fi ou module SIM ; prévoir un mode déconnexion permettant la copie manuelle via la carte SD.
-- [ ] **utils/energy_manager.py** : contrôler l'alimentation à l'aide du TPL5110 pour que le Pi fonctionne uniquement de 18 h à 10 h.
+- [x] **sync.py** : envoyer automatiquement spectrogrammes et photos via Wi-Fi ou module SIM ; prévoir un mode déconnexion permettant la copie manuelle via la carte SD.
+- [x] **utils/energy_manager.py** : contrôler l'alimentation à l'aide du TPL5110 pour que le Pi fonctionne uniquement de 18 h à 10 h.
+- [x] Ajouter des tests unitaires pour `camera_trigger.py`.
 
 ## 3. Gestion énergétique
 - [x] Implémenter la planification d'arrêt/démarrage dans `energy_manager.py` pour limiter la consommation.

@@ -9,7 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 MODULE_PATH = 'NightScanPi.Program.utils.energy_manager'
 
 
-def reload_energy_manager(start=None, stop=None):
+def reload_energy_manager(start=None, stop=None, pin=None):
     if start is not None:
         os.environ['NIGHTSCAN_START_HOUR'] = str(start)
     else:
@@ -18,6 +18,10 @@ def reload_energy_manager(start=None, stop=None):
         os.environ['NIGHTSCAN_STOP_HOUR'] = str(stop)
     else:
         os.environ.pop('NIGHTSCAN_STOP_HOUR', None)
+    if pin is not None:
+        os.environ['NIGHTSCAN_DONE_PIN'] = str(pin)
+    else:
+        os.environ.pop('NIGHTSCAN_DONE_PIN', None)
     if MODULE_PATH in sys.modules:
         del sys.modules[MODULE_PATH]
     return importlib.import_module(MODULE_PATH)
@@ -69,3 +73,51 @@ def test_schedule_shutdown(monkeypatch):
     monkeypatch.setattr(mod.subprocess, "run", fake_run)
     mod.schedule_shutdown(datetime(2022, 1, 1, 9, 0, 0))
     assert run_args == [["sudo", "shutdown", "-h", "10:00"]]
+
+
+def test_signal_done_without_gpio(monkeypatch):
+    mod = reload_energy_manager(pin=23)
+    monkeypatch.setattr(mod, "GPIO", None)
+    called = False
+
+    def fake_sleep(t):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(mod.time, "sleep", fake_sleep)
+    mod.signal_done()
+    assert not called
+
+
+def test_signal_done_with_gpio(monkeypatch):
+    mod = reload_energy_manager(pin=5)
+
+    class DummyGPIO:
+        BCM = "BCM"
+        OUT = "OUT"
+
+        def __init__(self):
+            self.calls = []
+
+        def setmode(self, mode):
+            self.calls.append(("setmode", mode))
+
+        def setup(self, pin, mode):
+            self.calls.append(("setup", pin, mode))
+
+        def output(self, pin, val):
+            self.calls.append(("output", pin, val))
+
+        def cleanup(self, pin=None):
+            self.calls.append(("cleanup", pin))
+
+    dummy = DummyGPIO()
+    monkeypatch.setattr(mod, "GPIO", dummy)
+    monkeypatch.setattr(mod.time, "sleep", lambda x: None)
+    mod.signal_done()
+    assert dummy.calls == [
+        ("setmode", dummy.BCM),
+        ("setup", 5, dummy.OUT),
+        ("output", 5, True),
+        ("cleanup", 5),
+    ]
