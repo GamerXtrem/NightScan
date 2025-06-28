@@ -31,4 +31,4 @@ Cette liste pourra être complétée au fur et à mesure de l'avancement du proj
 - [ ] Ajouter la prise en charge du module SIM pour le transfert des données lorsque le Wi-Fi est indisponible.
 - [ ] Écrire un script d'installation automatisée pour le Raspberry Pi (packages et configuration).
 - [x] Ajouter des tests unitaires pour `audio_capture.py` et `main.py`.
-- [ ] Fournir un exemple de fichier de configuration et activer un journal des erreurs.
+- [x] Fournir un exemple de fichier de configuration et activer un journal des erreurs.

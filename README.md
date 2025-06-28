@@ -226,3 +226,10 @@ French-speaking contributors can refer to
 [`docs/fr/application_objectifs.md`](docs/fr/application_objectifs.md)
 for the original summary in French.
 
+
+## Configuration and logging
+
+The repository provides `config_example.ini` with typical settings such as the
+log file path and active hours. Scripts under `NightScanPi/Program` write
+informational and error messages to `nightscan.log` by default. Set the
+`NIGHTSCAN_LOG` environment variable to override the log file location.

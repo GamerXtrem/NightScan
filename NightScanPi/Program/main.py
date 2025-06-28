@@ -4,13 +4,22 @@ from __future__ import annotations
 from pathlib import Path
 import time
 import logging
+import os
 
 from . import audio_capture
 from . import camera_trigger
 from .utils import energy_manager
 from .utils import detector
 
-logging.basicConfig(level=logging.INFO)
+LOG_PATH = Path(os.getenv("NIGHTSCAN_LOG", "nightscan.log"))
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_PATH),
+        logging.StreamHandler(),
+    ],
+)
 
 
 def run_cycle(base_dir: Path) -> None:
