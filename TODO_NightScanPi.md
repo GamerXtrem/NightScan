@@ -30,5 +30,5 @@ Cette liste pourra être complétée au fur et à mesure de l'avancement du proj
 - [ ] Créer un service pour recevoir les identifiants Wi-Fi depuis l'application mobile et appliquer `wifi_config.py`.
 - [ ] Ajouter la prise en charge du module SIM pour le transfert des données lorsque le Wi-Fi est indisponible.
 - [ ] Écrire un script d'installation automatisée pour le Raspberry Pi (packages et configuration).
-- [ ] Ajouter des tests unitaires pour `audio_capture.py` et `main.py`.
+- [x] Ajouter des tests unitaires pour `audio_capture.py` et `main.py`.
 - [ ] Fournir un exemple de fichier de configuration et activer un journal des erreurs.
