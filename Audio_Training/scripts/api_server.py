@@ -18,9 +18,12 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import pathlib
 import os
+import logging
 from pydub import AudioSegment
 from pydub.exceptions import CouldntDecodeError
 from flask import Flask, request, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import torch
 from torch.utils.data import DataLoader
 from torchvision import models
@@ -32,6 +35,8 @@ import predict
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit for uploads
 
 app = Flask(__name__)
+
+logger = logging.getLogger(__name__)
 
 model: torch.nn.Module | None = None
 labels: List[str] | None = None
@@ -64,6 +69,8 @@ def create_app(model_path: Optional[Path] = None, csv_dir: Optional[Path] = None
             raise RuntimeError("CSV_DIR environment variable not set")
         csv_dir = Path(csv_env)
     load_model(model_path, csv_dir)
+    rate_limit = os.environ.get("API_RATE_LIMIT", "60 per minute")
+    Limiter(get_remote_address, app=app, default_limits=[rate_limit])
     cors_origins = os.environ.get("API_CORS_ORIGINS")
     if cors_origins:
         origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
@@ -139,8 +146,16 @@ def api_predict():
         try:
             AudioSegment.from_file(tmp.name)
         except CouldntDecodeError:
+            logger.warning("Invalid WAV file uploaded")
             return jsonify({"error": "Invalid WAV file"}), 400
-        results = predict_file(Path(tmp.name))
+        except Exception as exc:  # pragma: no cover - unexpected
+            logger.exception("Error reading uploaded file: %s", exc)
+            return jsonify({"error": "Failed to process file"}), 500
+        try:
+            results = predict_file(Path(tmp.name))
+        except Exception as exc:  # pragma: no cover - prediction failed
+            logger.exception("Prediction failed: %s", exc)
+            return jsonify({"error": "Internal server error"}), 500
     return jsonify(results)
 
 
@@ -151,6 +166,9 @@ def main() -> None:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
+    logging.basicConfig(
+        format="%(levelname)s:%(processName)s:%(message)s", level=logging.INFO
+    )
     create_app(args.model_path, args.csv_dir).run(host=args.host, port=args.port)
 
 
