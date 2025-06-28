@@ -29,7 +29,7 @@ def record_segment(duration: int, out_path: Path) -> None:
     p.terminate()
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with wave.open(out_path, "wb") as wf:
+    with wave.open(str(out_path), "wb") as wf:
         wf.setnchannels(CHANNELS)
         wf.setsampwidth(p.get_sample_size(FORMAT))
         wf.setframerate(RATE)
