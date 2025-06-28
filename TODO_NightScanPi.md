@@ -18,7 +18,7 @@ Cette liste regroupe les actions à mettre en œuvre pour les scripts de `NightS
 - [ ] **utils/energy_manager.py** : contrôler l'alimentation à l'aide du TPL5110 pour que le Pi fonctionne uniquement de 18 h à 10 h.
 
 ## 3. Gestion énergétique
-- [ ] Implémenter la planification d'arrêt/démarrage dans `energy_manager.py` pour limiter la consommation.
+- [x] Implémenter la planification d'arrêt/démarrage dans `energy_manager.py` pour limiter la consommation.
 - [ ] Veiller à ce que la génération des spectrogrammes s'effectue après midi pour ne pas gêner les captures nocturnes.
 
 Cette liste pourra être complétée au fur et à mesure de l'avancement du projet.
