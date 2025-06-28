@@ -12,6 +12,7 @@
     {{ csrf_token() }}
     <input type="file" name="file" accept="audio/wav" required>
     <p>Maximum 100 MB per file, 10 GB total for your account. WAV files only.</p>
+    <p>Remaining quota: {{ '%.2f' % (remaining_bytes / (1024 * 1024 * 1024)) }} GB</p>
     <input type="submit" value="Analyze">
   </form>
   {% else %}
@@ -29,5 +30,14 @@
     {% endfor %}
   </ul>
   {% endif %}
+  {% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+  {% endwith %}
 </body>
 </html>
