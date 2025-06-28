@@ -69,4 +69,3 @@ def test_schedule_shutdown(monkeypatch):
     monkeypatch.setattr(mod.subprocess, "run", fake_run)
     mod.schedule_shutdown(datetime(2022, 1, 1, 9, 0, 0))
     assert run_args == [["sudo", "shutdown", "-h", "10:00"]]
-
