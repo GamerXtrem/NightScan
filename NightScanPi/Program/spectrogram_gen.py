@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+from datetime import datetime, time as dtime
 
 import numpy as np
 import torchaudio
@@ -45,6 +46,24 @@ def disk_usage_percent(path: Path) -> float:
     return used / total * 100
 
 
+def scheduled_conversion(
+    wav_dir: Path,
+    spec_dir: Path,
+    *,
+    threshold: float = 70.0,
+    now: datetime | None = None,
+) -> None:
+    """Convert WAV files after noon and delete them if disk usage is high."""
+    if now is None:
+        now = datetime.now()
+    if now.time() < dtime(12, 0):
+        return
+    convert_directory(wav_dir, spec_dir)
+    if disk_usage_percent(wav_dir) >= threshold:
+        for wav in Path(wav_dir).rglob("*.wav"):
+            wav.unlink()
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -52,6 +71,20 @@ if __name__ == "__main__":
     parser.add_argument("wav_dir", type=Path)
     parser.add_argument("out_dir", type=Path)
     parser.add_argument("--remove", action="store_true")
+    parser.add_argument(
+        "--scheduled",
+        action="store_true",
+        help="Only run after noon and delete WAV when disk > threshold",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=70.0,
+        help="Disk usage percentage triggering WAV deletion",
+    )
     args = parser.parse_args()
 
-    convert_directory(args.wav_dir, args.out_dir, args.remove)
+    if args.scheduled:
+        scheduled_conversion(args.wav_dir, args.out_dir, threshold=args.threshold)
+    else:
+        convert_directory(args.wav_dir, args.out_dir, args.remove)
