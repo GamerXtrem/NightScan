@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+import os
 import subprocess
 
 
-START_HOUR = 18
-STOP_HOUR = 10
+# Active hours can be customized through environment variables
+START_HOUR = int(os.getenv("NIGHTSCAN_START_HOUR", "18"))
+STOP_HOUR = int(os.getenv("NIGHTSCAN_STOP_HOUR", "10"))
 
 
 def within_active_period(now: datetime | None = None) -> bool:

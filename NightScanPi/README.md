@@ -102,6 +102,10 @@ TPL5110 coupe automatiquement le courant en dehors de la plage horaire utile
 
 Le Pi est alimenté uniquement de 18h à 10h
 
+Les horaires peuvent être adaptés en définissant les variables
+`NIGHTSCAN_START_HOUR` et `NIGHTSCAN_STOP_HOUR` avant l'exécution des scripts
+(`energy_manager.py`, `main.py`, etc.).
+
 Le traitement des fichiers audio (.wav → .npy) se fait après 12h, pour éviter les pics de charge pendant la collecte
 
 ## Aperçu du dépôt NightScan
