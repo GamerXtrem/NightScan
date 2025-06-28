@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import socket
 import requests
 
 SIM_DEVICE = os.getenv("NIGHTSCAN_SIM_DEVICE")
@@ -13,17 +14,29 @@ API_URL = "https://example.com/upload"
 OFFLINE = os.getenv("NIGHTSCAN_OFFLINE", "0") in {"1", "true", "True"}
 
 
+def network_available(host: str = "8.8.8.8", port: int = 53, timeout: int = 3) -> bool:
+    """Return ``True`` if the network appears reachable."""
+    try:
+        with socket.create_connection((host, port), timeout):
+            return True
+    except OSError:
+        return False
+
+
 def upload_file(path: Path, url: str = API_URL) -> None:
-    """Upload ``path`` to ``url`` via HTTP POST."""
+    """Upload ``path`` to ``url`` via HTTP POST or fallback to SIM modem."""
     with path.open("rb") as f:
-        try:
-            resp = requests.post(url, files={"file": (path.name, f)})
-            resp.raise_for_status()
-        except requests.RequestException:
-            if SIM_DEVICE:
-                upload_file_via_sim(path, url, SIM_DEVICE, SIM_BAUDRATE)
-            else:
-                raise
+        if network_available():
+            try:
+                resp = requests.post(url, files={"file": (path.name, f)})
+                resp.raise_for_status()
+                return
+            except requests.RequestException:
+                pass
+        if SIM_DEVICE:
+            upload_file_via_sim(path, url, SIM_DEVICE, SIM_BAUDRATE)
+        else:
+            raise requests.RequestException("Network unavailable and SIM not configured")
 
 
 def upload_file_via_sim(path: Path, url: str = API_URL, device: str | None = None, baudrate: int = 115200) -> None:

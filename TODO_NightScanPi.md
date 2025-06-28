@@ -3,10 +3,10 @@
 Cette liste regroupe les actions à mettre en œuvre pour les scripts de `NightScanPi` d'après la documentation du dossier.
 
 ## 1. Installation et configuration
-- [ ] Flasher **Raspberry Pi OS Lite** sur la carte SD.
-- [ ] Activer **SSH** et préparer `wifi_config.py` pour recevoir SSID et mot de passe depuis l'application mobile.
-- [ ] Installer les paquets système requis : `python3-pip`, `ffmpeg`, `sox`, `libatlas-base-dev`.
-- [ ] Installer les modules Python : `numpy`, `opencv-python`, `soundfile`, `flask`.
+- [x] Flasher **Raspberry Pi OS Lite** sur la carte SD.
+- [x] Activer **SSH** et préparer `wifi_config.py` pour recevoir SSID et mot de passe depuis l'application mobile.
+- [x] Installer les paquets système requis : `python3-pip`, `ffmpeg`, `sox`, `libatlas-base-dev`.
+- [x] Installer les modules Python : `numpy`, `opencv-python`, `soundfile`, `flask`.
 
 ## 2. Scripts principaux
 - [x] **main.py** : orchestrer le fonctionnement global (capture sur détection, horaires d'activité, appel des autres scripts).
@@ -25,10 +25,10 @@ Cette liste regroupe les actions à mettre en œuvre pour les scripts de `NightS
 Cette liste pourra être complétée au fur et à mesure de l'avancement du projet.
 
 ## 4. Tâches complémentaires
-- [ ] Documenter le câblage et les caractéristiques dans le dossier `Hardware/`.
+- [x] Documenter le câblage et les caractéristiques dans le dossier `Hardware/`.
 - [x] Intégrer la détection par capteur PIR et seuil audio dans `main.py`.
 - [x] Créer un service pour recevoir les identifiants Wi-Fi depuis l'application mobile et appliquer `wifi_config.py`.
-- [ ] Ajouter la prise en charge du module SIM pour le transfert des données lorsque le Wi-Fi est indisponible.
+- [x] Ajouter la prise en charge du module SIM pour le transfert des données lorsque le Wi-Fi est indisponible.
 - [x] Écrire un script d'installation automatisée pour le Raspberry Pi (packages et configuration).
 - [x] Ajouter des tests unitaires pour `audio_capture.py` et `main.py`.
 - [x] Fournir un exemple de fichier de configuration et activer un journal des erreurs.

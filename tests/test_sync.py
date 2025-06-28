@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import pytest
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -37,6 +38,7 @@ def test_sync_directory_success(tmp_path, monkeypatch):
         return DummyResp()
 
     monkeypatch.setattr(sync.requests, "post", fake_post)
+    monkeypatch.setattr(sync, "network_available", lambda: True)
 
     sync.sync_directory(tmp_path, url="http://test")
     assert called
@@ -71,8 +73,19 @@ def test_upload_file_fallback_sim(tmp_path, monkeypatch):
         raise sync.requests.RequestException("fail")
 
     monkeypatch.setattr(sync.requests, "post", fake_post)
+    monkeypatch.setattr(sync, "network_available", lambda: True)
     monkeypatch.setattr(sync, "SIM_DEVICE", "/dev/ttyUSB0")
     monkeypatch.setitem(sys.modules, "serial", type("m", (), {"Serial": DummySerial}))
 
     sync.upload_file(f, "http://test")
     assert called["serial"]
+
+
+def test_upload_file_no_network_no_sim(tmp_path, monkeypatch):
+    f = tmp_path / "x.txt"
+    f.write_text("data")
+
+    monkeypatch.setattr(sync, "network_available", lambda: False)
+
+    with pytest.raises(sync.requests.RequestException):
+        sync.upload_file(f, "http://test")

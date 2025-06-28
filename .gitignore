@@ -3,3 +3,4 @@ __pycache__/
 env/
 venv/
 ios-app/node_modules/
+nightscan.log
