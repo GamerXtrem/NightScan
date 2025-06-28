@@ -23,3 +23,12 @@ Cette liste regroupe les actions à mettre en œuvre pour les scripts de `NightS
 - [x] Veiller à ce que la génération des spectrogrammes s'effectue après midi pour ne pas gêner les captures nocturnes.
 
 Cette liste pourra être complétée au fur et à mesure de l'avancement du projet.
+
+## 4. Tâches complémentaires
+- [ ] Documenter le câblage et les caractéristiques dans le dossier `Hardware/`.
+- [ ] Intégrer la détection par capteur PIR et seuil audio dans `main.py`.
+- [ ] Créer un service pour recevoir les identifiants Wi-Fi depuis l'application mobile et appliquer `wifi_config.py`.
+- [ ] Ajouter la prise en charge du module SIM pour le transfert des données lorsque le Wi-Fi est indisponible.
+- [ ] Écrire un script d'installation automatisée pour le Raspberry Pi (packages et configuration).
+- [ ] Ajouter des tests unitaires pour `audio_capture.py` et `main.py`.
+- [ ] Fournir un exemple de fichier de configuration et activer un journal des erreurs.
