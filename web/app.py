@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import mimetypes
 import requests
 
 from flask import (
@@ -52,6 +53,18 @@ limiter = Limiter(app=app, key_func=get_remote_address)
 PASSWORD_RE = re.compile(r"^(?=.*\d).{8,}$")
 
 PREDICT_API_URL = os.environ.get("PREDICT_API_URL", "http://localhost:8001/api/predict")
+
+
+def is_wav_header(file_obj) -> bool:
+    """Check whether the file-like object has a RIFF/WAVE header."""
+    pos = file_obj.tell()
+    header = file_obj.read(12)
+    file_obj.seek(pos)
+    return (
+        len(header) >= 12
+        and header[0:4] == b"RIFF"
+        and header[8:12] == b"WAVE"
+    )
 
 
 class User(db.Model, UserMixin):
@@ -131,31 +144,36 @@ def logout():
 @login_required
 def index():
     result = None
+    total = (
+        db.session.query(db.func.coalesce(db.func.sum(Prediction.file_size), 0))
+        .filter_by(user_id=current_user.id)
+        .scalar()
+        or 0
+    )
+    remaining = MAX_TOTAL_SIZE - total
     if request.method == "POST":
         file = request.files.get("file")
         if not file or not file.filename.lower().endswith(".wav"):
             flash("Please upload a WAV file.")
-        elif file.mimetype not in ("audio/wav", "audio/x-wav"):
-            flash("Invalid file type. Only WAV files are accepted.")
         else:
-            file_size = request.content_length
-            if file_size is None:
-                pos = file.stream.tell()
-                file.stream.seek(0, os.SEEK_END)
-                file_size = file.stream.tell()
-                file.stream.seek(pos)
-            if file_size > MAX_FILE_SIZE:
-                flash("File exceeds 100 MB limit.")
+            mime_guess = mimetypes.guess_type(file.filename)[0]
+            if (
+                file.mimetype not in ("audio/wav", "audio/x-wav")
+                and mime_guess != "audio/x-wav"
+            ):
+                flash("Invalid file type. Only WAV files are accepted.")
+            elif not is_wav_header(file.stream):
+                flash("Invalid WAV header.")
             else:
-                total = (
-                    db.session.query(
-                        db.func.coalesce(db.func.sum(Prediction.file_size), 0)
-                    )
-                    .filter_by(user_id=current_user.id)
-                    .scalar()
-                    or 0
-                )
-                if total + file_size > MAX_TOTAL_SIZE:
+                file_size = request.content_length
+                if file_size is None:
+                    pos = file.stream.tell()
+                    file.stream.seek(0, os.SEEK_END)
+                    file_size = file.stream.tell()
+                    file.stream.seek(pos)
+                if file_size > MAX_FILE_SIZE:
+                    flash("File exceeds 100 MB limit.")
+                elif total + file_size > MAX_TOTAL_SIZE:
                     flash("Upload quota exceeded (10 GB total).")
                 else:
                     try:
@@ -174,6 +192,8 @@ def index():
                         )
                         db.session.add(pred)
                         db.session.commit()
+                        total += file_size
+                        remaining = MAX_TOTAL_SIZE - total
                     except requests.RequestException as e:
                         app.logger.error("Prediction request failed: %s", e)
                         flash("Prediction failed. Please try again later.")
@@ -182,7 +202,12 @@ def index():
         .order_by(Prediction.id.desc())
         .all()
     )
-    return render_template("index.html", result=result, predictions=predictions)
+    return render_template(
+        "index.html",
+        result=result,
+        predictions=predictions,
+        remaining_bytes=remaining,
+    )
 
 
 def create_app():

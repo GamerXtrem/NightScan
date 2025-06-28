@@ -63,10 +63,57 @@ def test_index_rejects_bad_mimetype(monkeypatch, tmp_path):
     data = {"file": (io.BytesIO(b"data"), "test.wav", "text/plain")}
     resp = client.post("/", data=data, content_type="multipart/form-data")
     assert resp.status_code == 200
-    with client.session_transaction() as sess:
-        flashes = sess.get("_flashes", [])
-    assert any("Invalid file type" in f[1] for f in flashes)
+    assert b"Invalid WAV header" in resp.data
     assert not called
+
+
+def test_index_rejects_bad_header(monkeypatch, tmp_path):
+    monkeypatch.setenv("SECRET_KEY", "test")
+    monkeypatch.setenv(
+        "SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path / 'db.sqlite'}"
+    )
+    module = load_app_module()
+    app = module.create_app()
+    app.config["WTF_CSRF_ENABLED"] = False
+    with app.app_context():
+        user = module.User(username="user")
+        user.set_password("pass")
+        module.db.session.add(user)
+        module.db.session.commit()
+
+    client = app.test_client()
+    client.environ_base["wsgi.url_scheme"] = "https"
+    client.environ_base["HTTP_X_FORWARDED_PROTO"] = "https"
+    client.post("/login", data={"username": "user", "password": "pass"})
+
+    data = {"file": (io.BytesIO(b"notriffdata"), "test.wav", "audio/x-wav")}
+    resp = client.post("/", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    assert b"Invalid WAV header" in resp.data
+
+
+def test_index_shows_remaining_quota(monkeypatch, tmp_path):
+    monkeypatch.setenv("SECRET_KEY", "test")
+    monkeypatch.setenv(
+        "SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path / 'db.sqlite'}"
+    )
+    module = load_app_module()
+    app = module.create_app()
+    app.config["WTF_CSRF_ENABLED"] = False
+    with app.app_context():
+        user = module.User(username="user")
+        user.set_password("pass")
+        module.db.session.add(user)
+        module.db.session.commit()
+
+    client = app.test_client()
+    client.environ_base["wsgi.url_scheme"] = "https"
+    client.environ_base["HTTP_X_FORWARDED_PROTO"] = "https"
+    client.post("/login", data={"username": "user", "password": "pass"})
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"Remaining quota" in resp.data
 
 
 def test_register_password_validation(monkeypatch, tmp_path):
