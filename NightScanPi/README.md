@@ -85,7 +85,7 @@ Modifier
 └── utils/
     └── energy_manager.py
 🛠 Installation système
-Flasher Raspberry Pi OS Lite sur carte SD
+Flasher Raspberry Pi OS Lite 64 bits sur carte SD
 
 Activer SSH et préparer les scripts wifi_config.py pour connexion via application mobile
 
