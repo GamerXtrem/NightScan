@@ -5,6 +5,9 @@ from pathlib import Path
 import os
 import requests
 
+SIM_DEVICE = os.getenv("NIGHTSCAN_SIM_DEVICE")
+SIM_BAUDRATE = int(os.getenv("NIGHTSCAN_SIM_BAUDRATE", "115200"))
+
 
 API_URL = "https://example.com/upload"
 OFFLINE = os.getenv("NIGHTSCAN_OFFLINE", "0") in {"1", "true", "True"}
@@ -13,8 +16,38 @@ OFFLINE = os.getenv("NIGHTSCAN_OFFLINE", "0") in {"1", "true", "True"}
 def upload_file(path: Path, url: str = API_URL) -> None:
     """Upload ``path`` to ``url`` via HTTP POST."""
     with path.open("rb") as f:
-        resp = requests.post(url, files={"file": (path.name, f)})
-        resp.raise_for_status()
+        try:
+            resp = requests.post(url, files={"file": (path.name, f)})
+            resp.raise_for_status()
+        except requests.RequestException:
+            if SIM_DEVICE:
+                upload_file_via_sim(path, url, SIM_DEVICE, SIM_BAUDRATE)
+            else:
+                raise
+
+
+def upload_file_via_sim(path: Path, url: str = API_URL, device: str | None = None, baudrate: int = 115200) -> None:
+    """Upload ``path`` to ``url`` using a SIM modem via AT commands."""
+    if device is None:
+        raise RuntimeError("SIM device not configured")
+    import serial  # lazy import so tests can patch
+
+    with serial.Serial(device, baudrate, timeout=10) as ser, path.open("rb") as f:
+        data = f.read()
+        ser.write(b"AT+HTTPTERM\r")
+        ser.readline()
+        ser.write(b"AT+HTTPINIT\r")
+        ser.readline()
+        ser.write(f'AT+HTTPPARA="URL","{url}"\r'.encode())
+        ser.readline()
+        ser.write(f"AT+HTTPDATA={len(data)},10000\r".encode())
+        ser.readline()
+        ser.write(data)
+        ser.readline()
+        ser.write(b"AT+HTTPACTION=1\r")
+        ser.readline()
+        ser.write(b"AT+HTTPTERM\r")
+        ser.readline()
 
 
 def sync_directory(dir_path: Path, url: str = API_URL, *, offline: bool | None = None) -> None:
