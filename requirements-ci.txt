@@ -9,4 +9,5 @@ SQLAlchemy==2.0.41
 WTForms==3.2.1
 requests==2.32.4
 pydub==0.25.1
+pyserial==3.5
 pytest==8.3.5
