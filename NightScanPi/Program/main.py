@@ -10,6 +10,7 @@ from . import audio_capture
 from . import camera_trigger
 from .utils import energy_manager
 from .utils import detector
+from . import spectrogram_gen
 
 LOG_PATH = Path(os.getenv("NIGHTSCAN_LOG", "nightscan.log"))
 logging.basicConfig(
@@ -41,7 +42,11 @@ def main(data_dir: Path = Path("data")) -> None:
             if detector.pir_detected() or detector.audio_triggered():
                 run_cycle(data_dir)
         else:
-            time.sleep(60)
+            spectrogram_gen.scheduled_conversion(
+                data_dir / "audio", data_dir / "spectrograms"
+            )
+            energy_manager.shutdown()
+            break
         time.sleep(1)
 
 

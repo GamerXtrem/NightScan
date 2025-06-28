@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
 
@@ -20,6 +22,14 @@ def write_wifi_config(ssid: str, password: str, path: Path = CONFIG_PATH) -> Non
         "}"
     )
     Path(path).write_text(conf)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    try:
+        subprocess.run(["wpa_cli", "-i", "wlan0", "reconfigure"], check=False)
+    except Exception:
+        pass
 
 
 def save_credentials(ssid: str, password: str, out_file: Path) -> None:
