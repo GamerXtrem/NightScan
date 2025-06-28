@@ -8,6 +8,7 @@ import logging
 from . import audio_capture
 from . import camera_trigger
 from .utils import energy_manager
+from .utils import detector
 
 logging.basicConfig(level=logging.INFO)
 
@@ -28,7 +29,8 @@ def main(data_dir: Path = Path("data")) -> None:
     """Continuously capture data during the active period."""
     while True:
         if energy_manager.within_active_period():
-            run_cycle(data_dir)
+            if detector.pir_detected() or detector.audio_triggered():
+                run_cycle(data_dir)
         else:
             time.sleep(60)
         time.sleep(1)

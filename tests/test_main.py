@@ -1,5 +1,6 @@
 import sys
 import types
+import pytest
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -36,4 +37,29 @@ def test_run_cycle(tmp_path, monkeypatch):
     assert image_called
     assert any(p.suffix == ".wav" for p in (tmp_path / "audio").iterdir())
     assert any(p.suffix == ".jpg" for p in (tmp_path / "images").iterdir())
+
+
+def test_main_loop_triggers_on_detection(tmp_path, monkeypatch):
+    called = []
+
+    def fake_run_cycle(base_dir):
+        called.append(base_dir)
+
+    monkeypatch.setattr(main, "run_cycle", fake_run_cycle)
+    monkeypatch.setattr(main.energy_manager, "within_active_period", lambda: True)
+    monkeypatch.setattr(
+        main,
+        "detector",
+        types.SimpleNamespace(pir_detected=lambda: True, audio_triggered=lambda: False),
+    )
+
+    def fake_sleep(t):
+        raise SystemExit()
+
+    monkeypatch.setattr(main.time, "sleep", fake_sleep)
+
+    with pytest.raises(SystemExit):
+        main.main(tmp_path)
+
+    assert called == [tmp_path]
 
