@@ -57,6 +57,9 @@ a chaque détection audio quand ça dépasse un seuil, il capture:
 🕛 À partir de 12h :
 
 Les fichiers audio sont transformés en spectrogrammes .npy
+Les enregistrements sont rééchantillonnés à 22 050 Hz et convertis en
+mel-spectrogrammes exprimés en dB afin de correspondre au traitement de
+`predict.py`
 
 Les fichiers .wav sont automatiquement supprimés si la carte SD dépasse 70% de remplissage
 

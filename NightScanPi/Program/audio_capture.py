@@ -10,7 +10,7 @@ import pyaudio
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
-RATE = 44100
+RATE = 22050
 
 
 def record_segment(duration: int, out_path: Path) -> None:
