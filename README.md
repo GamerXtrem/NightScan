@@ -106,6 +106,10 @@ through the reverse proxy.
 When exposing the service to the internet, terminate HTTPS at the proxy so both
 the web app and prediction API are accessed securely.
 
+For convenience the repository provides `setup_nginx.sh`, a helper script that
+installs Nginx and writes this configuration. See
+`docs/en/nginx_setup.md` for details.
+
 ## Quick prediction test
 
 After running the setup script (`bash setup_vps_infomaniak.sh`) you can
