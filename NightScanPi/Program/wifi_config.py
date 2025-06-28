@@ -28,16 +28,30 @@ def save_credentials(ssid: str, password: str, out_file: Path) -> None:
     out_file.write_text(json.dumps({"ssid": ssid, "password": password}))
 
 
+def apply_credentials_file(file_path: Path, path: Path | None = None) -> None:
+    """Read JSON credentials from ``file_path`` and write the config."""
+    if path is None:
+        path = CONFIG_PATH
+    data = json.loads(Path(file_path).read_text())
+    write_wifi_config(data["ssid"], data["password"], path)
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("ssid")
-    parser.add_argument("password")
+    parser.add_argument("ssid", nargs="?")
+    parser.add_argument("password", nargs="?")
     parser.add_argument("--out", type=Path, help="Store credentials instead of writing to system")
+    parser.add_argument("--apply", type=Path, help="Apply credentials from JSON file")
     args = parser.parse_args()
 
-    if args.out:
-        save_credentials(args.ssid, args.password, args.out)
+    if args.apply:
+        apply_credentials_file(args.apply, args.out or CONFIG_PATH)
+    elif args.ssid and args.password:
+        if args.out:
+            save_credentials(args.ssid, args.password, args.out)
+        else:
+            write_wifi_config(args.ssid, args.password)
     else:
-        write_wifi_config(args.ssid, args.password)
+        parser.error("SSID and password required unless --apply is used")

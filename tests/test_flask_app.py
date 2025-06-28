@@ -27,7 +27,9 @@ def test_create_app_requires_database_uri(monkeypatch):
 
 def test_index_rejects_bad_mimetype(monkeypatch, tmp_path):
     monkeypatch.setenv("SECRET_KEY", "test")
-    monkeypatch.setenv("SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path/'db.sqlite'}")
+    monkeypatch.setenv(
+        "SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path / 'db.sqlite'}"
+    )
     module = load_app_module()
     app = module.create_app()
     app.config["WTF_CSRF_ENABLED"] = False
@@ -47,6 +49,7 @@ def test_index_rejects_bad_mimetype(monkeypatch, tmp_path):
     def fake_post(*args, **kwargs):
         nonlocal called
         called = True
+
         class Dummy:
             def raise_for_status(self):
                 pass
@@ -68,7 +71,9 @@ def test_index_rejects_bad_mimetype(monkeypatch, tmp_path):
 
 def test_register_password_validation(monkeypatch, tmp_path):
     monkeypatch.setenv("SECRET_KEY", "test")
-    monkeypatch.setenv("SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path/'db.sqlite'}")
+    monkeypatch.setenv(
+        "SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path / 'db.sqlite'}"
+    )
     module = load_app_module()
     app = module.create_app()
     app.config["WTF_CSRF_ENABLED"] = False
@@ -83,7 +88,9 @@ def test_register_password_validation(monkeypatch, tmp_path):
 
 def test_login_rate_limiting(monkeypatch, tmp_path):
     monkeypatch.setenv("SECRET_KEY", "test")
-    monkeypatch.setenv("SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path/'db.sqlite'}")
+    monkeypatch.setenv(
+        "SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path / 'db.sqlite'}"
+    )
     module = load_app_module()
     app = module.create_app()
     app.config["WTF_CSRF_ENABLED"] = False
