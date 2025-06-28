@@ -39,6 +39,20 @@ with flask_db.cursor() as cur_src, wordpress.cursor() as cur_dest:
 
 Adjust the connection parameters and fields to match your exact schema. You can run this via `cron` for regular synchronization.
 
+## Automating the export
+
+To keep the `ns_predictions` table current, schedule the script from your
+crontab. Edit the user's crontab and add a line like the following:
+
+```cron
+*/10 * * * * /usr/bin/python3 /path/to/export_predictions.py \
+    >> /var/log/ns_export.log 2>&1
+```
+
+This runs the script every ten minutes and logs any output to
+`/var/log/ns_export.log` so you can confirm that the synchronization is
+working as expected.
+
 ## Plugin installation
 
 1. Copy the `prediction-charts` folder into `wp-content/plugins/`.
