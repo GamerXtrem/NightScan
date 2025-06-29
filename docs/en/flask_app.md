@@ -61,14 +61,14 @@ database.
 
 Before starting the Flask server, define two variables:
 
-- `SECRET_KEY`: used to sign the session. Choose a random value in production.
+- `SECRET_KEY`: used to sign the session. If unset, the application generates a temporary value at startup. Provide a persistent random key in production.
 - `PREDICT_API_URL`: URL of the API that receives the files to analyze. If not set, `web/app.py` defaults to `http://localhost:8001/api/predict`. The application accepts either scheme, but in production use an `https://` endpoint.
 
 Example (install `gunicorn` if it is not already available):
 
 ```bash
 pip install gunicorn
-export SECRET_KEY="change-me"
+export SECRET_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
 export PREDICT_API_URL="https://myserver.example/api/predict"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
