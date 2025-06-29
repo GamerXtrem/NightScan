@@ -19,6 +19,8 @@ from typing import List, Dict, Optional
 import pathlib
 import os
 import logging
+
+from log_utils import setup_logging
 import io
 from types import SimpleNamespace
 from pydub import AudioSegment
@@ -39,6 +41,7 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit for uploads
 app = Flask(__name__)
 
 logger = logging.getLogger(__name__)
+setup_logging()
 
 model: torch.nn.Module | None = None
 labels: List[str] | None = None
@@ -205,9 +208,6 @@ def main() -> None:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
-    logging.basicConfig(
-        format="%(levelname)s:%(processName)s:%(message)s", level=logging.INFO
-    )
     create_app(args.model_path, args.csv_dir).run(host=args.host, port=args.port)
 
 

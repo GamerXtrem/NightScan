@@ -254,3 +254,7 @@ The repository provides `config_example.ini` with typical settings such as the
 log file path and active hours. Scripts under `NightScanPi/Program` write
 informational and error messages to `nightscan.log` by default. Set the
 `NIGHTSCAN_LOG` environment variable to override the log file location.
+
+Server modules also emit JSON-formatted logs to standard output. The helper
+function `log_utils.setup_logging()` configures the root logger accordingly so
+that errors on the Flask app or API server are easier to parse.
