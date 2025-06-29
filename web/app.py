@@ -225,27 +225,26 @@ def index():
                 elif total + file_size > MAX_TOTAL_SIZE:
                     flash("Upload quota exceeded (10 GB total).")
                 else:
-                    try:
-                        resp = requests.post(
-                            PREDICT_API_URL,
-                            files={"file": (file.filename, file.stream, "audio/wav")},
-                            timeout=30,
-                        )
-                        resp.raise_for_status()
-                        result = resp.json()
-                        pred = Prediction(
-                            user_id=current_user.id,
-                            filename=file.filename,
-                            result=json.dumps(result),
-                            file_size=file_size,
-                        )
-                        db.session.add(pred)
-                        db.session.commit()
-                        total += file_size
-                        remaining = MAX_TOTAL_SIZE - total
-                    except requests.RequestException as e:
-                        app.logger.error("Prediction request failed: %s", e)
-                        flash("Prediction failed. Please try again later.")
+                    data = file.read()
+                    pred = Prediction(
+                        user_id=current_user.id,
+                        filename=file.filename,
+                        result="PENDING",
+                        file_size=file_size,
+                    )
+                    db.session.add(pred)
+                    db.session.commit()
+                    from .tasks import run_prediction
+
+                    run_prediction.delay(
+                        pred.id,
+                        file.filename,
+                        data,
+                        PREDICT_API_URL,
+                    )
+                    total += file_size
+                    remaining = MAX_TOTAL_SIZE - total
+                    flash("File queued for processing.")
     predictions = (
         Prediction.query.filter_by(user_id=current_user.id)
         .order_by(Prediction.id.desc())

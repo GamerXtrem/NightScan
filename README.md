@@ -45,6 +45,13 @@ export PREDICT_API_URL="https://myserver.example/api/predict"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
 
+The Flask app offloads the prediction request to a Celery worker when a
+file is uploaded. Start at least one worker alongside Gunicorn:
+
+```bash
+celery -A web.tasks worker --loglevel=info
+```
+
 The command above binds the web server to `0.0.0.0`, exposing it on every network interface. This is typical when running behind a reverse proxy or with firewall rules in place. If you prefer to keep the service private, bind to `127.0.0.1` or block the port using a firewall such as `ufw`.
 
 The application connects to a database using the URL in
