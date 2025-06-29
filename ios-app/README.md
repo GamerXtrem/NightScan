@@ -2,8 +2,10 @@
 
 This folder contains a React Native application for iOS.
 It provides a basic navigation setup with a home screen followed by a bottom tab
-interface. The tabs include the map, the detection list and a scan view.
-Additional placeholders can be filled in with authentication and settings.
+interface (map, detection list and scan views).
+Login and registration screens are already implemented and use `services/api.js`
+to contact the Flask backend. The detection list fetches data from
+`/api/detections` and caches it for offline viewing.
 The application can also be extended to support Android.
 
 ## Getting Started
@@ -28,6 +30,12 @@ After the Metro bundler starts, scan the QR code in your terminal with the Expo 
 4. Open Expo Go and tap **Scan QR Code**, or use the iPhone Camera app.
 5. Point it at the terminal QR code. After a short build step the app loads inside Expo Go.
 6. Keep the terminal window running so code changes reload automatically.
+
+## Server interaction
+
+Authentication requests are sent to the Flask backend using the helper
+functions in `services/api.js`. After logging in, the detection list requests
+`/api/detections` and stores the result with `AsyncStorage`.
 
 ## Offline caching
 
