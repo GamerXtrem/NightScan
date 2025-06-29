@@ -6,6 +6,7 @@ import mimetypes
 import requests
 import secrets
 import logging
+import random
 
 from flask import (
     Flask,
@@ -14,6 +15,7 @@ from flask import (
     flash,
     redirect,
     url_for,
+    session,
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
@@ -66,6 +68,19 @@ LOCKOUT_WINDOW = 30 * 60  # 30 minutes
 PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{10,}$")
 
 PREDICT_API_URL = os.environ.get("PREDICT_API_URL", "http://localhost:8001/api/predict")
+
+
+CAPTCHA_OPERATIONS = ["+", "-"]
+
+
+def generate_captcha() -> str:
+    """Create a simple math challenge and store the result in the session."""
+    a = random.randint(1, 9)
+    b = random.randint(1, 9)
+    op = random.choice(CAPTCHA_OPERATIONS)
+    answer = a + b if op == "+" else a - b
+    session["captcha_answer"] = str(answer)
+    return f"{a} {op} {b} = ?"
 
 
 def is_wav_header(file_obj) -> bool:
@@ -144,17 +159,27 @@ def login():
         return "Too many failed attempts. Try again later.", 429
 
     if request.method == "POST":
+        if request.form.get("captcha") != session.get("captcha_answer"):
+            attempts, first = FAILED_LOGINS.get(ip, (0, time.time()))
+            FAILED_LOGINS[ip] = (attempts + 1, first)
+            flash("Invalid captcha")
+            question = generate_captcha()
+            return render_template("login.html", captcha_question=question)
+
         username = request.form.get("username")
         password = request.form.get("password")
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
             FAILED_LOGINS.pop(ip, None)
+            session.pop("captcha_answer", None)
             return redirect(url_for("index"))
         attempts, first = FAILED_LOGINS.get(ip, (0, time.time()))
         FAILED_LOGINS[ip] = (attempts + 1, first)
         flash("Invalid credentials")
-    return render_template("login.html")
+
+    question = generate_captcha()
+    return render_template("login.html", captcha_question=question)
 
 
 @app.route("/logout")
