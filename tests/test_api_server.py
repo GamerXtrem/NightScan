@@ -30,6 +30,17 @@ def test_invalid_file(tmp_path):
     assert resp.get_json()["error"] == "WAV file required"
 
 
+def test_raw_audio_upload():
+    app = create_test_app()
+    client = app.test_client()
+    resp = client.post(
+        "/api/predict",
+        data=b"RIFF0000WAVEfmt ",
+        content_type="audio/wav",
+    )
+    assert resp.status_code == 200
+
+
 def test_rate_limiting(monkeypatch):
     monkeypatch.setenv("API_RATE_LIMIT", "2 per minute")
     app = create_test_app()

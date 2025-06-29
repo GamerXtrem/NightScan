@@ -1,6 +1,7 @@
 # Prediction API
 
 This module provides a small Flask server exposing the `POST /api/predict` endpoint. It accepts a WAV file and returns predictions in JSON format like those printed by `predict.py --json`.
+Uploads normally use `multipart/form-data` with a field named `file`, but the API also accepts a raw `audio/wav` body for compatibility with older clients.
 
 ## Launch the server
 
