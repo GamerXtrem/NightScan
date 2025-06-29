@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import logging
 from datetime import datetime, time as dtime
 
 import numpy as np
@@ -34,13 +35,20 @@ def wav_to_spec(wav_path: Path, out_path: Path, sr: int = 22050) -> None:
 def convert_directory(
     wav_dir: Path, out_dir: Path, remove: bool = False, *, sr: int = 22050
 ) -> None:
-    """Convert all WAV files in ``wav_dir`` to ``out_dir``."""
+    """Convert all WAV files in ``wav_dir`` to ``out_dir``.
+
+    Any file that cannot be converted is skipped with a warning.
+    """
     wav_dir = Path(wav_dir)
     for wav in wav_dir.rglob("*.wav"):
         rel = wav.relative_to(wav_dir)
         spec_path = out_dir / rel.with_suffix(".npy")
         spec_path.parent.mkdir(parents=True, exist_ok=True)
-        wav_to_spec(wav, spec_path, sr=sr)
+        try:
+            wav_to_spec(wav, spec_path, sr=sr)
+        except Exception as exc:  # pragma: no cover - unexpected
+            logging.warning("Could not convert %s: %s", wav, exc)
+            continue
         if remove:
             wav.unlink()
 
