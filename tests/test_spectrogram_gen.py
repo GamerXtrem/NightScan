@@ -61,3 +61,29 @@ def test_scheduled_conversion_keeps_when_below_threshold(tmp_path, monkeypatch):
     sg.scheduled_conversion(wav, tmp_path / "spec", now=datetime(2022, 1, 1, 13, 0, 0))
 
     assert f.exists()
+
+
+def test_convert_directory_skips_invalid(tmp_path, monkeypatch):
+    wav_dir = tmp_path / "wav"
+    wav_dir.mkdir()
+    good = wav_dir / "good.wav"
+    bad = wav_dir / "bad.wav"
+    good.write_bytes(b"good")
+    bad.write_bytes(b"bad")
+
+    out_dir = tmp_path / "spec"
+    calls = []
+
+    def fake_wav_to_spec(src, dst, sr=22050):
+        calls.append(src.name)
+        if src == bad:
+            raise RuntimeError("failed")
+        dst.write_text("ok")
+
+    monkeypatch.setattr(sg, "wav_to_spec", fake_wav_to_spec)
+
+    sg.convert_directory(wav_dir, out_dir)
+
+    assert (out_dir / "good.npy").exists()
+    assert not (out_dir / "bad.npy").exists()
+    assert set(calls) == {"good.wav", "bad.wav"}
