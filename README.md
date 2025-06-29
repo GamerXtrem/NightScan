@@ -107,8 +107,9 @@ When exposing the service to the internet, terminate HTTPS at the proxy so both
 the web app and prediction API are accessed securely.
 
 For convenience the repository provides `setup_nginx.sh`, a helper script that
-installs Nginx and writes this configuration. See
-`docs/en/nginx_setup.md` for details.
+installs Nginx and writes this configuration. If you prefer an end-to-end setup
+including HTTPS certificates, use `setup_nginx_tls.sh` instead. Both helpers are
+documented in `docs/en/nginx_setup.md`.
 
 ## Quick prediction test
 

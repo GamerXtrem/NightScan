@@ -12,14 +12,13 @@ sudo bash setup_nginx.sh example.com
 
 The script installs Nginx if needed, creates `/etc/nginx/sites-available/nightscan` and enables it. The configuration forwards `/` to the Flask app on port 8000 and `/api/` to the prediction API on port 8001.
 
-After running the script, verify that the service is reachable at `http://example.com`. For production deployments you should obtain HTTPS certificates, for instance with `certbot`:
+If you want to configure HTTPS automatically, use the helper `setup_nginx_tls.sh` script instead. It runs the steps above and invokes `certbot` to obtain a Let's Encrypt certificate:
 
 ```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d example.com
+sudo bash setup_nginx_tls.sh example.com
 ```
 
-This enables HTTPS for the site and redirects HTTP traffic to the secure endpoint.
+Both scripts configure Nginx and reload it. When using `setup_nginx_tls.sh` the service is immediately reachable at `https://example.com` with HTTP traffic redirected to the secure endpoint.
 
 ## Manual configuration
 
