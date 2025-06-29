@@ -193,6 +193,8 @@ def main() -> None:
     num_classes = len(labels)
 
     dataset = AudioDataset(files)
+    if len(dataset) == 0:
+        raise SystemExit("No audio segments found")
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

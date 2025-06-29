@@ -112,6 +112,8 @@ def predict_file(path: Path) -> List[Dict]:
     """
     try:
         dataset = predict.AudioDataset([path])
+        if len(dataset) == 0:
+            return []
         loader = DataLoader(dataset, batch_size=1, shuffle=False)
     except Exception as exc:  # pragma: no cover - unexpected
         logger.exception("Failed to prepare dataset for %s: %s", path, exc)
