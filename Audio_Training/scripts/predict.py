@@ -141,14 +141,21 @@ def gather_files(inputs: List[Path]) -> List[Path]:
 
 
 def load_labels(csv_dir: Path) -> List[str]:
+    """Return class labels from ``train.csv`` inside ``csv_dir``.
+
+    A ``RuntimeError`` is raised if the CSV is missing or malformed.
+    """
     csv_path = csv_dir / "train.csv"
     mapping = {}
-    with csv_path.open() as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            idx = int(row["label"])
-            name = Path(row["path"]).parent.name
-            mapping[idx] = name
+    try:
+        with csv_path.open() as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                idx = int(row["label"])
+                name = Path(row["path"]).parent.name
+                mapping[idx] = name
+    except Exception as exc:  # pragma: no cover - unexpected
+        raise RuntimeError(f"Failed to parse {csv_path}") from exc
     return [mapping[i] for i in sorted(mapping.keys())]
 
 
