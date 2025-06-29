@@ -19,6 +19,8 @@ from typing import List, Dict, Optional
 import pathlib
 import os
 import logging
+import io
+from types import SimpleNamespace
 from pydub import AudioSegment
 from pydub.exceptions import CouldntDecodeError
 from flask import Flask, request, jsonify
@@ -122,7 +124,14 @@ def predict_file(path: Path) -> List[Dict]:
 def api_predict():
     file = request.files.get("file")
     if not file or not file.filename:
-        return jsonify({"error": "No file uploaded"}), 400
+        if request.mimetype in ("audio/wav", "audio/x-wav") and request.data:
+            file = SimpleNamespace(
+                filename="upload.wav",
+                mimetype=request.mimetype,
+                stream=io.BytesIO(request.get_data()),
+            )
+        else:
+            return jsonify({"error": "No file uploaded"}), 400
     if not file.filename.lower().endswith(".wav"):
         return jsonify({"error": "WAV file required"}), 400
     if file.mimetype not in ("audio/wav", "audio/x-wav"):
