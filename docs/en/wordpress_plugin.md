@@ -37,12 +37,20 @@ with flask_db.cursor() as cur_src, wordpress.cursor() as cur_dest:
     wordpress.commit()
 ```
 
-Adjust the connection parameters and fields to match your exact schema. You can run this via `cron` for regular synchronization.
+Adjust the connection parameters and fields to match your exact schema. A ready to use helper named `export_predictions.py` is available at the repository root. It performs the same query and accepts MySQL connection strings via the `--flask-dsn` and `--wp-dsn` options (or the `FLASK_DB_URI` and `WORDPRESS_DB_URI` environment variables).
+
+```bash
+python export_predictions.py \
+  --flask-dsn mysql://appuser:secret@localhost/nightscan \
+  --wp-dsn mysql://wpuser:secret@localhost/wordpress
+```
+
+You can run this script from `cron` for regular synchronization.
 
 ## Automating the export
 
-To keep the `ns_predictions` table current, schedule the script from your
-crontab. Edit the user's crontab and add a line like the following:
+To keep the `ns_predictions` table current, schedule the helper script from
+your crontab. Edit the user's crontab and add a line like the following:
 
 ```cron
 */10 * * * * /usr/bin/python3 /path/to/export_predictions.py \
