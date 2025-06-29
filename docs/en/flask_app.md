@@ -24,6 +24,10 @@ Two pages let you create an account or log in:
 
 Access to the main page (`/`) is protected by `@login_required`: only logged‑in users can upload files and view their prediction history.
 
+### Authentication security
+
+Passwords must be at least **10 characters** and contain a lowercase letter, uppercase letter, digit and symbol. Login requests are rate limited to **5 per minute** and a temporary lockout is triggered after five failed attempts from the same IP address within 15 minutes.
+
 For public deployments you may instead send files from a WordPress site using
 the upload plugin described in `docs/en/wordpress_plugin.md`. The built‑in form
 is mainly for testing and can be omitted when uploads happen through

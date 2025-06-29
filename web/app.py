@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 import mimetypes
 import requests
 import secrets
@@ -56,8 +57,13 @@ login_manager.login_view = "login"
 # Rate limiter for login attempts
 limiter = Limiter(app=app, key_func=get_remote_address)
 
-# At least 8 characters and one digit
-PASSWORD_RE = re.compile(r"^(?=.*\d).{8,}$")
+# Track failed login attempts per IP
+FAILED_LOGINS = {}
+LOCKOUT_THRESHOLD = 5
+LOCKOUT_WINDOW = 15 * 60  # 15 minutes
+
+# Require at least 10 characters, including upper/lowercase, digit and symbol
+PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{10,}$")
 
 PREDICT_API_URL = os.environ.get("PREDICT_API_URL", "http://localhost:8001/api/predict")
 
@@ -111,7 +117,9 @@ def register():
         if not username or not password:
             flash("Please provide username and password")
         elif not PASSWORD_RE.match(password):
-            flash("Password must be at least 8 characters long and include a digit")
+            flash(
+                "Password must be at least 10 characters long and include uppercase, lowercase, a digit and symbol"
+            )
         elif User.query.filter_by(username=username).first():
             flash("Username already exists")
         else:
@@ -129,13 +137,22 @@ def register():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
+
+    ip = get_remote_address()
+    data = FAILED_LOGINS.get(ip)
+    if data and data[0] >= LOCKOUT_THRESHOLD and time.time() - data[1] < LOCKOUT_WINDOW:
+        return "Too many failed attempts. Try again later.", 429
+
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
+            FAILED_LOGINS.pop(ip, None)
             return redirect(url_for("index"))
+        attempts, first = FAILED_LOGINS.get(ip, (0, time.time()))
+        FAILED_LOGINS[ip] = (attempts + 1, first)
         flash("Invalid credentials")
     return render_template("login.html")
 
