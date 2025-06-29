@@ -7,8 +7,21 @@ Version: 1.0
 
 if (!defined('ABSPATH')) exit;
 
+// Maximum storage per user (10 GB)
+if (!defined('NSAU_MAX_TOTAL_BYTES')) {
+    define('NSAU_MAX_TOTAL_BYTES', 10 * 1024 * 1024 * 1024);
+}
+
 function nsau_render_form() {
     $output = '';
+
+    if (!is_user_logged_in()) {
+        return '<p>You must be logged in to upload files.</p>';
+    }
+
+    $user_id = get_current_user_id();
+    $total = intval(get_user_meta($user_id, 'nsau_total_bytes', true));
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_FILES['ns_audio_file'])) {
         if (!isset($_POST['nsau_nonce']) || !wp_verify_nonce($_POST['nsau_nonce'], 'nsau_upload')) {
             $output .= '<p>Nonce verification failed.</p>';
@@ -18,6 +31,8 @@ function nsau_render_form() {
                 $output .= '<p>File upload error.</p>';
             } elseif ($file['size'] > 100 * 1024 * 1024) {
                 $output .= '<p>File exceeds 100 MB limit.</p>';
+            } elseif ($total + $file['size'] > NSAU_MAX_TOTAL_BYTES) {
+                $output .= '<p>Upload quota exceeded (10 GB total).</p>';
             } else {
                 $mime = '';
                 if (function_exists('finfo_open')) {
@@ -56,6 +71,7 @@ function nsau_render_form() {
                             } else {
                                 $json = wp_remote_retrieve_body($response);
                                 $output .= '<pre>'.esc_html($json).'</pre>';
+                                update_user_meta($user_id, 'nsau_total_bytes', $total + $file['size']);
                             }
                         }
                     }
@@ -63,9 +79,11 @@ function nsau_render_form() {
             }
         }
     }
+    $remaining_gb = max(0, (NSAU_MAX_TOTAL_BYTES - $total) / (1024 * 1024 * 1024));
     $output .= '<form method="post" enctype="multipart/form-data">';
     $output .= '<input type="file" name="ns_audio_file" accept=".wav" required>';
     $output .= '<p>Maximum 100 MB per file, 10 GB total for your account. WAV files only.</p>';
+    $output .= '<p>Remaining quota: '.number_format($remaining_gb, 2).' GB</p>';
     $output .= wp_nonce_field('nsau_upload', 'nsau_nonce', true, false);
     $output .= '<input type="submit" value="Upload">';
     $output .= '</form>';
