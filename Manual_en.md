@@ -71,7 +71,19 @@ python Audio_Training/scripts/predict.py --model_path models/best_model.pth --cs
 
 The script splits the audio, runs the model and prints the three most probable species (e.g., cat, dog, etc.) with their scores. Use `--json` to get JSON output.
 
-## 5. Tips and troubleshooting
+## 5. Run the prediction API
+With a trained model you can start the small API server to process uploads from the web app or other clients. Inside the project folder run:
+
+```bash
+export MODEL_PATH="models/best_model.pth"
+export CSV_DIR="data/processed/csv"
+gunicorn -w 4 -b 0.0.0.0:8001 \
+  Audio_Training.scripts.api_server:application
+```
+
+By default the service listens on `0.0.0.0:8001`. Adjust the address with the `--host` and `--port` options if needed. The Flask app expects the API at `http://localhost:8001/api/predict` unless you set the `PREDICT_API_URL` environment variable.
+
+## 6. Tips and troubleshooting
 - **No sound detected?** Ensure your recording contains cries or sounds loud enough. Very quiet segments are skipped.
 - **FFMPEG error message?** Check that FFMPEG is installed and in your PATH (`ffmpeg -version` in a terminal).
 - **Using multiple cores**: the `--workers 4` option speeds up preprocessing on multi‑core machines. Adjust as needed.

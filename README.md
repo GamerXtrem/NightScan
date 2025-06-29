@@ -235,9 +235,10 @@ project is included under [`ios-app/`](ios-app/).
 **Usage**: familiar gestures (pinch to zoom, scrolling, pull to refresh) so the app remains intuitive on iOS and Android.
 **Simplicity first**: users quickly see when and where animals were observed without viewing the raw media.
 
-French-speaking contributors can refer to
-[`docs/fr/application_objectifs.md`](docs/fr/application_objectifs.md)
-for the original summary in French.
+For additional details see
+[`docs/en/application_objectives.md`](docs/en/application_objectives.md).
+The previous French version remains available at
+[`docs/fr/application_objectifs.md`](docs/fr/application_objectifs.md).
 
 
 ## Configuration and logging
