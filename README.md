@@ -181,7 +181,9 @@ A small plugin located in `wp-plugin/prediction-charts` can display
 user prediction statistics inside WordPress. See
 [`docs/en/wordpress_plugin.md`](docs/en/wordpress_plugin.md) for the expected
 database structure, how to export data from the Flask app and an example
-of the `[nightscan_chart]` shortcode.
+of the `[nightscan_chart]` shortcode. The repository ships with
+`export_predictions.py` to copy predictions from the Flask database to the
+WordPress table.
 
 ## Uploading from WordPress
 
