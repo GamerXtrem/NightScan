@@ -11,7 +11,8 @@ initializes it automatically so that the responses include the correct
     gunicorn Audio_Training.scripts.api_server:application
 
 To speed up inference you may also define ``API_BATCH_SIZE`` to process
-multiple segments at once.
+multiple segments at once. Set ``PREDICT_LOG_FILE`` (or pass ``--log-file``)
+to append JSON results to a file.
 """
 
 import argparse
@@ -22,6 +23,7 @@ from typing import List, Dict, Optional, Tuple
 import pathlib
 import os
 import logging
+import json
 
 from log_utils import setup_logging
 import io
@@ -80,6 +82,7 @@ def create_app(
     csv_dir: Optional[Path] = None,
     *,
     batch_size: Optional[int] = None,
+    log_file: Optional[Path] = None,
 ) -> Flask:
     """Load the model and return the Flask application."""
     if model_path is None:
@@ -107,6 +110,12 @@ def create_app(
                 raise RuntimeError("Invalid API_BATCH_SIZE value") from exc
         else:
             app.config["BATCH_SIZE"] = 1
+    if log_file is None:
+        lf_env = os.environ.get("PREDICT_LOG_FILE")
+        if lf_env:
+            log_file = Path(lf_env)
+    if log_file is not None:
+        app.config["LOG_FILE"] = log_file
     rate_limit = os.environ.get("API_RATE_LIMIT", "60 per minute")
     Limiter(get_remote_address, app=app, default_limits=[rate_limit])
     cors_origins = os.environ.get("API_CORS_ORIGINS")
@@ -233,6 +242,14 @@ def api_predict():
         except Exception as exc:  # pragma: no cover - unexpected
             logger.exception("Prediction failed: %s", exc)
             return jsonify({"error": "Internal server error"}), 500
+    log_file = current_app.config.get("LOG_FILE")
+    if log_file:
+        try:
+            with open(log_file, "a", encoding="utf-8") as f:
+                json.dump(results, f, ensure_ascii=False)
+                f.write("\n")
+        except Exception:  # pragma: no cover - unexpected
+            logger.exception("Failed to save predictions to %s", log_file)
     return jsonify(results)
 
 
@@ -248,8 +265,19 @@ def main() -> None:
         default=None,
         help="Number of segments processed in parallel",
     )
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        default=None,
+        help="Append JSON results to this file",
+    )
     args = parser.parse_args()
-    create_app(args.model_path, args.csv_dir, batch_size=args.batch_size).run(
+    create_app(
+        args.model_path,
+        args.csv_dir,
+        batch_size=args.batch_size,
+        log_file=args.log_file,
+    ).run(
         host=args.host, port=args.port
     )
 
