@@ -46,14 +46,29 @@ device: torch.device | None = None
 
 
 def load_model(model_path: Path, csv_dir: Path) -> None:
+    """Load the model weights and class labels.
+
+    Any error while reading the model file or the CSV will raise a
+    ``RuntimeError`` so that the caller can abort startup cleanly.
+    """
     global model, labels, device
-    labels = predict.load_labels(csv_dir)
+    try:
+        labels = predict.load_labels(csv_dir)
+    except Exception as exc:  # pragma: no cover - unexpected
+        logger.exception("Failed to load label CSV from %s: %s", csv_dir, exc)
+        raise RuntimeError("Could not read training CSV") from exc
+
     num_classes = len(labels)
     model = models.resnet18()
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    state = torch.load(model_path, map_location=device)
-    model.load_state_dict(state)
+    try:
+        state = torch.load(model_path, map_location=device)
+        model.load_state_dict(state)
+    except Exception as exc:  # pragma: no cover - unexpected
+        logger.exception("Failed to load model from %s: %s", model_path, exc)
+        raise RuntimeError("Could not load model weights") from exc
+
     model.to(device)
     model.eval()
 
@@ -90,15 +105,28 @@ application = create_app()
 
 
 def predict_file(path: Path) -> List[Dict]:
-    dataset = predict.AudioDataset([path])
-    loader = DataLoader(dataset, batch_size=1, shuffle=False)
+    """Return prediction results for ``path``.
+
+    Any error while preparing the dataset or running inference will raise a
+    ``RuntimeError``.
+    """
+    try:
+        dataset = predict.AudioDataset([path])
+        loader = DataLoader(dataset, batch_size=1, shuffle=False)
+    except Exception as exc:  # pragma: no cover - unexpected
+        logger.exception("Failed to prepare dataset for %s: %s", path, exc)
+        raise RuntimeError("Invalid audio file") from exc
     softmax = torch.nn.Softmax(dim=1)
     results: List[Dict] = []
     with torch.no_grad():
         for batch, paths in loader:
             batch = batch.to(device)
-            outputs = model(batch)
-            probs = softmax(outputs)
+            try:
+                outputs = model(batch)
+                probs = softmax(outputs)
+            except Exception as exc:  # pragma: no cover - unexpected
+                logger.exception("Inference failed on %s: %s", path, exc)
+                raise RuntimeError("Inference failed") from exc
             values, indices = torch.topk(probs, k=3, dim=1)
             for p, vals, idxs in zip(paths, values, indices):
                 seg_idx = 0
