@@ -60,7 +60,7 @@ limiter = Limiter(app=app, key_func=get_remote_address)
 # Track failed login attempts per IP
 FAILED_LOGINS = {}
 LOCKOUT_THRESHOLD = 5
-LOCKOUT_WINDOW = 15 * 60  # 15 minutes
+LOCKOUT_WINDOW = 30 * 60  # 30 minutes
 
 # Require at least 10 characters, including upper/lowercase, digit and symbol
 PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{10,}$")
