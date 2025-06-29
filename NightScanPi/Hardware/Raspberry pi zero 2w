@@ -1,22 +1,26 @@
 Raspberry Pi Zero 2 W
 ====================
 
-Le Raspberry Pi Zero 2 W est un nano-ordinateur basse consommation basé sur un processeur quad‑coeur 64‑bits ARM Cortex‑A53 cadencé à 1 GHz et 512 Mo de RAM. Il intègre le Wi‑Fi 2,4 GHz et le Bluetooth 4.2 (BLE).
+The Raspberry Pi Zero 2 W is a low-power single-board computer featuring a
+1 GHz quad‑core 64‑bit ARM Cortex‑A53 CPU and 512 MB of RAM. It includes 2.4 GHz
+Wi‑Fi and Bluetooth 4.2 (BLE).
 
-Caractéristiques principales
-- Ports mini HDMI et micro USB OTG
-- Port micro USB pour l’alimentation 5 V
-- Connecteur HAT 40 broches compatible GPIO
-- Connecteur caméra CSI‑2
-- Dimensions : environ 65 × 30 mm pour moins de 10 g
+Key specifications
+- Mini HDMI and micro USB OTG ports
+- Micro USB power input (5 V)
+- 40‑pin GPIO/HAT connector
+- CSI‑2 camera connector
+- Dimensions: ~65 × 30 mm weighing under 10 g
 
-Consommation
-- ∼0,6–0,9 W au repos
-- 2–3 W typiques en charge
+Typical power draw
+- ~0.6–0.9 W idle
+- 2–3 W under load
 
-Installation de Raspberry Pi OS
-1. Téléchargez l’outil **Raspberry Pi Imager** depuis le site officiel.
-2. Insérez une carte microSD (≥8 Go) dans votre ordinateur et sélectionnez « Raspberry Pi OS » dans l’imager.
-3. Lancer le flashage puis, si vous souhaitez activer l’accès SSH sans écran, créez un fichier vide nommé `ssh` à la racine de la carte.
-4. Insérez la microSD dans le Pi Zero 2 W et branchez l’alimentation 5 V.
-5. Une fois démarré, connectez-vous via HDMI/USB ou en SSH pour finir la configuration.
+Installing Raspberry Pi OS
+1. Download the **Raspberry Pi Imager** from the official site.
+2. Insert a microSD card (8 GB or larger) and select *Raspberry Pi OS* in the
+   imager.
+3. Flash the card. To enable headless SSH, create an empty `ssh` file on the boot
+   partition.
+4. Insert the microSD into the Pi Zero 2 W and connect the 5 V power.
+5. Once booted, connect via HDMI/USB or SSH to finish configuration.

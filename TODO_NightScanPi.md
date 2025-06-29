@@ -1,34 +1,49 @@
-# Liste de tâches NightScanPi
+# NightScanPi Task Checklist
 
-Cette liste regroupe les actions à mettre en œuvre pour les scripts de `NightScanPi` d'après la documentation du dossier.
+This file lists the main actions required to develop the `NightScanPi` scripts.
+It mirrors the original French notes so contributors can keep track of pending
+work in English.
 
-## 1. Installation et configuration
-- [x] Flasher **Raspberry Pi OS Lite** sur la carte SD.
-- [x] Activer **SSH** et préparer `wifi_config.py` pour recevoir SSID et mot de passe depuis l'application mobile.
-- [x] Installer les paquets système requis : `python3-pip`, `ffmpeg`, `sox`, `libatlas-base-dev`.
-- [x] Installer les modules Python : `numpy`, `opencv-python`, `soundfile`, `flask`.
+## 1. Installation and setup
+- [x] Flash **Raspberry Pi OS Lite** onto the SD card.
+- [x] Enable **SSH** and prepare `wifi_config.py` to receive the SSID and
+  password from the mobile app.
+- [x] Install the system packages: `python3-pip`, `ffmpeg`, `sox`,
+  `libatlas-base-dev`.
+- [x] Install the Python modules: `numpy`, `opencv-python`, `soundfile`, `flask`.
 
-## 2. Scripts principaux
-- [x] **main.py** : orchestrer le fonctionnement global (capture sur détection, horaires d'activité, appel des autres scripts).
-- [x] **audio_capture.py** : enregistrer 8 s de son à chaque détection (PIR ou seuil audio) et sauvegarder en `.wav`.
-- [x] **camera_trigger.py** : prendre une photo infrarouge lors de la détection (PIR ou audio).
-- [x] **spectrogram_gen.py** : après 12 h, convertir les `.wav` en spectrogrammes `.npy` et supprimer les `.wav` si la carte SD dépasse 70 % de remplissage.
-- [x] **wifi_config.py** : récupérer les paramètres Wi-Fi envoyés par l'application mobile et les appliquer.
-- [x] **sync.py** : envoyer automatiquement spectrogrammes et photos via Wi-Fi ou module SIM ; prévoir un mode déconnexion permettant la copie manuelle via la carte SD.
-- [x] **utils/energy_manager.py** : contrôler l'alimentation à l'aide du TPL5110 pour que le Pi fonctionne uniquement de 18 h à 10 h.
-- [x] Ajouter des tests unitaires pour `camera_trigger.py`.
+## 2. Core scripts
+- [x] **main.py** &ndash; orchestrates detection, active hours and calls the
+  other scripts.
+- [x] **audio_capture.py** &ndash; record 8 s of audio for each PIR or threshold
+  event and save as `.wav`.
+- [x] **camera_trigger.py** &ndash; take an infrared photo when motion or sound
+  is detected.
+- [x] **spectrogram_gen.py** &ndash; after 12 hours convert `.wav` files to
+  `.npy` spectrograms and delete the `.wav` files if the SD card exceeds 70%.
+- [x] **wifi_config.py** &ndash; apply the Wi‑Fi credentials sent by the mobile
+  app.
+- [x] **sync.py** &ndash; automatically upload spectrograms and photos over Wi‑Fi
+  or SIM; fall back to manual copy via SD card when offline.
+- [x] **utils/energy_manager.py** &ndash; use the TPL5110 to power the Pi only
+  between 18:00 and 10:00.
+- [x] Add unit tests for `camera_trigger.py`.
 
-## 3. Gestion énergétique
-- [x] Implémenter la planification d'arrêt/démarrage dans `energy_manager.py` pour limiter la consommation.
-- [x] Veiller à ce que la génération des spectrogrammes s'effectue après midi pour ne pas gêner les captures nocturnes.
+## 3. Power management
+- [x] Implement start/stop scheduling in `energy_manager.py` to reduce
+  consumption.
+- [x] Ensure spectrogram generation runs after noon so it doesn't interfere with
+  night captures.
 
-Cette liste pourra être complétée au fur et à mesure de l'avancement du projet.
+This checklist can be extended as the project progresses.
 
-## 4. Tâches complémentaires
-- [x] Documenter le câblage et les caractéristiques dans le dossier `Hardware/`.
-- [x] Intégrer la détection par capteur PIR et seuil audio dans `main.py`.
-- [x] Créer un service pour recevoir les identifiants Wi-Fi depuis l'application mobile et appliquer `wifi_config.py`.
-- [x] Ajouter la prise en charge du module SIM pour le transfert des données lorsque le Wi-Fi est indisponible.
-- [x] Écrire un script d'installation automatisée pour le Raspberry Pi (packages et configuration).
-- [x] Ajouter des tests unitaires pour `audio_capture.py` et `main.py`.
-- [x] Fournir un exemple de fichier de configuration et activer un journal des erreurs.
+## 4. Additional tasks
+- [x] Document wiring and specs in the `Hardware/` directory.
+- [x] Integrate PIR and audio threshold detection in `main.py`.
+- [x] Create a service to receive Wi‑Fi credentials from the mobile app and apply
+  `wifi_config.py`.
+- [x] Add SIM module support for data transfer when Wi‑Fi is unavailable.
+- [x] Provide an automated install script for the Raspberry Pi (packages and
+  configuration).
+- [x] Add unit tests for `audio_capture.py` and `main.py`.
+- [x] Supply a sample configuration file and enable error logging.

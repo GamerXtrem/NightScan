@@ -1,83 +1,52 @@
-NightScanPi – Piège nocturne autonome audio & photo (Raspberry Pi Zero 2 W)
-🎯 Objectif
-NightScanPi est un système embarqué dédié à la capture automatisée de sons et d’images de la faune nocturne, fonctionnant sur batterie et panneau solaire, avec envoi des données via Wi-Fi ou module SIM. Il est actif entre 18h et 10h, et transforme les sons détectés en spectrogrammes .npy plus légers pour le transfert.
+# NightScanPi – Autonomous Audio & Photo Trap (Raspberry Pi Zero 2 W)
 
-🧭 Première utilisation (Onboarding)
-À réception de l’appareil, l’utilisateur doit :
+This subfolder describes the embedded system used to capture wildlife activity at night.
+NightScanPi runs on battery and solar power. It records audio and infrared photos
+between **18:00** and **10:00**, then converts recordings to `.npy` spectrograms
+for transfer over Wi‑Fi or an optional SIM module.
 
-Insérer une carte microSD (min. 64 Go, format ext4 conseillé)
+## First-Time Setup
+When you receive the unit:
 
-Alimenter l'appareil (aucun bouton requis, démarrage automatique à la mise sous tension)
+1. Insert a **64 GB** microSD card (ext4 recommended).
+2. Power on the device &mdash; it starts automatically.
+3. Launch the NightScan mobile app (iOS or Android) and:
+   - Send your Wi‑Fi SSID and password.
+   - Provide the installation GPS coordinates.
+   - (Optional) Enable SIM transfer if a module and subscription are installed.
 
-Lancer l’application mobile NightScan (iOS / Android)
+## Core Components
+| Component                | Function                    |
+|--------------------------|-----------------------------|
+| Raspberry Pi Zero 2 W    | Main board                  |
+| IR-Cut Camera (CSI)      | Night photo capture         |
+| USB microphone           | Audio capture               |
+| IR LEDs                  | Night vision illumination   |
+| PIR sensor               | Motion detection            |
+| microSD (64 GB min.)     | Data storage                |
+| 18650 battery + TPL5110  | Power and timer             |
+| 5 V 1 A solar panel      | Daily recharge              |
+| (Optional) SIM module    | Off‑grid data transfer      |
 
-Depuis l'application :
+Detailed wiring guides are found under `Hardware/`.
 
-Configurer le Wi-Fi en envoyant SSID et mot de passe
+## Operation
+**18:00–10:00** – system active
+- On each PIR trigger: capture one IR photo and an 8 s audio clip.
+- On audio threshold triggers: capture an IR photo and an 8 s audio clip.
 
-Saisir la position GPS de l’installation
+**After 12:00** – processing
+- Convert `.wav` files to `.npy` mel spectrograms at 22,050 Hz.
+- Delete the `.wav` files if the SD card exceeds 70% capacity.
 
-(Facultatif) Activer l’envoi via module SIM si installé et si un abonnement a été souscrit
+## Data Transfer
+- **Wi‑Fi** (configured via the mobile app) sends spectrograms and photos
+  automatically.
+- **SIM module** uploads when a network is available.
+- If neither is possible, you can read the files directly from the SD card.
 
-🧩 Composants
-Composant	Fonction
-Raspberry Pi Zero 2 W	Unité centrale
-Caméra IR-Cut (CSI)	Capture photo nocturne
-Micro USB	Capture audio
-LED infrarouges	Vision de nuit
-Détecteur PIR	Détection de mouvement
-Carte microSD 64 Go min.	Stockage des données
-Batterie 18650 + TPL5110	Alimentation et timer
-Panneau solaire 5V 1A	Recharge quotidienne
-(Optionnel) Module SIM	Transfert hors Wi-Fi
-### Informations matérielles complémentaires
-
-Des fiches détaillées se trouvent dans le répertoire `Hardware/` :
-
-- **Raspberry Pi Zero 2 W** : processeur quad‑cœur 1 GHz, 512 Mo de RAM, Wi‑Fi 2,4 GHz et Bluetooth 4.2. Sa consommation varie entre 0,6 W et 3 W.
-- **RPI IR‑CUT Camera** : module caméra CSI avec filtre infrarouge motorisé et LED IR, prévu pour la vision diurne et nocturne. Le courant maximal avoisine 150 mA.
-- **ReSpeaker Mic Array Lite** : carte microphonique double basée sur un chipset XMOS XU316 intégrant l’annulation d’écho et la suppression de bruit, avec une LED RGB.
-
-Ces documents décrivent les schémas de raccordement et les réglages avancés (modes HDR de la caméra, mise à jour du micro, etc.).
-
-⏱ Fonctionnement
-🕕 De 18h à 10h :
-
-Le système est actif
-
-À chaque détection par le capteur PIR, il capture :
-
-1 photo infrarouge
-
-1 enregistrement audio de 8 secondes (.wav)
-a chaque détection audio quand ça dépasse un seuil, il capture:
-1 photo 
-1 enregistrement audio de 8 secondes
-
-🕛 À partir de 12h :
-
-Les fichiers audio sont transformés en spectrogrammes .npy
-Les enregistrements sont rééchantillonnés à 22 050 Hz et convertis en
-mel-spectrogrammes exprimés en dB afin de correspondre au traitement de
-`predict.py`
-
-Les fichiers .wav sont automatiquement supprimés si la carte SD dépasse 70% de remplissage
-
-📤 Transfert des données
-Via Wi-Fi configuré avec l'app mobile NightScan :
-
-Transfert automatique des spectrogrammes et photos
-
-Via module SIM :
-
-Transfert automatique si réseau disponible et abonnement actif
-
-Sinon : l’utilisateur peut retirer la carte SD pour consulter les fichiers localement
-
-📁 Structure des fichiers
-swift
-Copier
-Modifier
+## File Layout
+```
 /home/pi/nightscanpi/
 ├── main.py
 ├── audio_capture.py
@@ -87,49 +56,43 @@ Modifier
 ├── sync.py
 └── utils/
     └── energy_manager.py
-🛠 Installation système
-Flasher Raspberry Pi OS Lite 64 bits sur carte SD
+```
 
-Activer SSH et préparer les scripts wifi_config.py pour connexion via application mobile
+## System Installation
+1. Flash Raspberry Pi OS Lite (64‑bit) to the SD card.
+2. Enable SSH and prepare `wifi_config.py` for connection via the mobile app.
+3. Install dependencies:
+   ```bash
+   sudo apt update
+   sudo apt install python3-pip ffmpeg sox libatlas-base-dev
+   pip3 install numpy opencv-python soundfile flask
+   ```
 
-Installer les dépendances :
+## Power Management
+The TPL5110 automatically cuts power outside the active hours.
+Adjust `NIGHTSCAN_START_HOUR` and `NIGHTSCAN_STOP_HOUR` before running the
+scripts (`energy_manager.py`, `main.py`, and others).
+Spectrogram processing is scheduled after noon to avoid interfering with
+nighttime captures.
 
-bash
-Copier
-Modifier
-sudo apt update
-sudo apt install python3-pip ffmpeg sox libatlas-base-dev
-pip3 install numpy opencv-python soundfile flask
-🔌 Gestion énergétique
-TPL5110 coupe automatiquement le courant en dehors de la plage horaire utile
+## Repository Overview
+`NightScanPi/` contains the embedded side of the project. At the repository root
+you will also find:
+- `Audio_Training/` and `Picture_Training/` for preparing training data.
+- `web/` with the Flask interface for uploads and predictions.
+- `ios-app/` providing a sample mobile application.
+- `wp-plugin/` with WordPress modules for uploads and stats.
+- `setup_vps_infomaniak.sh` for deploying a VPS hosting the API.
+- `docs/` with additional guides.
 
-Le Pi est alimenté uniquement de 18h à 10h
+Refer to the root `README.md` for environment setup instructions.
 
-Les horaires peuvent être adaptés en définissant les variables
-`NIGHTSCAN_START_HOUR` et `NIGHTSCAN_STOP_HOUR` avant l'exécution des scripts
-(`energy_manager.py`, `main.py`, etc.).
-
-Le traitement des fichiers audio (.wav → .npy) se fait après 12h, pour éviter les pics de charge pendant la collecte
-
-## Aperçu du dépôt NightScan
-
-Ce dossier `NightScanPi/` représente la partie embarquée du projet. À la racine du dépôt, on trouve notamment :
-- `Audio_Training/` et `Picture_Training/` pour la préparation des données et l'entraînement des modèles de reconnaissance.
-- `web/` contenant l'application Flask servant d'interface de téléversement et de consultation des prédictions.
-- `ios-app/` pour un exemple d'application mobile.
-- `wp-plugin/` avec des modules WordPress dédiés aux envois depuis un site et à l'affichage des statistiques.
-- `setup_vps_infomaniak.sh` qui automatise le déploiement d'un VPS configuré pour héberger l'API.
-- `docs/` où se trouvent des guides complémentaires.
-
-Le `README.md` situé à la racine détaille ces répertoires et explique comment installer l'environnement de test.
-
-## Dossier `Program`
-Ce répertoire contient les scripts Python exécutés sur le Raspberry Pi :
-
-- `main.py` orchestre les captures nocturnes.
-- `audio_capture.py` enregistre 8 s d'audio.
-- `camera_trigger.py` prend une photo infrarouge.
-- `spectrogram_gen.py` convertit les fichiers `.wav` en spectrogrammes `.npy`.
-- `wifi_config.py` écrit la configuration Wi-Fi reçue via l'application mobile.
-- `sync.py` envoie automatiquement les fichiers générés.
-- `utils/energy_manager.py` gère la plage horaire d'activité.
+## `Program` Directory
+The `Program` folder holds the Python scripts executed on the Raspberry Pi:
+- `main.py` orchestrates the nightly captures.
+- `audio_capture.py` records 8 s of audio.
+- `camera_trigger.py` takes an IR photo.
+- `spectrogram_gen.py` converts `.wav` files to `.npy` spectrograms.
+- `wifi_config.py` writes the Wi‑Fi configuration from the mobile app.
+- `sync.py` uploads generated files.
+- `utils/energy_manager.py` controls the active hours.

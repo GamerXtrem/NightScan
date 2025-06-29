@@ -237,8 +237,6 @@ project is included under [`ios-app/`](ios-app/).
 
 For additional details see
 [`docs/en/application_objectives.md`](docs/en/application_objectives.md).
-The previous French version remains available at
-[`docs/fr/application_objectifs.md`](docs/fr/application_objectifs.md).
 
 
 ## Configuration and logging
