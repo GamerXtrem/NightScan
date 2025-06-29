@@ -44,7 +44,9 @@ the upload. Clients should keep individual WAV files under this size.
 
 Malformed or truncated WAV files are also rejected. The server attempts to open
 the uploaded data before running the model and returns a 400 error when the file
-cannot be decoded.
+cannot be decoded. If the audio contains only silence, `predict_file()` raises a
+`RuntimeError` and the API responds with `{"error": "Audio file is silent"}` and
+a 400 status.
 
 Just like the Flask web app, you should place a reverse proxy (for example
 Nginx) in front of Gunicorn and forward requests to port `8001`.

@@ -116,7 +116,7 @@ def predict_file(path: Path) -> List[Dict]:
     try:
         dataset = predict.AudioDataset([path])
         if len(dataset) == 0:
-            return []
+            raise RuntimeError("No audio segments found")
         loader = DataLoader(dataset, batch_size=1, shuffle=False)
     except Exception as exc:  # pragma: no cover - unexpected
         logger.exception("Failed to prepare dataset for %s: %s", path, exc)
@@ -195,7 +195,12 @@ def api_predict():
             return jsonify({"error": "Failed to process file"}), 500
         try:
             results = predict_file(Path(tmp.name))
-        except Exception as exc:  # pragma: no cover - prediction failed
+        except RuntimeError as exc:  # pragma: no cover - prediction failed
+            if str(exc) == "No audio segments found":
+                return jsonify({"error": "Audio file is silent"}), 400
+            logger.exception("Prediction failed: %s", exc)
+            return jsonify({"error": "Internal server error"}), 500
+        except Exception as exc:  # pragma: no cover - unexpected
             logger.exception("Prediction failed: %s", exc)
             return jsonify({"error": "Internal server error"}), 500
     return jsonify(results)
