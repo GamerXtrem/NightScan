@@ -3,7 +3,8 @@
 Provide one or more audio files or directories via ``inputs``. The mapping
 between label indices and class names is loaded from ``--csv_dir`` and the
 model weights from ``--model_path``. Use ``--json`` to output predictions as
-a JSON object. The batch size can be controlled with ``--batch_size``.
+a JSON object. Add ``--json-file`` to save the same output to disk. The batch
+size can be controlled with ``--batch_size``.
 """
 
 import argparse
@@ -179,6 +180,12 @@ def main() -> None:
         action="store_true",
         help="Output predictions as a JSON object instead of plain text",
     )
+    parser.add_argument(
+        "--json-file",
+        type=Path,
+        default=None,
+        help="Save JSON output to this file",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -243,6 +250,9 @@ def main() -> None:
                         print(f"  {rank}. {labels[idx]} ({val.item():.2f})")
 
     if args.json:
+        if args.json_file:
+            with open(args.json_file, "w", encoding="utf-8") as f:
+                json.dump(results, f, ensure_ascii=False, indent=2)
         json.dump(results, sys.stdout, ensure_ascii=False, indent=2)
 
 

@@ -78,6 +78,8 @@ gunicorn -w 4 -b 0.0.0.0:8001 \
   Audio_Training.scripts.api_server:application
 
 ```
+Set `PREDICT_LOG_FILE` or pass `--log-file` to `api_server.py` if you want each
+prediction appended as a JSON line for later review.
 
 Like the web app, this command listens on `0.0.0.0` so the API is reachable from any interface. Behind a proxy or with firewall rules this is fine. Otherwise consider binding to `127.0.0.1` or restricting the port with a firewall.
 
@@ -142,7 +144,8 @@ python Audio_Training/scripts/predict.py \
 ```
 
 The script prints the three most probable classes for each audio
-segment. Add `--json` to get the result as JSON. No environment
+segment. Add `--json` to get the result as JSON and `--json-file` to
+save it for later. No environment
 variables are required for this command, but the dependencies installed
 in `env/` (PyTorch, torchaudio, pydub, etc.) must be available.
 
