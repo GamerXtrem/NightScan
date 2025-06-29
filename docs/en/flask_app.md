@@ -77,6 +77,12 @@ export PREDICT_API_URL="https://myserver.example/api/predict"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
 
+Start a Celery worker to handle the prediction requests asynchronously:
+
+```bash
+celery -A web.tasks worker --loglevel=info
+```
+
 In production you should place a reverse proxy such as Nginx in front of the
 Gunicorn workers and forward requests to port `8000`.
 
