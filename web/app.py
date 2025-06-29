@@ -3,6 +3,8 @@ import json
 import re
 import mimetypes
 import requests
+import secrets
+import logging
 
 from flask import (
     Flask,
@@ -27,12 +29,17 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
-    raise RuntimeError("SECRET_KEY environment variable not set")
+    secret_key = secrets.token_hex(32)
+    logger.warning("SECRET_KEY not set; using ephemeral value")
 app.secret_key = secret_key
-app.config["WTF_CSRF_SECRET_KEY"] = os.environ.get("WTF_CSRF_SECRET_KEY", secret_key)
+app.config["WTF_CSRF_SECRET_KEY"] = os.environ.get(
+    "WTF_CSRF_SECRET_KEY", secret_key
+)
 csrf = CSRFProtect(app)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
