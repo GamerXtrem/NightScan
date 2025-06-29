@@ -208,6 +208,11 @@ WordPress may enforce stricter file size limits via PHP. In `php.ini`,
 set `upload_max_filesize` and `post_max_size` to at least `100M` so the
 plugin can accept files up to 100 MB.
 
+The plugin records how much storage each user has used in the
+`nsau_total_bytes` user meta field. Once uploads reach 10 GB the form
+rejects additional files and shows the remaining quota next to the
+upload button.
+
 ## App
 
 For instructions on building a mobile client in React Native, see
