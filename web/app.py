@@ -1,12 +1,13 @@
 import os
-import json
 import re
 import time
 import mimetypes
-import requests
 import secrets
 import logging
 import random
+import requests
+
+from log_utils import setup_logging
 
 from flask import (
     Flask,
@@ -33,6 +34,7 @@ from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 
 logger = logging.getLogger(__name__)
+setup_logging()
 
 app = Flask(__name__)
 secret_key = os.environ.get("SECRET_KEY")
