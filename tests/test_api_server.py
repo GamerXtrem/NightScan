@@ -13,7 +13,7 @@ def create_test_app():
     module = types.ModuleType('api_server_test')
     module.__file__ = str(path)
     exec(compile(source, str(path), 'exec'), module.__dict__)
-    module.load_model = lambda *a, **k: None
+    module.load_model = lambda *a, **k: (None, [], None)
     module.AudioSegment.from_file = lambda *a, **k: None
     module.predict_file = lambda *a, **k: []
     os.environ['MODEL_PATH'] = str(path)

@@ -18,7 +18,7 @@ import argparse
 import tempfile
 import sys
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import pathlib
 import os
 import logging
@@ -28,7 +28,7 @@ import io
 from types import SimpleNamespace
 from pydub import AudioSegment
 from pydub.exceptions import CouldntDecodeError
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import torch
@@ -46,19 +46,13 @@ app = Flask(__name__)
 logger = logging.getLogger(__name__)
 setup_logging()
 
-model: torch.nn.Module | None = None
-labels: List[str] | None = None
-device: torch.device | None = None
-BATCH_SIZE = 1
 
-
-def load_model(model_path: Path, csv_dir: Path) -> None:
+def load_model(model_path: Path, csv_dir: Path) -> Tuple[torch.nn.Module, List[str], torch.device]:
     """Load the model weights and class labels.
 
     Any error while reading the model file or the CSV will raise a
     ``RuntimeError`` so that the caller can abort startup cleanly.
     """
-    global model, labels, device
     try:
         labels = predict.load_labels(csv_dir)
     except Exception as exc:  # pragma: no cover - unexpected
@@ -78,6 +72,7 @@ def load_model(model_path: Path, csv_dir: Path) -> None:
 
     model.to(device)
     model.eval()
+    return model, labels, device
 
 
 def create_app(
@@ -97,17 +92,21 @@ def create_app(
         if not csv_env:
             raise RuntimeError("CSV_DIR environment variable not set")
         csv_dir = Path(csv_env)
-    load_model(model_path, csv_dir)
-    global BATCH_SIZE
+    model, labels, device = load_model(model_path, csv_dir)
+    app.config["MODEL"] = model
+    app.config["LABELS"] = labels
+    app.config["DEVICE"] = device
     if batch_size is not None:
-        BATCH_SIZE = batch_size
+        app.config["BATCH_SIZE"] = batch_size
     else:
         bs_env = os.environ.get("API_BATCH_SIZE")
         if bs_env:
             try:
-                BATCH_SIZE = int(bs_env)
+                app.config["BATCH_SIZE"] = int(bs_env)
             except ValueError as exc:
                 raise RuntimeError("Invalid API_BATCH_SIZE value") from exc
+        else:
+            app.config["BATCH_SIZE"] = 1
     rate_limit = os.environ.get("API_RATE_LIMIT", "60 per minute")
     Limiter(get_remote_address, app=app, default_limits=[rate_limit])
     cors_origins = os.environ.get("API_CORS_ORIGINS")
@@ -125,7 +124,14 @@ def create_app(
 application = create_app()
 
 
-def predict_file(path: Path) -> List[Dict]:
+def predict_file(
+    path: Path,
+    *,
+    model: torch.nn.Module,
+    labels: List[str],
+    device: torch.device,
+    batch_size: int,
+) -> List[Dict]:
     """Return prediction results for ``path``.
 
     Any error while preparing the dataset or running inference will raise a
@@ -135,7 +141,7 @@ def predict_file(path: Path) -> List[Dict]:
         dataset = predict.AudioDataset([path])
         if len(dataset) == 0:
             raise RuntimeError("No audio segments found")
-        loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     except Exception as exc:  # pragma: no cover - unexpected
         logger.exception("Failed to prepare dataset for %s: %s", path, exc)
         raise RuntimeError("Invalid audio file") from exc
@@ -212,7 +218,13 @@ def api_predict():
             logger.exception("Error reading uploaded file: %s", exc)
             return jsonify({"error": "Failed to process file"}), 500
         try:
-            results = predict_file(Path(tmp.name))
+            results = predict_file(
+                Path(tmp.name),
+                model=current_app.config["MODEL"],
+                labels=current_app.config["LABELS"],
+                device=current_app.config["DEVICE"],
+                batch_size=current_app.config["BATCH_SIZE"],
+            )
         except RuntimeError as exc:  # pragma: no cover - prediction failed
             if str(exc) == "No audio segments found":
                 return jsonify({"error": "Audio file is silent"}), 400
