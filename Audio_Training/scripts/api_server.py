@@ -9,6 +9,9 @@ initializes it automatically so that the responses include the correct
 
     export API_CORS_ORIGINS="https://your-wordpress.example"
     gunicorn Audio_Training.scripts.api_server:application
+
+To speed up inference you may also define ``API_BATCH_SIZE`` to process
+multiple segments at once.
 """
 
 import argparse
@@ -46,6 +49,7 @@ setup_logging()
 model: torch.nn.Module | None = None
 labels: List[str] | None = None
 device: torch.device | None = None
+BATCH_SIZE = 1
 
 
 def load_model(model_path: Path, csv_dir: Path) -> None:
@@ -76,7 +80,12 @@ def load_model(model_path: Path, csv_dir: Path) -> None:
     model.eval()
 
 
-def create_app(model_path: Optional[Path] = None, csv_dir: Optional[Path] = None) -> Flask:
+def create_app(
+    model_path: Optional[Path] = None,
+    csv_dir: Optional[Path] = None,
+    *,
+    batch_size: Optional[int] = None,
+) -> Flask:
     """Load the model and return the Flask application."""
     if model_path is None:
         mp_env = os.environ.get("MODEL_PATH")
@@ -89,6 +98,16 @@ def create_app(model_path: Optional[Path] = None, csv_dir: Optional[Path] = None
             raise RuntimeError("CSV_DIR environment variable not set")
         csv_dir = Path(csv_env)
     load_model(model_path, csv_dir)
+    global BATCH_SIZE
+    if batch_size is not None:
+        BATCH_SIZE = batch_size
+    else:
+        bs_env = os.environ.get("API_BATCH_SIZE")
+        if bs_env:
+            try:
+                BATCH_SIZE = int(bs_env)
+            except ValueError as exc:
+                raise RuntimeError("Invalid API_BATCH_SIZE value") from exc
     rate_limit = os.environ.get("API_RATE_LIMIT", "60 per minute")
     Limiter(get_remote_address, app=app, default_limits=[rate_limit])
     cors_origins = os.environ.get("API_CORS_ORIGINS")
@@ -103,7 +122,6 @@ def create_app(model_path: Optional[Path] = None, csv_dir: Optional[Path] = None
         CORS(app, origins=origins)
     return app
 
-
 application = create_app()
 
 
@@ -117,7 +135,7 @@ def predict_file(path: Path) -> List[Dict]:
         dataset = predict.AudioDataset([path])
         if len(dataset) == 0:
             raise RuntimeError("No audio segments found")
-        loader = DataLoader(dataset, batch_size=1, shuffle=False)
+        loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
     except Exception as exc:  # pragma: no cover - unexpected
         logger.exception("Failed to prepare dataset for %s: %s", path, exc)
         raise RuntimeError("Invalid audio file") from exc
@@ -212,8 +230,16 @@ def main() -> None:
     parser.add_argument("--csv_dir", type=Path, help="Directory containing train.csv")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help="Number of segments processed in parallel",
+    )
     args = parser.parse_args()
-    create_app(args.model_path, args.csv_dir).run(host=args.host, port=args.port)
+    create_app(args.model_path, args.csv_dir, batch_size=args.batch_size).run(
+        host=args.host, port=args.port
+    )
 
 
 if __name__ == "__main__":

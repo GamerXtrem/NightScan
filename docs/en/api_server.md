@@ -15,6 +15,10 @@ gunicorn -w 4 -b 0.0.0.0:8001 \
   Audio_Training.scripts.api_server:application
 ```
 
+You can process several segments at once by defining `API_BATCH_SIZE` or
+passing `--batch-size` when starting the server. The default value is `1`,
+meaning segments are fed individually to the model.
+
 By default the API listens on `0.0.0.0:8001`. The `--host` and `--port` options let you change this address. Make sure not to reuse the Flask app's port to avoid conflicts.
 
 Listening on `0.0.0.0` means the API accepts connections from any interface. When running behind a reverse proxy or a firewall this is generally expected. If you do not want the service to be reachable from outside, bind it to `127.0.0.1` or restrict access with firewall rules (for example using `ufw`).
