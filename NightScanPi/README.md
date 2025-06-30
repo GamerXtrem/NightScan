@@ -19,6 +19,8 @@ Saisir la position GPS de l’installation
 
 (Facultatif) Activer l’envoi via module SIM si installé et si un abonnement a été souscrit
 
+Configurer la date et l'heure avec `time_config.py` (coordonnées GPS nécessaires pour le fuseau horaire)
+
 🧩 Composants
 Composant	Fonction
 Raspberry Pi Zero 2 W	Unité centrale
@@ -133,3 +135,11 @@ Ce répertoire contient les scripts Python exécutés sur le Raspberry Pi :
 - `wifi_config.py` écrit la configuration Wi-Fi reçue via l'application mobile.
 - `sync.py` envoie automatiquement les fichiers générés.
 - `utils/energy_manager.py` gère la plage horaire d'activité.
+- `time_config.py` règle l'heure et le fuseau en début d'installation.
+
+### Synchronisation horaire
+Pour définir l'heure et le fuseau, exécutez :
+```bash
+python time_config.py "2024-01-01 12:00:00" --lat 46.9 --lon 7.4
+```
+Si aucune coordonnée n'est fournie, celles de Berne sont utilisées.
