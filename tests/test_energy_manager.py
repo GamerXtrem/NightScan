@@ -9,7 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 MODULE_PATH = 'NightScanPi.Program.utils.energy_manager'
 
 
-def reload_energy_manager(start=None, stop=None, pin=None):
+def reload_energy_manager(start=None, stop=None, pin=None, sun_file=None, offset=None):
     if start is not None:
         os.environ['NIGHTSCAN_START_HOUR'] = str(start)
     else:
@@ -22,6 +22,14 @@ def reload_energy_manager(start=None, stop=None, pin=None):
         os.environ['NIGHTSCAN_DONE_PIN'] = str(pin)
     else:
         os.environ.pop('NIGHTSCAN_DONE_PIN', None)
+    if sun_file is not None:
+        os.environ['NIGHTSCAN_SUN_FILE'] = str(sun_file)
+    else:
+        os.environ.pop('NIGHTSCAN_SUN_FILE', None)
+    if offset is not None:
+        os.environ['NIGHTSCAN_SUN_OFFSET'] = str(offset)
+    else:
+        os.environ.pop('NIGHTSCAN_SUN_OFFSET', None)
     if MODULE_PATH in sys.modules:
         del sys.modules[MODULE_PATH]
     return importlib.import_module(MODULE_PATH)
@@ -121,3 +129,32 @@ def test_signal_done_with_gpio(monkeypatch):
         ("output", 5, True),
         ("cleanup", 5),
     ]
+
+
+def test_sun_schedule(tmp_path, monkeypatch):
+    sun_file = tmp_path / "sun.json"
+
+    def fake_get_or_update(path, day, lat=None, lon=None):
+        if day == datetime(2022, 1, 1).date():
+            sunrise = datetime(2022, 1, 1, 7, 0, 0)
+            sunset = datetime(2022, 1, 1, 17, 0, 0)
+        elif day == datetime(2022, 1, 2).date():
+            sunrise = datetime(2022, 1, 2, 7, 0, 0)
+            sunset = datetime(2022, 1, 2, 17, 0, 0)
+        else:
+            sunrise = datetime(2021, 12, 31, 7, 0, 0)
+            sunset = datetime(2021, 12, 31, 17, 0, 0)
+        return day, sunrise, sunset
+
+    mod = reload_energy_manager(sun_file=sun_file)
+    monkeypatch.setattr(mod.sun_times, "get_or_update_sun_times", fake_get_or_update)
+
+    # 20 min before sunset should be active
+    assert mod.within_active_period(datetime(2022, 1, 1, 16, 40, 0))
+    # 20 min after sunrise still active
+    assert mod.within_active_period(datetime(2022, 1, 2, 7, 20, 0))
+    # 40 min after sunrise inactive
+    assert not mod.within_active_period(datetime(2022, 1, 2, 7, 40, 0))
+
+    stop = mod.next_stop_time(datetime(2022, 1, 1, 12, 0, 0))
+    assert stop == datetime(2022, 1, 2, 7, 30, 0)
