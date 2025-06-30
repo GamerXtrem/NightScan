@@ -49,3 +49,23 @@ def load_sun_times(file_path: Path) -> tuple[date, datetime, datetime]:
     sunrise = datetime.fromisoformat(data["sunrise"])
     sunset = datetime.fromisoformat(data["sunset"])
     return day, sunrise, sunset
+
+
+def get_or_update_sun_times(
+    file_path: Path,
+    day: date | None = None,
+    lat: float | None = None,
+    lon: float | None = None,
+) -> tuple[date, datetime, datetime]:
+    """Return sun times from ``file_path`` updating it if necessary."""
+    if day is None:
+        day = date.today()
+    if file_path.exists():
+        try:
+            saved_day, sunrise, sunset = load_sun_times(file_path)
+            if saved_day == day:
+                return saved_day, sunrise, sunset
+        except Exception:
+            pass
+    sunrise, sunset = save_sun_times(file_path, day, lat, lon)
+    return day, sunrise, sunset

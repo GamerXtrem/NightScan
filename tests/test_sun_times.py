@@ -62,3 +62,27 @@ def test_missing_library(monkeypatch):
     with pytest.raises(RuntimeError):
         mod.get_sun_times(date.today())
 
+
+def test_get_or_update(tmp_path):
+    class DummySun:
+        def __init__(self, lat, lon):
+            pass
+
+        def get_local_sunrise_time(self, d):
+            return datetime(2024, 1, 3, 6, 0, 0)
+
+        def get_local_sunset_time(self, d):
+            return datetime(2024, 1, 3, 18, 0, 0)
+
+    mod = reload_module(DummySun)
+    file_path = tmp_path / "sun.json"
+    day, sr, ss = mod.get_or_update_sun_times(file_path, date(2024, 1, 3))
+    assert file_path.exists()
+    assert day == date(2024, 1, 3)
+    # second call should read the same values without recomputing
+    day2, sr2, ss2 = mod.get_or_update_sun_times(file_path, date(2024, 1, 3))
+    assert (day2, sr2, ss2) == (day, sr, ss)
+    # new date should trigger an update
+    day3, sr3, ss3 = mod.get_or_update_sun_times(file_path, date(2024, 1, 4))
+    assert day3 == date(2024, 1, 4)
+
