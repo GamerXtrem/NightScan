@@ -34,8 +34,8 @@ Cette liste pourra être complétée au fur et à mesure de l'avancement du proj
 - [x] Fournir un exemple de fichier de configuration et activer un journal des erreurs.
 
 ## 5. Synchronisation horaire
-- [ ] Écrire un script `time_config.py` pour saisir l'heure actuelle et la position GPS lors de la première configuration.
-- [ ] Si aucune position n'est fournie, utiliser par défaut les coordonnées de Berne (46.9480 N, 7.4474 E).
-- [ ] Déterminer le fuseau horaire à partir de la position avec `timezonefinder` et l'appliquer via `timedatectl`.
+- [x] Écrire un script `time_config.py` pour saisir l'heure actuelle et la position GPS lors de la première configuration.
+- [x] Si aucune position n'est fournie, utiliser par défaut les coordonnées de Berne (46.9480 N, 7.4474 E).
+- [x] Déterminer le fuseau horaire à partir de la position avec `timezonefinder` et l'appliquer via `timedatectl`.
 - [ ] Installer et configurer `chrony` pour maintenir l'heure synchronisée via Wi‑Fi ou module SIM.
-- [ ] Documenter la procédure dans `NightScanPi/README.md`.
+- [x] Documenter la procédure dans `NightScanPi/README.md`.
