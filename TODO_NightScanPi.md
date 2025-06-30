@@ -46,3 +46,11 @@ Cette liste pourra être complétée au fur et à mesure de l'avancement du proj
 - [x] Adapter `energy_manager.py` et `main.py` pour n'activer l'enregistrement que 30 min avant le coucher du soleil jusqu'à 30 min après le lever.
 - [x] Écrire des tests unitaires pour vérifier le calcul des horaires et le respect de la fenêtre d'activité.
 - [x] Mettre à jour la documentation pour décrire la configuration du système basé sur le cycle solaire.
+
+## 7. Interface de transfert manuel
+- [ ] Générer une mini page web accessible en local via Flask ou FastAPI.
+- [ ] Ajouter un bouton **Transférer les données** déclenchant l'envoi des fichiers.
+- [ ] Vérifier la connexion réseau (ping ou DNS) avant le transfert.
+- [ ] Envoyer les spectrogrammes `.npy` et les photos du dossier `/data/exports/` vers le VPS.
+- [ ] Supprimer les fichiers locaux une fois l'envoi confirmé.
+- [ ] Envoyer une notification à l'app mobile NightScan pour signaler la fin du transfert.
