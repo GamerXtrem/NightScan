@@ -49,4 +49,7 @@ if [ -f requirements.txt ]; then
     pip install -r requirements.txt
 fi
 
+# Generate default sunrise/sunset file
+python NightScanPi/Program/utils/sun_times.py "$HOME/sun_times.json"
+
 echo "NightScanPi installation complete. Activate the environment with 'source env/bin/activate'."

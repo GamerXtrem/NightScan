@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+from datetime import date
+from pathlib import Path
+
+from .utils import sun_times
 
 try:  # pragma: no cover - optional dependency
     from timezonefinder import TimezoneFinder
@@ -12,6 +16,7 @@ except Exception:  # pragma: no cover - not installed
 DEFAULT_LAT = 46.9480
 DEFAULT_LON = 7.4474
 DEFAULT_TZ = "Europe/Zurich"
+DEFAULT_SUN_FILE = Path.home() / "sun_times.json"
 
 
 def guess_timezone(lat: float, lon: float) -> str:
@@ -39,6 +44,7 @@ def configure(dt_str: str, lat: float | None = None, lon: float | None = None) -
     tz = guess_timezone(lat, lon)
     set_timezone(tz)
     set_time(dt_str)
+    sun_times.save_sun_times(DEFAULT_SUN_FILE, date.today(), lat, lon)
     return tz
 
 
