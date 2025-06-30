@@ -142,6 +142,7 @@ Ce répertoire contient les scripts Python exécutés sur le Raspberry Pi :
 - `sync.py` envoie automatiquement les fichiers générés.
 - `utils/energy_manager.py` gère la plage horaire d'activité.
 - `time_config.py` règle l'heure et le fuseau en début d'installation.
+- `manual_transfer.py` lance une petite interface Flask pour déclencher manuellement l'envoi des données.
 
 ### Synchronisation horaire
 Pour définir l'heure et le fuseau, exécutez :

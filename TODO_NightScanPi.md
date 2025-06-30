@@ -48,9 +48,9 @@ Cette liste pourra être complétée au fur et à mesure de l'avancement du proj
 - [x] Mettre à jour la documentation pour décrire la configuration du système basé sur le cycle solaire.
 
 ## 7. Interface de transfert manuel
-- [ ] Générer une mini page web accessible en local via Flask ou FastAPI.
-- [ ] Ajouter un bouton **Transférer les données** déclenchant l'envoi des fichiers.
-- [ ] Vérifier la connexion réseau (ping ou DNS) avant le transfert.
-- [ ] Envoyer les spectrogrammes `.npy` et les photos du dossier `/data/exports/` vers le VPS.
-- [ ] Supprimer les fichiers locaux une fois l'envoi confirmé.
-- [ ] Envoyer une notification à l'app mobile NightScan pour signaler la fin du transfert.
+- [x] Générer une mini page web accessible en local via Flask ou FastAPI.
+- [x] Ajouter un bouton **Transférer les données** déclenchant l'envoi des fichiers.
+- [x] Vérifier la connexion réseau (ping ou DNS) avant le transfert.
+- [x] Envoyer les spectrogrammes `.npy` et les photos du dossier `/data/exports/` vers le VPS.
+- [x] Supprimer les fichiers locaux une fois l'envoi confirmé.
+- [x] Envoyer une notification à l'app mobile NightScan pour signaler la fin du transfert.
