@@ -111,11 +111,11 @@ Les horaires peuvent être adaptés en définissant les variables
 `NIGHTSCAN_START_HOUR` et `NIGHTSCAN_STOP_HOUR` avant l'exécution des scripts
 (`energy_manager.py`, `main.py`, etc.).
 
-Pour activer automatiquement le cycle jour/nuit, définissez `NIGHTSCAN_SUN_FILE`
-avec le chemin d'un fichier JSON où seront enregistrées les heures de lever et
-de coucher du soleil. Le système se mettra alors en marche 30 min avant le
-coucher et s'arrêtera 30 min après le lever. La marge peut être ajustée via
-`NIGHTSCAN_SUN_OFFSET` (en minutes).
+Le cycle jour/nuit est activé par défaut. Les heures de lever et de coucher
+sont enregistrées dans `~/sun_times.json` dès l'installation. Ce fichier est
+mis à jour automatiquement si la position ou la date changent. Pour stocker ces
+informations ailleurs, définissez `NIGHTSCAN_SUN_FILE`. La marge par rapport au
+lever/coucher peut être ajustée via `NIGHTSCAN_SUN_OFFSET` (en minutes).
 
 Le traitement des fichiers audio (.wav → .npy) se fait après 12h, pour éviter les pics de charge pendant la collecte
 

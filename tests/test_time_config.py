@@ -17,12 +17,20 @@ def test_configure_defaults(monkeypatch):
 
     monkeypatch.setattr(time_config.subprocess, "run", fake_run)
 
+    saved = []
+
+    def fake_save(path, day, lat=None, lon=None):
+        saved.append(path)
+
+    monkeypatch.setattr(time_config.sun_times, "save_sun_times", fake_save)
+
     tz = time_config.configure("2024-01-01 12:00:00")
     assert tz == "Europe/Zurich"
     assert calls == [
         ["sudo", "timedatectl", "set-timezone", "Europe/Zurich"],
         ["sudo", "timedatectl", "set-time", "2024-01-01 12:00:00"],
     ]
+    assert saved and saved[0] == time_config.DEFAULT_SUN_FILE
 
 
 def test_guess_timezone_fallback(monkeypatch):

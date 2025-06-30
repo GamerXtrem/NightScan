@@ -69,3 +69,18 @@ def get_or_update_sun_times(
             pass
     sunrise, sunset = save_sun_times(file_path, day, lat, lon)
     return day, sunrise, sunset
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Save today's sun times")
+    parser.add_argument("file", nargs="?", default=str(time_config.DEFAULT_SUN_FILE))
+    parser.add_argument("--lat", type=float, help="Latitude")
+    parser.add_argument("--lon", type=float, help="Longitude")
+    args = parser.parse_args()
+    save_sun_times(Path(args.file), date.today(), args.lat, args.lon)
+
+
+if __name__ == "__main__":
+    main()
