@@ -143,3 +143,13 @@ Pour définir l'heure et le fuseau, exécutez :
 python time_config.py "2024-01-01 12:00:00" --lat 46.9 --lon 7.4
 ```
 Si aucune coordonnée n'est fournie, celles de Berne sont utilisées.
+
+Pour conserver une heure précise durant l'utilisation, installez et activez
+`chrony` qui synchronisera automatiquement l'horloge dès qu'une connexion
+(Wi‑Fi ou module SIM) est disponible :
+
+```bash
+sudo apt install -y chrony
+sudo systemctl enable --now chrony
+sudo timedatectl set-ntp true
+```

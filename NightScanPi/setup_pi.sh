@@ -21,7 +21,7 @@ if [ ! -e /boot/ssh ]; then
 fi
 
 # Install required system packages
-PACKAGES=(python3-pip ffmpeg sox libatlas-base-dev)
+PACKAGES=(python3-pip ffmpeg sox libatlas-base-dev chrony)
 MISSING=()
 for pkg in "${PACKAGES[@]}"; do
     dpkg -s "$pkg" >/dev/null 2>&1 || MISSING+=("$pkg")
@@ -30,6 +30,12 @@ done
 if [ ${#MISSING[@]} -gt 0 ]; then
     $SUDO apt update
     $SUDO apt install -y "${MISSING[@]}"
+fi
+
+# Enable and start chrony to keep the clock in sync
+if command -v systemctl >/dev/null 2>&1; then
+    $SUDO systemctl enable --now chrony >/dev/null 2>&1 || true
+    $SUDO timedatectl set-ntp true >/dev/null 2>&1 || true
 fi
 
 # Setup Python environment
