@@ -39,3 +39,10 @@ Cette liste pourra être complétée au fur et à mesure de l'avancement du proj
 - [x] Déterminer le fuseau horaire à partir de la position avec `timezonefinder` et l'appliquer via `timedatectl`.
 - [x] Installer et configurer `chrony` pour maintenir l'heure synchronisée via Wi‑Fi ou module SIM.
 - [x] Documenter la procédure dans `NightScanPi/README.md`.
+
+## 6. Cycle jour/nuit automatique
+- [ ] Ajouter un module `sun_times.py` calculant les heures de lever et coucher du soleil en fonction de la date et des coordonnées GPS (par exemple via `suntime`).
+- [ ] Conserver ces horaires dans un fichier de référence mis à jour quotidiennement.
+- [ ] Adapter `energy_manager.py` et `main.py` pour n'activer l'enregistrement que 30 min avant le coucher du soleil jusqu'à 30 min après le lever.
+- [ ] Écrire des tests unitaires pour vérifier le calcul des horaires et le respect de la fenêtre d'activité.
+- [ ] Mettre à jour la documentation pour décrire la configuration du système basé sur le cycle solaire.
