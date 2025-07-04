@@ -57,11 +57,11 @@ Cette liste pourra être complétée au fur et à mesure de l'avancement du proj
 
 ## 8. Réveil Wi-Fi par signal sonore
 - [ ] Installer `sounddevice`, `numpy`, `scipy` ou `aubio` sur le Pi.
-- [ ] Écrire un script `wifi_wakeup.py` analysant le flux micro en temps réel (FFT) et activant le Wi-Fi avec `sudo ifconfig wlan0 up` à la détection de 2100 Hz.
-- [ ] Journaliser chaque détection pour faciliter le debug.
-- [ ] Générer un son déclencheur `.wav` d'une seconde à 2100 Hz (ou DTMF) et l'intégrer dans l'application iOS.
+- [x] Écrire un script `wifi_wakeup.py` analysant le flux micro en temps réel (FFT) et activant le Wi-Fi avec `sudo ifconfig wlan0 up` à la détection de 2100 Hz.
+- [x] Journaliser chaque détection pour faciliter le debug.
+- [x] Générer un son déclencheur `.wav` d'une seconde à 2100 Hz (ou DTMF) et l'intégrer dans l'application iOS.
 - [ ] Ajouter dans l'app iOS un bouton **Réveiller NightScanPi** jouant ce son à plein volume et affichant « Envoi du signal sonore… ».
-- [ ] Conserver un état `wifi_awake` dans un fichier `.status` et couper automatiquement le Wi-Fi après 10 min sans connexion.
-- [ ] Journaliser la durée d'activation du Wi-Fi.
+- [x] Conserver un état `wifi_awake` dans un fichier `.status` et couper automatiquement le Wi-Fi après 10 min sans connexion.
+- [x] Journaliser la durée d'activation du Wi-Fi.
 - [ ] Tester différentes fréquences, la distance et le volume nécessaires pour éviter les faux positifs et valider le fonctionnement.
 - [ ] Vérifier que la détection sonore ne consomme pas trop d’énergie (benchmark).

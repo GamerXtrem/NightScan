@@ -52,11 +52,18 @@ def _remove_status() -> None:
 
 
 def wifi_up() -> None:
+    """Activate the Wi-Fi interface."""
     subprocess.run(["sudo", "ifconfig", "wlan0", "up"], check=False)
+    logger.info("Wi-Fi interface up")
 
 
 def wifi_down() -> None:
+    """Deactivate the Wi-Fi interface and log how long it was up."""
     subprocess.run(["sudo", "ifconfig", "wlan0", "down"], check=False)
+    start = _read_status()
+    if start is not None:
+        duration = time.time() - start
+        logger.info("Wi-Fi interface down after %.1f s", duration)
 
 
 def network_available(host: str = "8.8.8.8", port: int = 53, timeout: int = 3) -> bool:
