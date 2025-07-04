@@ -41,3 +41,12 @@ def test_main_activates_wifi(monkeypatch):
             wifi_wakeup.main()
 
     assert "up" in events
+
+
+def test_wifi_down_logs(monkeypatch):
+    msgs = []
+    monkeypatch.setattr(wifi_wakeup.subprocess, "run", lambda *a, **k: None)
+    monkeypatch.setattr(wifi_wakeup, "_read_status", lambda: wifi_wakeup.time.time() - 3)
+    monkeypatch.setattr(wifi_wakeup.logger, "info", lambda m, *a: msgs.append(m % a if a else m))
+    wifi_wakeup.wifi_down()
+    assert any("Wi-Fi interface down" in m for m in msgs)
