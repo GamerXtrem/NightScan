@@ -32,6 +32,10 @@ import time as time_module
 from log_utils import setup_logging
 from metrics import (track_request_metrics, record_prediction_metrics, 
                     get_metrics, CONTENT_TYPE_LATEST)
+from cache_utils import get_cache, cache_health_check
+from api_v1 import api_v1
+from openapi_spec import create_openapi_endpoint
+from config import get_config
 import io
 from types import SimpleNamespace
 from pydub import AudioSegment
@@ -47,7 +51,9 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parent))
 
 import predict
 
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit for uploads
+# Load configuration
+config = get_config()
+MAX_FILE_SIZE = config.upload.max_file_size
 
 app = Flask(__name__)
 
@@ -197,15 +203,9 @@ def create_app(
 ) -> Flask:
     """Load the model and return the Flask application."""
     if model_path is None:
-        mp_env = os.environ.get("MODEL_PATH")
-        if not mp_env:
-            raise RuntimeError("MODEL_PATH environment variable not set")
-        model_path = Path(mp_env)
+        model_path = Path(config.model.model_path)
     if csv_dir is None:
-        csv_env = os.environ.get("CSV_DIR")
-        if not csv_env:
-            raise RuntimeError("CSV_DIR environment variable not set")
-        csv_dir = Path(csv_env)
+        csv_dir = Path(config.model.csv_dir)
     model, labels, device = load_model(model_path, csv_dir)
     app.config["MODEL"] = model
     app.config["LABELS"] = labels
@@ -213,40 +213,40 @@ def create_app(
     if batch_size is not None:
         app.config["BATCH_SIZE"] = batch_size
     else:
-        bs_env = os.environ.get("API_BATCH_SIZE")
-        if bs_env:
-            try:
-                app.config["BATCH_SIZE"] = int(bs_env)
-            except ValueError as exc:
-                raise RuntimeError("Invalid API_BATCH_SIZE value") from exc
-        else:
-            app.config["BATCH_SIZE"] = 1
+        app.config["BATCH_SIZE"] = config.model.batch_size
     if log_file is None:
         lf_env = os.environ.get("PREDICT_LOG_FILE")
         if lf_env:
             log_file = Path(lf_env)
     if log_file is not None:
         app.config["LOG_FILE"] = log_file
-    # Enhanced rate limiting for API
-    rate_limit = os.environ.get("API_RATE_LIMIT", "60 per minute")
-    limiter = Limiter(
-        get_remote_address, 
-        app=app, 
-        default_limits=[rate_limit, "1000 per day"]
-    )
-    cors_origins = os.environ.get("API_CORS_ORIGINS")
-    if cors_origins:
-        origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
+    # Enhanced rate limiting for API from config
+    if config.rate_limit.enabled:
+        limiter = Limiter(
+            get_remote_address, 
+            app=app, 
+            default_limits=[config.api.rate_limit]
+        )
+    else:
+        limiter = None
+        
+    app.config["LIMITER"] = limiter
+    if config.api.cors_origins:
         try:
             from flask_cors import CORS
         except ImportError as exc:
             raise RuntimeError(
-                "API_CORS_ORIGINS is set but flask_cors is not installed"
+                "CORS origins configured but flask_cors is not installed"
             ) from exc
-        CORS(app, origins=origins)
+        CORS(app, origins=config.api.cors_origins)
     return app
 
 application = create_app()
+
+# Register API v1 blueprint and OpenAPI docs
+with application.app_context():
+    application.register_blueprint(api_v1)
+    create_openapi_endpoint(application)
 
 
 @app.route("/metrics")
@@ -313,9 +313,14 @@ def readiness_check():
     is_ready = all(checks[check] for check in critical_checks)
     status_code = 200 if is_ready else 503
     
+    # Add cache health check
+    cache_status = cache_health_check()
+    checks["cache"] = cache_status["status"] == "healthy"
+    
     return jsonify({
         "status": "ready" if is_ready else "not_ready",
         "checks": checks,
+        "cache": cache_status,
         "timestamp": datetime.utcnow().isoformat()
     }), status_code
 
@@ -374,7 +379,7 @@ def predict_file(
 
 
 @app.post("/api/predict")
-@limiter.limit("10 per minute")  # More restrictive for prediction endpoint
+@limiter.limit(config.rate_limit.prediction_limit if limiter else None)
 @track_request_metrics
 def api_predict():
     file = request.files.get("file")
@@ -411,6 +416,17 @@ def api_predict():
         tmp.flush()
         if request.content_length is None and total > MAX_FILE_SIZE:
             return jsonify({"error": "File exceeds 100 MB limit"}), 400
+        # Read file data for caching
+        with open(tmp.name, 'rb') as f:
+            audio_data = f.read()
+        
+        # Check cache first
+        cache = get_cache()
+        cached_result = cache.get_prediction(audio_data)
+        if cached_result is not None:
+            logger.info("Returning cached prediction result")
+            return jsonify(cached_result)
+        
         # Validate WAV signature before processing
         with open(tmp.name, 'rb') as wav_file:
             if not validate_wav_signature(wav_file):
@@ -420,9 +436,11 @@ def api_predict():
         try:
             # Additional validation with pydub
             audio = AudioSegment.from_file(tmp.name)
-            # Check duration (reject files longer than 10 minutes)
-            if len(audio) > 600000:  # 10 minutes in milliseconds
-                return jsonify({"error": "Audio file too long (max 10 minutes)"}), 400
+            # Check duration based on config
+            max_duration_ms = config.model.max_audio_duration * 1000
+            if len(audio) > max_duration_ms:
+                max_minutes = config.model.max_audio_duration // 60
+                return jsonify({"error": f"Audio file too long (max {max_minutes} minutes)"}), 400
         except CouldntDecodeError:
             logger.warning("Invalid WAV file uploaded")
             return jsonify({"error": "Invalid WAV file"}), 400
@@ -457,6 +475,9 @@ def api_predict():
                 file_size=total,
                 audio_duration=len(audio) / 1000.0 if 'audio' in locals() else None
             )
+            
+            # Cache the result
+            cache.cache_prediction(audio_data, results)
         except RuntimeError as exc:  # pragma: no cover - prediction failed
             duration = time.time() - start_time
             record_prediction_metrics(duration=duration, success=False)

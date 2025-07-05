@@ -40,19 +40,20 @@ from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 from metrics import (track_request_metrics, record_failed_login, record_quota_usage, 
                     get_metrics, CONTENT_TYPE_LATEST)
+from cache_utils import cache_health_check
+from api_v1 import api_v1
+from openapi_spec import create_openapi_endpoint
+from config import get_config
 
 logger = logging.getLogger(__name__)
 setup_logging()
 
+# Load configuration
+config = get_config()
+
 app = Flask(__name__)
-secret_key = os.environ.get("SECRET_KEY")
-if not secret_key:
-    secret_key = secrets.token_hex(32)
-    logger.warning("SECRET_KEY not set; using ephemeral value")
-app.secret_key = secret_key
-app.config["WTF_CSRF_SECRET_KEY"] = os.environ.get(
-    "WTF_CSRF_SECRET_KEY", secret_key
-)
+app.secret_key = config.security.secret_key
+app.config["WTF_CSRF_SECRET_KEY"] = config.security.csrf_secret_key or config.security.secret_key
 csrf = CSRFProtect(app)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -89,27 +90,28 @@ Talisman(app,
     }
 )
 
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB per upload
-MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB per user
+MAX_FILE_SIZE = config.upload.max_file_size
+MAX_TOTAL_SIZE = config.upload.max_total_size
 
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-# Enhanced rate limiter with different limits for different endpoints
+# Enhanced rate limiter with different limits from config
 limiter = Limiter(
     app=app, 
     key_func=get_remote_address,
-    default_limits=["1000 per day", "100 per hour"]
-)
+    default_limits=[config.rate_limit.default_limit]
+) if config.rate_limit.enabled else None
 
 # Track failed login attempts per IP - now persistent
-LOCKOUT_THRESHOLD = 5
-LOCKOUT_WINDOW = 30 * 60  # 30 minutes
-LOCKOUT_FILE = os.environ.get("LOCKOUT_FILE", "failed_logins.json")
+LOCKOUT_THRESHOLD = config.security.lockout_threshold
+LOCKOUT_WINDOW = config.security.lockout_window
+LOCKOUT_FILE = config.security.lockout_file
 CLEANUP_INTERVAL = 3600  # Clean old entries every hour
 
-# Require at least 10 characters, including upper/lowercase, digit and symbol
-PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{10,}$")
+# Password validation based on config
+min_length = config.security.password_min_length
+PASSWORD_RE = re.compile(rf"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{{{min_length},}}$")
 
 # Username validation - alphanumeric and underscore only
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
@@ -298,8 +300,7 @@ def load_user(user_id: str):
 
 
 @app.route("/register", methods=["GET", "POST"])
-@limiter.limit("3 per minute")
-@limiter.limit("10 per hour")
+@limiter.limit(config.rate_limit.login_limit if limiter else None)
 @track_request_metrics
 def register():
     if current_user.is_authenticated:
@@ -329,8 +330,7 @@ def register():
 
 
 @app.route("/login", methods=["GET", "POST"])
-@limiter.limit("5 per minute")
-@limiter.limit("20 per hour")
+@limiter.limit(config.rate_limit.login_limit if limiter else None)
 @track_request_metrics
 def login():
     if current_user.is_authenticated:
@@ -391,7 +391,7 @@ def logout():
 
 @app.route("/", methods=["GET", "POST"])
 @login_required
-@limiter.limit("10 per minute", methods=["POST"])
+@limiter.limit(config.rate_limit.upload_limit, methods=["POST"] if limiter else None)
 @track_request_metrics
 def index():
     result = None
@@ -522,9 +522,14 @@ def readiness_check():
     all_healthy = all(checks.values())
     status_code = 200 if all_healthy else 503
     
+    # Add cache health check
+    cache_status = cache_health_check()
+    checks["cache"] = cache_status["status"] in ["healthy", "disabled"]
+    
     return jsonify({
         "status": "ready" if all_healthy else "not_ready",
         "checks": checks,
+        "cache": cache_status,
         "timestamp": datetime.utcnow().isoformat()
     }), status_code
 
@@ -586,10 +591,13 @@ def create_database_indexes():
 
 def create_app():
     """Initialize the database and return the Flask app."""
-    db_uri = os.environ.get("SQLALCHEMY_DATABASE_URI")
-    if not db_uri:
-        raise RuntimeError("SQLALCHEMY_DATABASE_URI environment variable not set")
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+    app.config["SQLALCHEMY_DATABASE_URI"] = config.database.uri
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_size": config.database.pool_size,
+        "pool_timeout": config.database.pool_timeout,
+        "pool_recycle": config.database.pool_recycle,
+        "echo": config.database.echo
+    }
     db.init_app(app)
     with app.app_context():
         db.create_all()
@@ -601,6 +609,11 @@ def create_app():
 
 
 application = create_app()
+
+# Register API v1 blueprint and OpenAPI docs
+with application.app_context():
+    application.register_blueprint(api_v1)
+    create_openapi_endpoint(application)
 
 
 if __name__ == "__main__":
