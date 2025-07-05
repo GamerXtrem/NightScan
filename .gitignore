@@ -4,3 +4,4 @@ env/
 venv/
 ios-app/node_modules/
 nightscan.log
+ios-app/assets/wake_tone.wav
