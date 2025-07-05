@@ -1,7 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Button } from 'react-native';
+import { Audio } from 'expo-av';
 
 export default function HomeScreen({ navigation }) {
+  const [sound, setSound] = useState();
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync().catch(() => {});
+        }
+      : undefined;
+  }, [sound]);
+
+  const playWakeTone = async () => {
+    try {
+      const { sound: s } = await Audio.Sound.createAsync(
+        require('../assets/wake_tone.wav')
+      );
+      setSound(s);
+      await s.replayAsync();
+    } catch {
+      // ignore playback errors
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome to NightScan iOS</Text>
@@ -23,6 +46,8 @@ export default function HomeScreen({ navigation }) {
       <Button title="Login" onPress={() => navigation.navigate('Login')} />
       <View style={styles.spacing} />
       <Button title="Register" onPress={() => navigation.navigate('Register')} />
+      <View style={styles.spacing} />
+      <Button title="Réveiller NightScanPi" onPress={playWakeTone} />
     </View>
   );
 }

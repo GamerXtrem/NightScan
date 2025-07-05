@@ -22,6 +22,15 @@ npx expo start
 ```
 After the Metro bundler starts, scan the QR code in your terminal with the Expo Go app to launch NightScan on your device.
 
+### Wake tone asset
+
+The repository does not store the wake tone audio file directly. It will be generated automatically when you run `npm start` thanks to the `prestart` script in `package.json`.
+If you need to generate it manually, run:
+
+```bash
+python ../NightScanPi/Program/generate_wake_tone.py assets/wake_tone.wav
+```
+
 
 ## Testing on iPhone with a QR Code
 1. Install **Expo Go** from the App Store.
