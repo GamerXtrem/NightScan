@@ -6,6 +6,8 @@ import secrets
 import logging
 import random
 import requests
+import json
+from datetime import datetime, timedelta
 
 from log_utils import setup_logging
 
@@ -33,6 +35,7 @@ from flask_talisman import Talisman
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 logger = logging.getLogger(__name__)
 setup_logging()
@@ -50,8 +53,37 @@ csrf = CSRFProtect(app)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy()
-csp = {"default-src": "'self'"}
-Talisman(app, force_https=True, frame_options="DENY", content_security_policy=csp)
+
+# Enhanced Content Security Policy
+csp = {
+    "default-src": "'self'",
+    "script-src": "'self' 'unsafe-inline'",  # Allow inline scripts for forms
+    "style-src": "'self' 'unsafe-inline'",   # Allow inline styles
+    "img-src": "'self' data:",              # Allow data URLs for images
+    "font-src": "'self'",
+    "connect-src": "'self'",
+    "media-src": "'self'",
+    "object-src": "'none'",
+    "base-uri": "'self'",
+    "form-action": "'self'",
+    "frame-ancestors": "'none'",
+    "upgrade-insecure-requests": True
+}
+
+# Enhanced security headers
+Talisman(app, 
+    force_https=True, 
+    frame_options="DENY",
+    content_security_policy=csp,
+    referrer_policy="strict-origin-when-cross-origin",
+    feature_policy={
+        "microphone": "'self'",
+        "camera": "'self'",
+        "geolocation": "'self'",
+        "payment": "'none'",
+        "usb": "'none'"
+    }
+)
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB per upload
 MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB per user
@@ -59,22 +91,121 @@ MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB per user
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-# Rate limiter for login attempts
-limiter = Limiter(app=app, key_func=get_remote_address)
+# Enhanced rate limiter with different limits for different endpoints
+limiter = Limiter(
+    app=app, 
+    key_func=get_remote_address,
+    default_limits=["1000 per day", "100 per hour"]
+)
 
-# Track failed login attempts per IP
-FAILED_LOGINS = {}
+# Track failed login attempts per IP - now persistent
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_WINDOW = 30 * 60  # 30 minutes
+LOCKOUT_FILE = os.environ.get("LOCKOUT_FILE", "failed_logins.json")
+CLEANUP_INTERVAL = 3600  # Clean old entries every hour
 
 # Require at least 10 characters, including upper/lowercase, digit and symbol
 PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{10,}$")
+
+# Username validation - alphanumeric and underscore only
+USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
 
 PREDICT_API_URL = os.environ.get("PREDICT_API_URL", "http://localhost:8001/api/predict")
 
 
 CAPTCHA_OPERATIONS = ["+", "-"]
 
+
+def load_failed_logins() -> dict:
+    """Load failed login attempts from persistent storage."""
+    try:
+        if os.path.exists(LOCKOUT_FILE):
+            with open(LOCKOUT_FILE, 'r') as f:
+                data = json.load(f)
+                # Clean old entries
+                now = time.time()
+                cleaned = {ip: (count, timestamp) for ip, (count, timestamp) in data.items() 
+                          if now - timestamp < LOCKOUT_WINDOW}
+                if len(cleaned) != len(data):
+                    save_failed_logins(cleaned)
+                return cleaned
+    except (json.JSONDecodeError, ValueError, KeyError) as e:
+        logger.warning(f"Failed to load lockout file: {e}")
+    return {}
+
+def save_failed_logins(failed_logins: dict) -> None:
+    """Save failed login attempts to persistent storage."""
+    try:
+        with open(LOCKOUT_FILE, 'w') as f:
+            json.dump(failed_logins, f)
+    except Exception as e:
+        logger.error(f"Failed to save lockout file: {e}")
+
+def cleanup_old_failed_logins() -> None:
+    """Clean up old failed login entries."""
+    failed_logins = load_failed_logins()
+    now = time.time()
+    cleaned = {ip: (count, timestamp) for ip, (count, timestamp) in failed_logins.items() 
+              if now - timestamp < LOCKOUT_WINDOW}
+    if len(cleaned) != len(failed_logins):
+        save_failed_logins(cleaned)
+        logger.info(f"Cleaned {len(failed_logins) - len(cleaned)} old lockout entries")
+
+def is_ip_locked(ip: str) -> bool:
+    """Check if IP is currently locked out."""
+    failed_logins = load_failed_logins()
+    data = failed_logins.get(ip)
+    if data and data[0] >= LOCKOUT_THRESHOLD:
+        return time.time() - data[1] < LOCKOUT_WINDOW
+    return False
+
+def record_failed_login(ip: str) -> None:
+    """Record a failed login attempt."""
+    failed_logins = load_failed_logins()
+    attempts, first_attempt = failed_logins.get(ip, (0, time.time()))
+    failed_logins[ip] = (attempts + 1, first_attempt)
+    save_failed_logins(failed_logins)
+
+def clear_failed_logins(ip: str) -> None:
+    """Clear failed login attempts for IP."""
+    failed_logins = load_failed_logins()
+    if ip in failed_logins:
+        del failed_logins[ip]
+        save_failed_logins(failed_logins)
+
+def validate_input(text: str, max_length: int = 255) -> str:
+    """Validate and sanitize text input."""
+    if not text:
+        return ""
+    
+    # Remove null bytes and control characters
+    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+    
+    # Limit length
+    text = text[:max_length]
+    
+    # Strip whitespace
+    text = text.strip()
+    
+    return text
+
+def validate_filename(filename: str) -> str:
+    """Validate and sanitize filename."""
+    if not filename:
+        return ""
+    
+    # Use werkzeug's secure_filename
+    filename = secure_filename(filename)
+    
+    # Ensure it's not empty after sanitization
+    if not filename:
+        return "upload.wav"
+    
+    # Ensure .wav extension
+    if not filename.lower().endswith('.wav'):
+        filename += '.wav'
+    
+    return filename
 
 def generate_captcha() -> str:
     """Create a simple math challenge and store the result in the session."""
@@ -87,15 +218,31 @@ def generate_captcha() -> str:
 
 
 def is_wav_header(file_obj) -> bool:
-    """Check whether the file-like object has a RIFF/WAVE header."""
+    """Check whether the file-like object has a valid RIFF/WAVE header."""
     pos = file_obj.tell()
-    header = file_obj.read(12)
+    header = file_obj.read(44)  # Read full WAV header
     file_obj.seek(pos)
-    return (
-        len(header) >= 12
-        and header[0:4] == b"RIFF"
-        and header[8:12] == b"WAVE"
-    )
+    
+    if len(header) < 44:
+        return False
+    
+    # Check RIFF signature
+    if header[0:4] != b"RIFF":
+        return False
+    
+    # Check WAVE signature
+    if header[8:12] != b"WAVE":
+        return False
+    
+    # Check fmt chunk
+    if header[12:16] != b"fmt ":
+        return False
+    
+    # Check data chunk signature (should be at offset 36 for standard WAV)
+    if header[36:40] != b"data":
+        return False
+    
+    return True
 
 
 class User(db.Model, UserMixin):
@@ -147,14 +294,19 @@ def load_user(user_id: str):
 
 
 @app.route("/register", methods=["GET", "POST"])
+@limiter.limit("3 per minute")
+@limiter.limit("10 per hour")
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+        username = validate_input(request.form.get("username", ""), 30)
+        password = request.form.get("password", "")
+        
         if not username or not password:
             flash("Please provide username and password")
+        elif not USERNAME_RE.match(username):
+            flash("Username must be 3-30 characters long and contain only letters, numbers and underscore")
         elif not PASSWORD_RE.match(password):
             flash(
                 "Password must be at least 10 characters long and include uppercase, lowercase, a digit and symbol"
@@ -173,33 +325,47 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
+@limiter.limit("20 per hour")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
 
     ip = get_remote_address()
-    data = FAILED_LOGINS.get(ip)
-    if data and data[0] >= LOCKOUT_THRESHOLD and time.time() - data[1] < LOCKOUT_WINDOW:
+    
+    # Clean up old entries periodically
+    if hasattr(app, '_last_cleanup'):
+        if time.time() - app._last_cleanup > CLEANUP_INTERVAL:
+            cleanup_old_failed_logins()
+            app._last_cleanup = time.time()
+    else:
+        app._last_cleanup = time.time()
+    
+    if is_ip_locked(ip):
         return "Too many failed attempts. Try again later.", 429
 
     if request.method == "POST":
         if request.form.get("captcha") != session.get("captcha_answer"):
-            attempts, first = FAILED_LOGINS.get(ip, (0, time.time()))
-            FAILED_LOGINS[ip] = (attempts + 1, first)
+            record_failed_login(ip)
             flash("Invalid captcha")
             question = generate_captcha()
             return render_template("login.html", captcha_question=question)
 
-        username = request.form.get("username")
-        password = request.form.get("password")
+        username = validate_input(request.form.get("username", ""), 30)
+        password = request.form.get("password", "")
+        
+        if not username or not password:
+            record_failed_login(ip)
+            flash("Please provide username and password")
+            question = generate_captcha()
+            return render_template("login.html", captcha_question=question)
+        
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
-            FAILED_LOGINS.pop(ip, None)
+            clear_failed_logins(ip)
             session.pop("captcha_answer", None)
             return redirect(url_for("index"))
-        attempts, first = FAILED_LOGINS.get(ip, (0, time.time()))
-        FAILED_LOGINS[ip] = (attempts + 1, first)
+        record_failed_login(ip)
         flash("Invalid credentials")
 
     question = generate_captcha()
@@ -215,6 +381,7 @@ def logout():
 
 @app.route("/", methods=["GET", "POST"])
 @login_required
+@limiter.limit("10 per minute", methods=["POST"])
 def index():
     result = None
     total = (
@@ -226,49 +393,54 @@ def index():
     remaining = MAX_TOTAL_SIZE - total
     if request.method == "POST":
         file = request.files.get("file")
-        if not file or not file.filename.lower().endswith(".wav"):
-            flash("Please upload a WAV file.")
+        if not file or not file.filename:
+            flash("Please upload a file.")
         else:
-            mime_guess = mimetypes.guess_type(file.filename)[0]
-            if (
-                file.mimetype not in ("audio/wav", "audio/x-wav")
-                and mime_guess != "audio/x-wav"
-            ):
-                flash("Invalid file type. Only WAV files are accepted.")
-            elif not is_wav_header(file.stream):
-                flash("Invalid WAV header.")
+            # Validate and sanitize filename
+            original_filename = validate_filename(file.filename)
+            if not original_filename.lower().endswith(".wav"):
+                flash("Please upload a WAV file.")
             else:
-                file_size = request.content_length
-                if file_size is None:
-                    pos = file.stream.tell()
-                    file.stream.seek(0, os.SEEK_END)
-                    file_size = file.stream.tell()
-                    file.stream.seek(pos)
-                if file_size > MAX_FILE_SIZE:
-                    flash("File exceeds 100 MB limit.")
-                elif total + file_size > MAX_TOTAL_SIZE:
-                    flash("Upload quota exceeded (10 GB total).")
+                mime_guess = mimetypes.guess_type(original_filename)[0]
+                if (
+                    file.mimetype not in ("audio/wav", "audio/x-wav")
+                    and mime_guess != "audio/x-wav"
+                ):
+                    flash("Invalid file type. Only WAV files are accepted.")
+                elif not is_wav_header(file.stream):
+                    flash("Invalid WAV header.")
                 else:
-                    data = file.read()
-                    pred = Prediction(
-                        user_id=current_user.id,
-                        filename=file.filename,
-                        result="PENDING",
-                        file_size=file_size,
-                    )
-                    db.session.add(pred)
-                    db.session.commit()
-                    from .tasks import run_prediction
+                    file_size = request.content_length
+                    if file_size is None:
+                        pos = file.stream.tell()
+                        file.stream.seek(0, os.SEEK_END)
+                        file_size = file.stream.tell()
+                        file.stream.seek(pos)
+                    if file_size > MAX_FILE_SIZE:
+                        flash("File exceeds 100 MB limit.")
+                    elif total + file_size > MAX_TOTAL_SIZE:
+                        flash("Upload quota exceeded (10 GB total).")
+                    else:
+                        data = file.read()
+                        pred = Prediction(
+                            user_id=current_user.id,
+                            filename=original_filename,
+                            result="PENDING",
+                            file_size=file_size,
+                        )
+                        db.session.add(pred)
+                        db.session.commit()
+                        from .tasks import run_prediction
 
-                    run_prediction.delay(
-                        pred.id,
-                        file.filename,
-                        data,
-                        PREDICT_API_URL,
-                    )
-                    total += file_size
-                    remaining = MAX_TOTAL_SIZE - total
-                    flash("File queued for processing.")
+                        run_prediction.delay(
+                            pred.id,
+                            original_filename,
+                            data,
+                            PREDICT_API_URL,
+                        )
+                        total += file_size
+                        remaining = MAX_TOTAL_SIZE - total
+                        flash("File queued for processing.")
     predictions = (
         Prediction.query.filter_by(user_id=current_user.id)
         .order_by(Prediction.id.desc())
@@ -284,6 +456,7 @@ def index():
 
 @app.route("/api/detections")
 @login_required
+@limiter.limit("30 per minute")
 def api_detections():
     detections = (
         Detection.query.order_by(Detection.time.desc()).all()

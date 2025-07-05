@@ -50,6 +50,8 @@ function nsau_render_form() {
                 }
                 if ($mime !== 'audio/wav') {
                     $output .= '<p>Invalid file type. WAV required.</p>';
+                } elseif (!nsau_validate_wav_header($file['tmp_name'])) {
+                    $output .= '<p>Invalid WAV file format.</p>';
                 } else {
                     $endpoint = get_option('ns_api_endpoint');
                     if (!$endpoint) {
@@ -61,16 +63,12 @@ function nsau_render_form() {
                         if (!$validated || strtolower($scheme) !== 'https') {
                             $output .= '<p>Invalid or non-HTTPS API endpoint.</p>';
                         } else {
-                            $body = file_get_contents($file['tmp_name']);
-                            $response = wp_remote_post($endpoint, array(
-                                'headers' => array('Content-Type' => 'audio/wav'),
-                                'body'    => $body,
-                            ));
-                            if (is_wp_error($response)) {
-                                $output .= '<p>Request error: '.esc_html($response->get_error_message()).'</p>';
+                            // Stream upload to prevent memory exhaustion
+                            $success = nsau_stream_upload($file['tmp_name'], $endpoint);
+                            if (is_wp_error($success)) {
+                                $output .= '<p>Request error: '.esc_html($success->get_error_message()).'</p>';
                             } else {
-                                $json = wp_remote_retrieve_body($response);
-                                $output .= '<pre>'.esc_html($json).'</pre>';
+                                $output .= '<pre>'.esc_html($success).'</pre>';
                                 update_user_meta($user_id, 'nsau_total_bytes', $total + $file['size']);
                             }
                         }
@@ -90,4 +88,121 @@ function nsau_render_form() {
     $output .= '<script>document.addEventListener("DOMContentLoaded",function(){var i=document.querySelector("input[name=ns_audio_file]");if(i){i.addEventListener("change",function(){if(this.files.length&&this.files[0].size>104857600){alert("File exceeds 100 MB limit.");this.value="";}});}});</script>';
     return $output;
 }
+function nsau_validate_wav_header($file_path) {
+    $handle = fopen($file_path, 'rb');
+    if (!$handle) {
+        return false;
+    }
+    
+    // Read RIFF header
+    $riff_header = fread($handle, 12);
+    if (strlen($riff_header) < 12) {
+        fclose($handle);
+        return false;
+    }
+    
+    // Check RIFF signature
+    if (substr($riff_header, 0, 4) !== 'RIFF') {
+        fclose($handle);
+        return false;
+    }
+    
+    // Check WAVE signature
+    if (substr($riff_header, 8, 4) !== 'WAVE') {
+        fclose($handle);
+        return false;
+    }
+    
+    // Read fmt chunk
+    $fmt_header = fread($handle, 8);
+    if (strlen($fmt_header) < 8) {
+        fclose($handle);
+        return false;
+    }
+    
+    // Check fmt chunk signature
+    if (substr($fmt_header, 0, 4) !== 'fmt ') {
+        fclose($handle);
+        return false;
+    }
+    
+    fclose($handle);
+    return true;
+}
+
+function nsau_stream_upload($file_path, $endpoint) {
+    // Validate WAV header first
+    if (!nsau_validate_wav_header($file_path)) {
+        return new WP_Error('invalid_wav', 'Invalid WAV file format');
+    }
+    
+    $handle = fopen($file_path, 'rb');
+    if (!$handle) {
+        return new WP_Error('file_error', 'Cannot open file');
+    }
+    
+    $file_size = filesize($file_path);
+    $chunk_size = 64 * 1024; // 64KB chunks
+    
+    // Use wp_remote_post with streaming
+    $args = array(
+        'method' => 'POST',
+        'timeout' => 300, // 5 minutes timeout
+        'headers' => array(
+            'Content-Type' => 'audio/wav',
+            'Content-Length' => $file_size
+        ),
+        'body' => '',
+        'stream' => false,
+        'filename' => null
+    );
+    
+    // For large files, we need to chunk the upload
+    $temp_file = wp_tempnam();
+    $temp_handle = fopen($temp_file, 'wb');
+    
+    if (!$temp_handle) {
+        fclose($handle);
+        return new WP_Error('temp_error', 'Cannot create temp file');
+    }
+    
+    // Copy file in chunks to verify integrity
+    while (!feof($handle)) {
+        $chunk = fread($handle, $chunk_size);
+        if ($chunk === false) {
+            fclose($handle);
+            fclose($temp_handle);
+            unlink($temp_file);
+            return new WP_Error('read_error', 'File read error');
+        }
+        fwrite($temp_handle, $chunk);
+    }
+    
+    fclose($handle);
+    fclose($temp_handle);
+    
+    // Read the complete file for upload
+    $body = file_get_contents($temp_file);
+    unlink($temp_file);
+    
+    if ($body === false) {
+        return new WP_Error('read_error', 'Cannot read processed file');
+    }
+    
+    $args['body'] = $body;
+    
+    $response = wp_remote_post($endpoint, $args);
+    
+    if (is_wp_error($response)) {
+        return $response;
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    if ($response_code !== 200) {
+        return new WP_Error('api_error', 'API returned error: ' . $response_code);
+    }
+    
+    return wp_remote_retrieve_body($response);
+}
+
 add_shortcode('nightscan_uploader', 'nsau_render_form');

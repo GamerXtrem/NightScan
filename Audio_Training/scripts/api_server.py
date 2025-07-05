@@ -24,6 +24,7 @@ import pathlib
 import os
 import logging
 import json
+import struct
 
 from log_utils import setup_logging
 import io
@@ -47,6 +48,111 @@ app = Flask(__name__)
 
 logger = logging.getLogger(__name__)
 setup_logging()
+
+
+def validate_wav_signature(file_obj) -> bool:
+    """Validate complete WAV file signature and structure."""
+    try:
+        pos = file_obj.tell()
+        file_obj.seek(0)
+        
+        # Read and validate RIFF header
+        riff_header = file_obj.read(12)
+        if len(riff_header) < 12:
+            return False
+        
+        # Check RIFF signature
+        if riff_header[0:4] != b"RIFF":
+            return False
+        
+        # Get file size from RIFF header
+        riff_size = struct.unpack('<I', riff_header[4:8])[0]
+        
+        # Check WAVE signature
+        if riff_header[8:12] != b"WAVE":
+            return False
+        
+        # Read fmt chunk
+        fmt_header = file_obj.read(8)
+        if len(fmt_header) < 8:
+            return False
+        
+        # Check fmt chunk signature
+        if fmt_header[0:4] != b"fmt ":
+            return False
+        
+        # Get fmt chunk size
+        fmt_size = struct.unpack('<I', fmt_header[4:8])[0]
+        
+        # Validate fmt chunk size (should be 16 for PCM)
+        if fmt_size < 16:
+            return False
+        
+        # Read fmt chunk data
+        fmt_data = file_obj.read(fmt_size)
+        if len(fmt_data) < 16:
+            return False
+        
+        # Validate audio format (1 = PCM)
+        audio_format = struct.unpack('<H', fmt_data[0:2])[0]
+        if audio_format != 1:  # Only allow PCM format
+            return False
+        
+        # Validate number of channels (1 or 2)
+        channels = struct.unpack('<H', fmt_data[2:4])[0]
+        if channels not in [1, 2]:
+            return False
+        
+        # Validate sample rate (common rates)
+        sample_rate = struct.unpack('<I', fmt_data[4:8])[0]
+        if sample_rate not in [8000, 16000, 22050, 44100, 48000, 96000]:
+            return False
+        
+        # Validate bits per sample
+        bits_per_sample = struct.unpack('<H', fmt_data[14:16])[0]
+        if bits_per_sample not in [8, 16, 24, 32]:
+            return False
+        
+        # Find data chunk
+        while True:
+            chunk_header = file_obj.read(8)
+            if len(chunk_header) < 8:
+                return False
+            
+            chunk_id = chunk_header[0:4]
+            chunk_size = struct.unpack('<I', chunk_header[4:8])[0]
+            
+            if chunk_id == b"data":
+                # Found data chunk, validate size
+                if chunk_size == 0:
+                    return False
+                break
+            else:
+                # Skip other chunks
+                file_obj.seek(chunk_size, 1)
+        
+        return True
+        
+    except (struct.error, ValueError, IOError) as e:
+        logger.warning(f"WAV validation error: {e}")
+        return False
+    finally:
+        file_obj.seek(pos)
+
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize filename to prevent path traversal attacks."""
+    # Remove path separators and dangerous characters
+    import re
+    filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+    # Remove null bytes
+    filename = filename.replace('\x00', '')
+    # Limit length
+    filename = filename[:255]
+    # Ensure it ends with .wav
+    if not filename.lower().endswith('.wav'):
+        filename += '.wav'
+    return filename
 
 
 def load_model(model_path: Path, csv_dir: Path) -> Tuple[torch.nn.Module, List[str], torch.device]:
@@ -116,8 +222,13 @@ def create_app(
             log_file = Path(lf_env)
     if log_file is not None:
         app.config["LOG_FILE"] = log_file
+    # Enhanced rate limiting for API
     rate_limit = os.environ.get("API_RATE_LIMIT", "60 per minute")
-    Limiter(get_remote_address, app=app, default_limits=[rate_limit])
+    limiter = Limiter(
+        get_remote_address, 
+        app=app, 
+        default_limits=[rate_limit, "1000 per day"]
+    )
     cors_origins = os.environ.get("API_CORS_ORIGINS")
     if cors_origins:
         origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
@@ -187,6 +298,7 @@ def predict_file(
 
 
 @app.post("/api/predict")
+@limiter.limit("10 per minute")  # More restrictive for prediction endpoint
 def api_predict():
     file = request.files.get("file")
     if not file or not file.filename:
@@ -198,7 +310,10 @@ def api_predict():
             )
         else:
             return jsonify({"error": "No file uploaded"}), 400
-    if not file.filename.lower().endswith(".wav"):
+    # Sanitize filename
+    sanitized_filename = sanitize_filename(file.filename)
+    
+    if not sanitized_filename.lower().endswith(".wav"):
         return jsonify({"error": "WAV file required"}), 400
     if file.mimetype not in ("audio/wav", "audio/x-wav"):
         return jsonify({"error": "Invalid content type"}), 400
@@ -218,8 +333,18 @@ def api_predict():
         tmp.flush()
         if request.content_length is None and total > MAX_FILE_SIZE:
             return jsonify({"error": "File exceeds 100 MB limit"}), 400
+        # Validate WAV signature before processing
+        with open(tmp.name, 'rb') as wav_file:
+            if not validate_wav_signature(wav_file):
+                logger.warning("Invalid WAV file signature uploaded")
+                return jsonify({"error": "Invalid WAV file format"}), 400
+        
         try:
-            AudioSegment.from_file(tmp.name)
+            # Additional validation with pydub
+            audio = AudioSegment.from_file(tmp.name)
+            # Check duration (reject files longer than 10 minutes)
+            if len(audio) > 600000:  # 10 minutes in milliseconds
+                return jsonify({"error": "Audio file too long (max 10 minutes)"}), 400
         except CouldntDecodeError:
             logger.warning("Invalid WAV file uploaded")
             return jsonify({"error": "Invalid WAV file"}), 400
