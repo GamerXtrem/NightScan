@@ -8,6 +8,7 @@ import random
 import requests
 import json
 from datetime import datetime, timedelta
+import psutil
 
 from log_utils import setup_logging
 
@@ -36,6 +37,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from flask_sqlalchemy import SQLAlchemy
+from metrics import (track_request_metrics, record_failed_login, record_quota_usage, 
+                    get_metrics, CONTENT_TYPE_LATEST)
 
 logger = logging.getLogger(__name__)
 setup_logging()
@@ -296,6 +300,7 @@ def load_user(user_id: str):
 @app.route("/register", methods=["GET", "POST"])
 @limiter.limit("3 per minute")
 @limiter.limit("10 per hour")
+@track_request_metrics
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
@@ -326,6 +331,7 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
 @limiter.limit("20 per hour")
+@track_request_metrics
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
@@ -346,6 +352,7 @@ def login():
     if request.method == "POST":
         if request.form.get("captcha") != session.get("captcha_answer"):
             record_failed_login(ip)
+            record_failed_login('invalid_captcha')
             flash("Invalid captcha")
             question = generate_captcha()
             return render_template("login.html", captcha_question=question)
@@ -355,6 +362,7 @@ def login():
         
         if not username or not password:
             record_failed_login(ip)
+            record_failed_login('missing_credentials')
             flash("Please provide username and password")
             question = generate_captcha()
             return render_template("login.html", captcha_question=question)
@@ -366,6 +374,7 @@ def login():
             session.pop("captcha_answer", None)
             return redirect(url_for("index"))
         record_failed_login(ip)
+        record_failed_login('invalid_credentials')
         flash("Invalid credentials")
 
     question = generate_captcha()
@@ -374,6 +383,7 @@ def login():
 
 @app.route("/logout")
 @login_required
+@track_request_metrics
 def logout():
     logout_user()
     return redirect(url_for("login"))
@@ -382,6 +392,7 @@ def logout():
 @app.route("/", methods=["GET", "POST"])
 @login_required
 @limiter.limit("10 per minute", methods=["POST"])
+@track_request_metrics
 def index():
     result = None
     total = (
@@ -440,6 +451,11 @@ def index():
                         )
                         total += file_size
                         remaining = MAX_TOTAL_SIZE - total
+                        
+                        # Record quota usage metrics
+                        usage_percent = (total / MAX_TOTAL_SIZE) * 100
+                        record_quota_usage(usage_percent)
+                        
                         flash("File queued for processing.")
     predictions = (
         Prediction.query.filter_by(user_id=current_user.id)
@@ -454,14 +470,118 @@ def index():
     )
 
 
+@app.route("/metrics")
+def metrics_endpoint():
+    """Prometheus metrics endpoint."""
+    return get_metrics(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+
+@app.route("/health")
+@track_request_metrics
+def health_check():
+    """Basic health check endpoint."""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    })
+
+
+@app.route("/ready")
+@track_request_metrics
+def readiness_check():
+    """Comprehensive readiness check for load balancers."""
+    checks = {
+        "database": False,
+        "disk_space": False,
+        "memory": False
+    }
+    
+    # Check database connectivity
+    try:
+        db.session.execute("SELECT 1")
+        checks["database"] = True
+    except Exception as e:
+        logger.error(f"Database check failed: {e}")
+    
+    # Check disk space (> 1GB free)
+    try:
+        disk_usage = psutil.disk_usage('/')
+        free_gb = disk_usage.free / (1024**3)
+        checks["disk_space"] = free_gb > 1.0
+    except Exception as e:
+        logger.error(f"Disk space check failed: {e}")
+    
+    # Check memory usage (< 90%)
+    try:
+        memory = psutil.virtual_memory()
+        checks["memory"] = memory.percent < 90.0
+    except Exception as e:
+        logger.error(f"Memory check failed: {e}")
+    
+    all_healthy = all(checks.values())
+    status_code = 200 if all_healthy else 503
+    
+    return jsonify({
+        "status": "ready" if all_healthy else "not_ready",
+        "checks": checks,
+        "timestamp": datetime.utcnow().isoformat()
+    }), status_code
+
+
 @app.route("/api/detections")
 @login_required
 @limiter.limit("30 per minute")
+@track_request_metrics
 def api_detections():
-    detections = (
-        Detection.query.order_by(Detection.time.desc()).all()
+    # Add pagination support
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 50, type=int), 100)  # Max 100 items
+    
+    detections_query = Detection.query.order_by(Detection.time.desc())
+    detections = detections_query.paginate(
+        page=page, per_page=per_page, error_out=False
     )
-    return jsonify([d.to_dict() for d in detections])
+    
+    return jsonify({
+        "detections": [d.to_dict() for d in detections.items],
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": detections.total,
+            "pages": detections.pages,
+            "has_next": detections.has_next,
+            "has_prev": detections.has_prev
+        }
+    })
+
+
+def create_database_indexes():
+    """Create database indexes for better performance."""
+    with db.engine.connect() as conn:
+        # Index on user_id for predictions (most common query)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_prediction_user_id ON prediction(user_id)")
+        
+        # Composite index for user predictions ordered by ID (for pagination)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_prediction_user_id_id ON prediction(user_id, id DESC)")
+        
+        # Index on detection time for chronological queries
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_detection_time ON detection(time DESC)")
+        
+        # Index on detection species for filtering
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_detection_species ON detection(species)")
+        
+        # Composite index for species and zone filtering
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_detection_species_zone ON detection(species, zone)")
+        
+        # Index on user username for login queries
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_user_username ON user(username)")
+        
+        # Index for geospatial queries if using lat/lng
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_detection_location ON detection(latitude, longitude)")
+        
+        conn.commit()
+        logger.info("Database indexes created successfully")
 
 
 def create_app():
@@ -473,6 +593,10 @@ def create_app():
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        try:
+            create_database_indexes()
+        except Exception as e:
+            logger.warning(f"Failed to create some indexes: {e}")
     return app
 
 

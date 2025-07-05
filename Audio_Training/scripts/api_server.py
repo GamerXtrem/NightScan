@@ -25,8 +25,13 @@ import os
 import logging
 import json
 import struct
+from datetime import datetime
+import psutil
+import time as time_module
 
 from log_utils import setup_logging
+from metrics import (track_request_metrics, record_prediction_metrics, 
+                    get_metrics, CONTENT_TYPE_LATEST)
 import io
 from types import SimpleNamespace
 from pydub import AudioSegment
@@ -244,6 +249,77 @@ def create_app(
 application = create_app()
 
 
+@app.route("/metrics")
+def metrics_endpoint():
+    """Prometheus metrics endpoint for API."""
+    return get_metrics(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+
+@app.route("/health")
+@track_request_metrics
+def health_check():
+    """Basic health check endpoint for API."""
+    return jsonify({
+        "status": "healthy",
+        "service": "prediction-api",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    })
+
+
+@app.route("/ready")
+@track_request_metrics
+def readiness_check():
+    """Comprehensive readiness check for prediction API."""
+    checks = {
+        "model_loaded": False,
+        "disk_space": False,
+        "memory": False,
+        "gpu_available": False
+    }
+    
+    # Check if model is loaded
+    try:
+        model = current_app.config.get("MODEL")
+        labels = current_app.config.get("LABELS")
+        checks["model_loaded"] = model is not None and labels is not None
+    except Exception as e:
+        logger.error(f"Model check failed: {e}")
+    
+    # Check disk space (> 2GB free for temp files)
+    try:
+        disk_usage = psutil.disk_usage('/')
+        free_gb = disk_usage.free / (1024**3)
+        checks["disk_space"] = free_gb > 2.0
+    except Exception as e:
+        logger.error(f"Disk space check failed: {e}")
+    
+    # Check memory usage (< 85% for ML workloads)
+    try:
+        memory = psutil.virtual_memory()
+        checks["memory"] = memory.percent < 85.0
+    except Exception as e:
+        logger.error(f"Memory check failed: {e}")
+    
+    # Check GPU availability
+    try:
+        import torch
+        checks["gpu_available"] = torch.cuda.is_available()
+    except Exception:
+        checks["gpu_available"] = False
+    
+    # API is ready if model is loaded and basic resources are available
+    critical_checks = ["model_loaded", "disk_space", "memory"]
+    is_ready = all(checks[check] for check in critical_checks)
+    status_code = 200 if is_ready else 503
+    
+    return jsonify({
+        "status": "ready" if is_ready else "not_ready",
+        "checks": checks,
+        "timestamp": datetime.utcnow().isoformat()
+    }), status_code
+
+
 def predict_file(
     path: Path,
     *,
@@ -299,6 +375,7 @@ def predict_file(
 
 @app.post("/api/predict")
 @limiter.limit("10 per minute")  # More restrictive for prediction endpoint
+@track_request_metrics
 def api_predict():
     file = request.files.get("file")
     if not file or not file.filename:
@@ -321,8 +398,9 @@ def api_predict():
         return jsonify({"error": "File exceeds 100 MB limit"}), 400
     with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
         total = 0
+        chunk_size = 64 * 1024  # Optimized to 64KB chunks for better I/O performance
         while True:
-            chunk = file.stream.read(8192)
+            chunk = file.stream.read(chunk_size)
             if not chunk:
                 break
             tmp.write(chunk)
@@ -351,6 +429,7 @@ def api_predict():
         except Exception as exc:  # pragma: no cover - unexpected
             logger.exception("Error reading uploaded file: %s", exc)
             return jsonify({"error": "Failed to process file"}), 500
+        start_time = time.time()
         try:
             results = predict_file(
                 Path(tmp.name),
@@ -359,12 +438,35 @@ def api_predict():
                 device=current_app.config["DEVICE"],
                 batch_size=current_app.config["BATCH_SIZE"],
             )
+            duration = time.time() - start_time
+            
+            # Log prediction metrics
+            from log_utils import log_prediction
+            log_prediction(
+                filename=sanitized_filename,
+                duration=duration,
+                result_count=len(results),
+                file_size=total,
+                audio_duration=len(audio) / 1000.0 if 'audio' in locals() else None
+            )
+            
+            # Record Prometheus metrics
+            record_prediction_metrics(
+                duration=duration,
+                success=True,
+                file_size=total,
+                audio_duration=len(audio) / 1000.0 if 'audio' in locals() else None
+            )
         except RuntimeError as exc:  # pragma: no cover - prediction failed
+            duration = time.time() - start_time
+            record_prediction_metrics(duration=duration, success=False)
             if str(exc) == "No audio segments found":
                 return jsonify({"error": "Audio file is silent"}), 400
             logger.exception("Prediction failed: %s", exc)
             return jsonify({"error": "Internal server error"}), 500
         except Exception as exc:  # pragma: no cover - unexpected
+            duration = time.time() - start_time
+            record_prediction_metrics(duration=duration, success=False)
             logger.exception("Prediction failed: %s", exc)
             return jsonify({"error": "Internal server error"}), 500
     log_file = current_app.config.get("LOG_FILE")
