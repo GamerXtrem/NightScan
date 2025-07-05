@@ -197,6 +197,26 @@ of the `[nightscan_chart]` shortcode. The repository ships with
 `export_predictions.py` to copy predictions from the Flask database to the
 WordPress table.
 
+The plugins live in the `wp-plugin/` directory. Run
+`./package_wp_plugins.sh` to create ZIP archives that include the version
+numbers declared in each PHP header (for example
+`audio-upload-1.0.zip`).
+
+### Installing the plugins
+
+1. Run `./package_wp_plugins.sh` to generate the archives.
+2. Log into WordPress as an administrator.
+3. Navigate to **Plugins › Add New › Upload Plugin**.
+4. Select the desired ZIP file (e.g. `audio-upload-1.0.zip`), click
+   **Install Now** and activate the plugin.
+
+The prediction chart shortcode becomes available immediately. For the
+uploader plugin, configure the API endpoint after activation as shown
+below.
+
+You can regenerate the archives after modifying the plugin sources by
+running `./package_wp_plugins.sh` from the repository root.
+
 ## Uploading from WordPress
 
 The repository also includes **NightScan Audio Upload**, a plugin that
