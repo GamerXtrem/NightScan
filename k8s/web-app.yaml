@@ -1,0 +1,187 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+  namespace: nightscan
+type: Opaque
+data:
+  # Base64 encoded secrets - replace with actual encoded secrets
+  secret-key: eW91ci1zZWNyZXQta2V5LWhlcmU=  # your-secret-key-here
+  csrf-secret-key: eW91ci1jc3JmLXNlY3JldC1rZXk=  # your-csrf-secret-key
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: nightscan
+data:
+  NIGHTSCAN_ENV: "production"
+  PREDICT_API_URL: "http://prediction-service:8001/api/predict"
+  WEBSOCKET_URL: "ws://web-service:8000"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: upload-pvc
+  namespace: nightscan
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: nightscan
+  labels:
+    app: web-app
+    component: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+        component: frontend
+    spec:
+      containers:
+      - name: web-app
+        image: nightscan/web-app:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: NIGHTSCAN_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: web-config
+              key: NIGHTSCAN_ENV
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres-service:5432/$(POSTGRES_DB)"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: database
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis-service:6379/0"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        - name: PREDICT_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: web-config
+              key: PREDICT_API_URL
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: secret-key
+        - name: CSRF_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: csrf-secret-key
+        - name: WEBSOCKET_URL
+          valueFrom:
+            configMapKeyRef:
+              name: web-config
+              key: WEBSOCKET_URL
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        volumeMounts:
+        - name: upload-storage
+          mountPath: /app/uploads
+        - name: logs-storage
+          mountPath: /app/logs
+      volumes:
+      - name: upload-storage
+        persistentVolumeClaim:
+          claimName: upload-pvc
+      - name: logs-storage
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: nightscan
+  labels:
+    app: web-app
+spec:
+  selector:
+    app: web-app
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nightscan-ingress
+  namespace: nightscan
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+spec:
+  tls:
+  - hosts:
+    - nightscan.yourdomain.com
+    secretName: nightscan-tls
+  rules:
+  - host: nightscan.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-service
+            port:
+              number: 8000

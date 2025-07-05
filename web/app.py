@@ -44,6 +44,8 @@ from cache_utils import cache_health_check
 from api_v1 import api_v1
 from openapi_spec import create_openapi_endpoint
 from config import get_config
+from websocket_service import FlaskWebSocketIntegration, get_websocket_manager
+from analytics_dashboard import analytics_bp
 
 logger = logging.getLogger(__name__)
 setup_logging()
@@ -457,6 +459,22 @@ def index():
                         record_quota_usage(usage_percent)
                         
                         flash("File queued for processing.")
+                        
+                        # Emit WebSocket notification for upload
+                        import asyncio
+                        try:
+                            loop = asyncio.get_event_loop()
+                        except RuntimeError:
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                        
+                        if hasattr(application, 'websocket_manager'):
+                            loop.create_task(application.websocket_manager.notify_prediction_complete({
+                                'filename': original_filename,
+                                'status': 'queued',
+                                'user_id': current_user.id,
+                                'file_size': file_size
+                            }, current_user.id))
     predictions = (
         Prediction.query.filter_by(user_id=current_user.id)
         .order_by(Prediction.id.desc())
@@ -613,7 +631,11 @@ application = create_app()
 # Register API v1 blueprint and OpenAPI docs
 with application.app_context():
     application.register_blueprint(api_v1)
+    application.register_blueprint(analytics_bp)
     create_openapi_endpoint(application)
+    
+    # Initialize WebSocket integration
+    websocket_integration = FlaskWebSocketIntegration(application)
 
 
 if __name__ == "__main__":

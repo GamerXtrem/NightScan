@@ -1,0 +1,94 @@
+# NightScan Automated Backup and Disaster Recovery Crontab
+# Copy this file to your crontab configuration
+# 
+# To install: crontab crontab.example
+# To edit:    crontab -e
+# To view:    crontab -l
+
+# Set environment variables for cron jobs
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+MAILTO=admin@yourdomain.com
+NIGHTSCAN_HOME=/opt/nightscan
+
+# === BACKUP SCHEDULES ===
+
+# Full backup every day at 2:00 AM
+0 2 * * * $NIGHTSCAN_HOME/scripts/backup-cron.sh full
+
+# Quick backup every 6 hours (database and configs only)
+0 */6 * * * $NIGHTSCAN_HOME/scripts/backup-cron.sh quick
+
+# Database-only backup every 2 hours during business hours (8 AM - 6 PM)
+0 8-18/2 * * 1-5 $NIGHTSCAN_HOME/scripts/backup-cron.sh database-only
+
+# Weekly full backup with extra verification (Sundays at 1:00 AM)
+0 1 * * 0 $NIGHTSCAN_HOME/scripts/backup-cron.sh full false false
+
+# === CLEANUP SCHEDULES ===
+
+# Clean up old backups weekly (Sundays at 3:00 AM)
+0 3 * * 0 $NIGHTSCAN_HOME/scripts/backup-cron.sh cleanup
+
+# === VERIFICATION SCHEDULES ===
+
+# Verify recent backups daily at 4:00 AM
+0 4 * * * $NIGHTSCAN_HOME/scripts/backup-cron.sh verify
+
+# === DISASTER RECOVERY MONITORING ===
+
+# Health check every 5 minutes during business hours
+*/5 8-18 * * 1-5 $NIGHTSCAN_HOME/scripts/backup-cron.sh health
+
+# === LOG ROTATION ===
+
+# Rotate backup logs weekly (Sundays at 5:00 AM)
+0 5 * * 0 /usr/sbin/logrotate -f /etc/logrotate.d/nightscan-backup
+
+# === EXAMPLE ALTERNATIVE SCHEDULES ===
+
+# High-frequency backup for critical environments (every 30 minutes)
+# */30 * * * * $NIGHTSCAN_HOME/scripts/backup-cron.sh quick true true
+
+# Low-frequency backup for development environments (daily)
+# 0 3 * * * $NIGHTSCAN_HOME/scripts/backup-cron.sh full
+
+# Backup before maintenance windows (example: before 2nd Sunday of month at 11 PM)
+# 0 23 8-14 * 0 $NIGHTSCAN_HOME/scripts/backup-cron.sh full false false
+
+# === MONITORING AND ALERTING ===
+
+# Check backup status and send report weekly (Mondays at 9:00 AM)
+# 0 9 * * 1 $NIGHTSCAN_HOME/scripts/backup-report.sh
+
+# === NOTES ===
+#
+# Backup Types:
+# - full: Complete backup including database, uploads, models, and configuration
+# - quick: Fast backup excluding models and cloud upload  
+# - database-only: Only database backup
+#
+# Parameters:
+# - backup_type: full, quick, database-only
+# - skip_cleanup: true/false (default: false)
+# - skip_verification: true/false (default: false)
+#
+# Recommended schedules by environment:
+#
+# Production:
+# - Full backup: Daily at off-peak hours
+# - Quick backup: Every 4-6 hours
+# - Database backup: Every 1-2 hours
+# - Cleanup: Weekly
+# - Verification: Daily
+#
+# Staging:
+# - Full backup: Daily
+# - Quick backup: Every 8 hours
+# - Cleanup: Weekly
+#
+# Development:
+# - Full backup: Daily or weekly
+# - Cleanup: Weekly
+#
+# Always test your backup and restore procedures regularly!

@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prediction-config
+  namespace: nightscan
+data:
+  MODEL_PATH: "/app/models/wildlife_model.pth"
+  LABELS_PATH: "/app/models/labels.json"
+  TORCH_DEVICE: "cpu"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prediction-api
+  namespace: nightscan
+  labels:
+    app: prediction-api
+    component: ml-inference
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: prediction-api
+  template:
+    metadata:
+      labels:
+        app: prediction-api
+        component: ml-inference
+    spec:
+      containers:
+      - name: prediction-api
+        image: nightscan/prediction-api:latest
+        ports:
+        - containerPort: 8001
+        env:
+        - name: MODEL_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: prediction-config
+              key: MODEL_PATH
+        - name: LABELS_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: prediction-config
+              key: LABELS_PATH
+        - name: TORCH_DEVICE
+          valueFrom:
+            configMapKeyRef:
+              name: prediction-config
+              key: TORCH_DEVICE
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@redis-service:6379/0"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        resources:
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/ready
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: model-volume
+          mountPath: /app/models
+          readOnly: true
+      volumes:
+      - name: model-volume
+        persistentVolumeClaim:
+          claimName: model-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prediction-service
+  namespace: nightscan
+  labels:
+    app: prediction-api
+spec:
+  selector:
+    app: prediction-api
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-pvc
+  namespace: nightscan
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard

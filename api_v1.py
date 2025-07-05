@@ -6,14 +6,19 @@ from marshmallow import Schema, fields, ValidationError, validate, post_load
 from marshmallow_dataclass import dataclass
 from typing import List, Optional, Dict, Any
 import time
+import logging
 from datetime import datetime
 
 from metrics import track_request_metrics, record_prediction_metrics
 from log_utils import log_prediction
 from cache_utils import get_cache
+from websocket_service import get_websocket_manager
+from push_notifications import get_push_service
 
 # Create API v1 blueprint
 api_v1 = Blueprint('api_v1', __name__, url_prefix='/api/v1')
+
+logger = logging.getLogger(__name__)
 
 
 # ===== SCHEMAS =====
@@ -339,6 +344,30 @@ def predict_audio():
             
             # Cache the result
             cache.cache_prediction(audio_data, results)
+            
+            # Send real-time notifications
+            try:
+                websocket_manager = get_websocket_manager()
+                push_service = get_push_service()
+                
+                notification_data = {
+                    "filename": sanitized_filename,
+                    "results": results[:3] if results else [],  # Top 3 results
+                    "processing_time": processing_time,
+                    "file_size": total,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+                # WebSocket notification (sync version)
+                websocket_manager.notify_prediction_complete_sync(notification_data)
+                
+                # Push notification (if user is authenticated)
+                # In a real implementation, you'd get user_id from the request context
+                # push_service.send_prediction_complete_notification_sync(user_id, notification_data)
+                
+            except Exception as e:
+                # Don't fail the request if notifications fail
+                logger.warning(f"Failed to send notifications: {e}")
             
             response_data = {
                 "results": results,
