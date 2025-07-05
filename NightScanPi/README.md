@@ -101,7 +101,7 @@ Copier
 Modifier
 sudo apt update
 sudo apt install python3-pip ffmpeg sox libatlas-base-dev
-pip3 install numpy opencv-python soundfile flask
+pip3 install numpy opencv-python soundfile sounddevice scipy flask
 🔌 Gestion énergétique
 TPL5110 coupe automatiquement le courant en dehors de la plage horaire utile
 

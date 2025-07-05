@@ -42,7 +42,7 @@ fi
 python3 -m venv env
 source env/bin/activate
 pip install --upgrade pip
-pip install numpy opencv-python soundfile flask pyaudio
+pip install numpy opencv-python soundfile sounddevice scipy flask pyaudio
 
 # Install repository requirements if present
 if [ -f requirements.txt ]; then

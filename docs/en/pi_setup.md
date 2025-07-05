@@ -25,6 +25,7 @@ Create and activate a virtual environment and install the required modules:
 python3 -m venv env
 source env/bin/activate
 pip install numpy opencv-python soundfile flask pyaudio
+pip install sounddevice scipy
 ```
 
 Alternatively you can run the `NightScanPi/setup_pi.sh` script which performs the steps above automatically.
