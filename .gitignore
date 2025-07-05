@@ -5,3 +5,6 @@ venv/
 ios-app/node_modules/
 nightscan.log
 ios-app/assets/wake_tone.wav
+
+# Ignore packaged plugin archives
+wp-plugin/*.zip
