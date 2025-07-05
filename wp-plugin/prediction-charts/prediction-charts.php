@@ -16,9 +16,27 @@ add_action('wp_enqueue_scripts', 'pc_enqueue_scripts');
 function pc_get_data() {
     global $wpdb, $current_user;
     wp_get_current_user();
-    $table = $wpdb->prefix . 'ns_predictions';
-    $rows = $wpdb->get_results($wpdb->prepare(
-        "SELECT species, DATE_FORMAT(predicted_at, '%Y-%m-%d %H:00:00') as hour, COUNT(*) as cnt FROM $table WHERE user_id = %d GROUP BY species,hour ORDER BY hour", $current_user->ID), ARRAY_A);
+    
+    // Secure table name construction - no user input should affect table names
+    $table_name = $wpdb->prefix . 'ns_predictions';
+    
+    // Additional security: validate user ID
+    if (!is_numeric($current_user->ID) || $current_user->ID <= 0) {
+        return array(); // Return empty array for invalid user ID
+    }
+    
+    // Secure SQL query with proper escaping
+    $sql = $wpdb->prepare(
+        "SELECT species, DATE_FORMAT(predicted_at, %s) as hour, COUNT(*) as cnt 
+         FROM {$wpdb->prefix}ns_predictions 
+         WHERE user_id = %d 
+         GROUP BY species, hour 
+         ORDER BY hour",
+        '%Y-%m-%d %H:00:00',
+        $current_user->ID
+    );
+    
+    $rows = $wpdb->get_results($sql, ARRAY_A);
 
     $data = array();
     foreach ($rows as $r) {

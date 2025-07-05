@@ -32,6 +32,26 @@ A minimal Flask application in `web/` forwards
 uploaded audio clips to a prediction API. The endpoint URL is
 read from the `PREDICT_API_URL` environment variable.
 
+### 🚀 Optimized ML Serving
+
+NightScan now includes advanced ML serving optimization with:
+- **Connection Pooling**: Database, Redis, and HTTP connection pools
+- **Model Instance Pooling**: Multiple model instances for load balancing  
+- **Batch Inference**: Automatic batching for improved throughput
+- **Intelligent Caching**: Multi-level caching with Redis
+- **Performance Monitoring**: Real-time metrics and statistics
+
+See [docs/ML_SERVING_OPTIMIZATION.md](docs/ML_SERVING_OPTIMIZATION.md) for detailed documentation.
+
+**Quick Demo:**
+```bash
+# Run optimization demo
+python demo_optimized_serving.py --mode demo
+
+# Start optimized server
+python demo_optimized_serving.py --mode server
+```
+
 Launch it inside the virtual environment. Install `gunicorn` if it is not
 already available (it is listed in `requirements.txt`) and start the server
 with Gunicorn rather than the built in Flask runner:

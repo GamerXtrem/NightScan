@@ -100,6 +100,40 @@ class ApiConfig:
 
 
 @dataclass
+class OptimizedServingConfig:
+    """Optimized ML serving configuration."""
+    enabled: bool = True
+    
+    # Connection pooling
+    db_min_connections: int = 5
+    db_max_connections: int = 20
+    db_connection_timeout: float = 10.0
+    
+    redis_min_connections: int = 3
+    redis_max_connections: int = 15
+    redis_connection_timeout: float = 5.0
+    
+    http_max_connections: int = 100
+    http_connection_timeout: float = 10.0
+    
+    # Model instance pooling
+    model_pool_size: int = 3
+    model_warmup_requests: int = 5
+    
+    # Batch processing
+    batch_timeout_ms: float = 100.0
+    max_batch_size: int = 8
+    request_queue_size: int = 1000
+    worker_threads: int = 4
+    
+    # Performance settings
+    enable_async_inference: bool = True
+    enable_batch_processing: bool = True
+    enable_model_pooling: bool = True
+    fallback_to_original: bool = True
+
+
+@dataclass
 class RaspberryPiConfig:
     """Raspberry Pi specific configuration."""
     data_dir: str = "data"
@@ -147,6 +181,9 @@ if PYDANTIC_AVAILABLE:
         
         # Raspberry Pi
         raspberry_pi: RaspberryPiConfig = RaspberryPiConfig()
+        
+        # Optimized serving
+        optimized_serving: OptimizedServingConfig = OptimizedServingConfig()
         
         class Config:
             env_prefix = "NIGHTSCAN_"
@@ -214,6 +251,7 @@ else:
             self.upload = FileUploadConfig()
             self.api = ApiConfig()
             self.raspberry_pi = RaspberryPiConfig()
+            self.optimized_serving = OptimizedServingConfig()
             
             # Load from environment variables
             self._load_from_env()
