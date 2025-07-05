@@ -65,3 +65,4 @@ Cette liste pourra être complétée au fur et à mesure de l'avancement du proj
 - [x] Journaliser la durée d'activation du Wi-Fi.
 - [ ] Tester différentes fréquences, la distance et le volume nécessaires pour éviter les faux positifs et valider le fonctionnement.
 - [ ] Vérifier que la détection sonore ne consomme pas trop d’énergie (benchmark).
+- [ ] Supprimer l'ancien service de connexion Wi-Fi qui laissait le réseau actif en permanence avec une page web et un bouton.
