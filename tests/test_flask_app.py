@@ -216,3 +216,40 @@ def test_login_requires_captcha(monkeypatch, tmp_path):
         data={"username": "user", "password": "pass1234", "captcha": "2"},
     )
     assert resp.status_code == 302
+
+
+def test_api_detections_returns_list(monkeypatch, tmp_path):
+    monkeypatch.setenv("SECRET_KEY", "test")
+    monkeypatch.setenv(
+        "SQLALCHEMY_DATABASE_URI", f"sqlite:///{tmp_path / 'db.sqlite'}"
+    )
+    module = load_app_module()
+    app = module.create_app()
+    app.config["WTF_CSRF_ENABLED"] = False
+    with app.app_context():
+        user = module.User(username="user")
+        user.set_password("pass")
+        det = module.Detection(
+            species="Bat",
+            latitude=1.0,
+            longitude=2.0,
+            zone="Z",
+        )
+        module.db.session.add_all([user, det])
+        module.db.session.commit()
+
+    client = app.test_client()
+    client.environ_base["wsgi.url_scheme"] = "https"
+    client.environ_base["HTTP_X_FORWARDED_PROTO"] = "https"
+    with client.session_transaction() as sess:
+        sess["captcha_answer"] = "2"
+    client.post(
+        "/login",
+        data={"username": "user", "password": "pass", "captcha": "2"},
+    )
+
+    resp = client.get("/api/detections")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert isinstance(data, list)
+    assert data and data[0]["species"] == "Bat"

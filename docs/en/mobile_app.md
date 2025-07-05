@@ -93,6 +93,19 @@ fetch(PREDICT_API_URL, {
 
 `credentials: 'include'` ensures the session cookie obtained during login is sent along with the upload request.
 
+## Fetching detections
+
+Call `GET /api/detections` to retrieve the list of observations in JSON format. The response is an array of objects containing at least:
+
+- `id`: unique identifier
+- `species`: predicted species name
+- `time`: ISO timestamp of the detection
+- `latitude` and `longitude`: GPS coordinates
+- `zone`: optional text label for the area
+- `image`: URL of the associated picture if available
+
+This endpoint also requires authentication so remember to send the session cookie.
+
 ## Testing
 
 Use the Android or iOS simulator for manual checks and run your preferred test framework (for example `npm test`) to automate unit tests. Confirm that uploads work and that the prediction list updates.

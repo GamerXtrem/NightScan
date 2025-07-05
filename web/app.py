@@ -17,6 +17,7 @@ from flask import (
     redirect,
     url_for,
     session,
+    jsonify,
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
@@ -117,6 +118,27 @@ class Prediction(db.Model):
     file_size = db.Column(db.Integer)
 
     user = db.relationship("User", backref=db.backref("predictions", lazy=True))
+
+
+class Detection(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    species = db.Column(db.String(100), nullable=False)
+    time = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
+    zone = db.Column(db.String(100))
+    image_url = db.Column(db.String(200))
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "species": self.species,
+            "time": self.time.isoformat() if self.time else None,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "zone": self.zone,
+            "image": self.image_url,
+        }
 
 
 @login_manager.user_loader
@@ -258,6 +280,15 @@ def index():
         predictions=predictions,
         remaining_bytes=remaining,
     )
+
+
+@app.route("/api/detections")
+@login_required
+def api_detections():
+    detections = (
+        Detection.query.order_by(Detection.time.desc()).all()
+    )
+    return jsonify([d.to_dict() for d in detections])
 
 
 def create_app():
