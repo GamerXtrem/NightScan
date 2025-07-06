@@ -1,0 +1,109 @@
+{
+  "timestamp": "2025-07-06T21:32:51.040878",
+  "test_type": "vps_lite_performance",
+  "baseline": {
+    "memory_used_mb": 10294.1,
+    "memory_percent": 62.8,
+    "cpu_percent": 6.3,
+    "disk_used_gb": 216.1,
+    "load_average": 2.86181640625
+  },
+  "load_tests": {
+    "docker_startup": {
+      "startup_time_seconds": 1.0,
+      "estimated_memory_usage_mb": 3220,
+      "vps_lite_memory_utilization_percent": 78.6,
+      "services": {
+        "web_memory_mb": 700,
+        "api_memory_mb": 1400,
+        "postgres_memory_mb": 350,
+        "redis_memory_mb": 150,
+        "nginx_memory_mb": 120,
+        "monitoring_memory_mb": 500
+      },
+      "vps_lite_compatible": true,
+      "baseline_stats": {
+        "memory_used_mb": 10292.8,
+        "memory_percent": 62.8,
+        "cpu_percent": 5.8,
+        "disk_used_gb": 216.1,
+        "load_average": 2.86181640625
+      }
+    },
+    "nginx_performance": {
+      "nginx_performance_score": 100,
+      "parameters": {
+        "worker_processes": "optimal_2_vcpu",
+        "worker_connections": "good_1024",
+        "gzip_enabled": true,
+        "rate_limiting": true,
+        "client_limits_optimized": true
+      },
+      "vps_lite_optimized": true
+    },
+    "monitoring_overhead": {
+      "monitoring_overhead": {
+        "loki_memory_mb": 300,
+        "grafana_memory_mb": 150,
+        "promtail_memory_mb": 100,
+        "total_memory_mb": 550
+      },
+      "elk_comparison": {
+        "elasticsearch_memory_mb": 2048,
+        "logstash_memory_mb": 1024,
+        "kibana_memory_mb": 512,
+        "total_memory_mb": 3584
+      },
+      "memory_savings_mb": 3034,
+      "memory_savings_percent": 84.7,
+      "optimizations": {
+        "cache_optimized": true,
+        "retention_optimized": true,
+        "parallelism_limited": true
+      },
+      "vps_lite_suitable": true
+    },
+    "backup_performance": {
+      "estimated_backup_sizes": {
+        "database_compressed_mb": 50,
+        "redis_rdb_mb": 10,
+        "config_files_mb": 5,
+        "ssl_certs_mb": 1,
+        "logs_compressed_mb": 20,
+        "total_mb": 86
+      },
+      "storage_impact_percent": 0.2,
+      "rotation_optimizations": {
+        "daily_rotation": true,
+        "compression_max": true,
+        "space_monitoring": false,
+        "emergency_cleanup": false
+      },
+      "vps_lite_suitable": true,
+      "baseline_stats": {
+        "memory_used_mb": 10303.5,
+        "memory_percent": 62.9,
+        "cpu_percent": 6.1,
+        "disk_used_gb": 216.1,
+        "load_average": 2.71240234375
+      }
+    },
+    "ssl_performance": {
+      "ssl_performance_score": 100,
+      "optimizations": {
+        "modern_protocols": true,
+        "session_cache": true,
+        "ocsp_stapling": true,
+        "hsts_enabled": true
+      },
+      "production_ready": true
+    }
+  },
+  "resource_usage": {},
+  "recommendations": [
+    "🚀 Performance excellente pour VPS Lite",
+    "📊 Monitoring régulier recommandé",
+    "🔄 Tests de charge périodiques conseillés"
+  ],
+  "overall_score": 100
+}

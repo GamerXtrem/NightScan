@@ -1,782 +1,2404 @@
 {
-  "security_score": 0,
-  "total_vulnerabilities": 124,
-  "severity_breakdown": {
-    "critical": 25,
-    "high": 42,
-    "medium": 57
+  "timestamp": "2025-07-06T20:33:24.276013",
+  "project_root": "/Users/jonathanmaitrot/NightScan/Clone claude/NightScan",
+  "summary": {
+    "total_issues": 297,
+    "critical": 205,
+    "high": 92,
+    "medium": 0,
+    "low": 0
   },
-  "vulnerabilities": {
-    "hardcoded_secrets": [
-      {
-        "type": "CRITICAL",
-        "description": "Database URL with credentials",
-        "file": "security_audit.py",
-        "match": "postgres://[^:]+:[^@...",
-        "line": 63
-      },
-      {
-        "type": "CRITICAL",
-        "description": "MySQL URL with credentials",
-        "file": "security_audit.py",
-        "match": "mysql://[^:]+:[^@...",
-        "line": 64
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Secret Key",
-        "file": "README.md",
-        "match": "SECRET_KEY=\"$SECRET_KEY\"...",
-        "line": 63
-      },
-      {
-        "type": "CRITICAL",
-        "description": "MySQL URL with credentials",
-        "file": "export_predictions.py",
-        "match": "mysql://user:pass@...",
-        "line": 12
-      },
-      {
-        "type": "CRITICAL",
-        "description": "MySQL URL with credentials",
-        "file": "export_predictions.py",
-        "match": "mysql://user:pass@...",
-        "line": 12
-      },
-      {
-        "type": "CRITICAL",
-        "description": "MySQL URL with credentials",
-        "file": "export_predictions.py",
-        "match": "mysql://user:pass@...",
-        "line": 12
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Password",
-        "file": "SECURITY.md",
-        "match": "password=\"$NEW_PASSWORD\"...",
-        "line": 214
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Token",
-        "file": "SECURITY.md",
-        "match": "TOKEN=\"your-vault-token\"...",
-        "line": 90
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Token",
-        "file": "SECURITY.md",
-        "match": "TOKEN=\"dev-token\"...",
-        "line": 114
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Token",
-        "file": "SECURITY.md",
-        "match": "TOKEN=\"$(cat /etc/vault/token)\"...",
-        "line": 122
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Password",
-        "file": "tests/test_config.py",
-        "match": "password='key-123'...",
-        "line": 204
-      },
-      {
-        "type": "CRITICAL",
-        "description": "MySQL URL with credentials",
-        "file": "tests/test_config.py",
-        "match": "mysql://user:pass@...",
-        "line": 93
-      },
-      {
-        "type": "CRITICAL",
-        "description": "MySQL URL with credentials",
-        "file": "tests/test_config.py",
-        "match": "mysql://user:pass@...",
-        "line": 93
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Password",
-        "file": "scripts/setup-secrets.sh",
-        "match": "password=\"$db_password\"...",
-        "line": 90
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Password",
-        "file": "scripts/setup-secrets.sh",
-        "match": "password=\"$redis_password\"...",
-        "line": 95
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Password",
-        "file": "scripts/setup-secrets.sh",
-        "match": "password=\"CHANGE_ME\"...",
-        "line": 117
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Password",
-        "file": "scripts/setup-secrets.sh",
-        "match": "password=\"...\"...",
-        "line": 141
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Secret Key",
-        "file": "scripts/setup-secrets.sh",
-        "match": "secret_key=\"$secret_key\"...",
-        "line": 99
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Secret Key",
-        "file": "scripts/setup-secrets.sh",
-        "match": "secret_key=\"$csrf_secret\"...",
-        "line": 100
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded API Key",
-        "file": "scripts/setup-secrets.sh",
-        "match": "api_key=\"CHANGE_ME\"...",
-        "line": 110
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded API Key",
-        "file": "scripts/setup-secrets.sh",
-        "match": "api_key=\"...\"...",
-        "line": 139
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Token",
-        "file": "scripts/setup-secrets.sh",
-        "match": "TOKEN=\"${VAULT_TOKEN:-}\"...",
-        "line": 17
-      },
-      {
-        "type": "CRITICAL",
-        "description": "Hardcoded Token",
-        "file": "scripts/setup-secrets.sh",
-        "match": "TOKEN=\"$VAULT_TOKEN\"...",
-        "line": 74
-      },
-      {
-        "type": "CRITICAL",
-        "description": "MySQL URL with credentials",
-        "file": "docs/en/wordpress_plugin.md",
-        "match": "mysql://appuser:secret@...",
-        "line": 44
-      },
-      {
-        "type": "CRITICAL",
-        "description": "MySQL URL with credentials",
-        "file": "docs/en/wordpress_plugin.md",
-        "match": "mysql://wpuser:secret@...",
-        "line": 45
-      }
-    ],
-    "xss": [
-      {
-        "type": "HIGH",
-        "description": "Jinja2 safe filter usage",
-        "file": "analytics_dashboard.py",
-        "pattern": "|safe }}",
-        "line": 578
-      },
-      {
-        "type": "HIGH",
-        "description": "Jinja2 safe filter usage",
-        "file": "analytics_dashboard.py",
-        "pattern": "|safe }}",
-        "line": 578
-      },
-      {
-        "type": "HIGH",
-        "description": "Jinja2 safe filter usage",
-        "file": "analytics_dashboard.py",
-        "pattern": "|safe }}",
-        "line": 578
-      },
-      {
-        "type": "HIGH",
-        "description": "Jinja2 safe filter usage",
-        "file": "analytics_dashboard.py",
-        "pattern": "|safe }}",
-        "line": 578
-      }
-    ],
-    "csrf": [
-      {
-        "type": "MEDIUM",
-        "description": "CSRF protection exemption found",
-        "file": "security_audit.py",
-        "line": 174,
-        "context": "                    lines = content.split('\\n')"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "CSRF protection exemption found",
-        "file": "security_audit.py",
-        "line": 177,
-        "context": "                            csrf_exclusions.append({"
-      }
-    ],
-    "authentication": [
-      {
-        "type": "HIGH",
-        "description": "Weak password hashing algorithm",
-        "file": "security_audit.py",
-        "recommendation": "Use bcrypt, scrypt, or Argon2"
-      },
-      {
-        "type": "HIGH",
-        "description": "Weak password hashing algorithm",
-        "file": "analyze_conflicts.py",
-        "recommendation": "Use bcrypt, scrypt, or Argon2"
-      },
-      {
-        "type": "HIGH",
-        "description": "Weak password hashing algorithm",
-        "file": "model_versioning.py",
-        "recommendation": "Use bcrypt, scrypt, or Argon2"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential session fixation vulnerability",
-        "file": "web/app.py",
-        "recommendation": "Regenerate session ID after login"
-      }
-    ],
-    "authorization": [
-      {
-        "type": "HIGH",
-        "description": "Potential privilege escalation",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "demo_optimized_serving.py",
-        "route": "@app.route(\"/\")",
-        "function": "index"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "openapi_spec.py",
-        "route": "@app.route(\"/api/v1/openapi.json\")",
-        "function": "openapi_spec"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "openapi_spec.py",
-        "route": "@app.route(\"/api/v1/docs\")",
-        "function": "api_docs"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "optimized_api_integration.py",
-        "route": "@app.route(\"/api/optimized/stats\")",
-        "function": "optimized_stats"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "optimized_api_integration.py",
-        "route": "@app.route(\"/api/optimized/health\")",
-        "function": "optimized_health"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "optimized_api_integration.py",
-        "route": "@app.route(\"/api/optimized/predict\", methods=['POST'])",
-        "function": "optimized_predict_endpoint"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "optimized_api_integration.py",
-        "route": "@app.route(\"/test\")",
-        "function": "test_endpoint"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "web/app.py",
-        "route": "@app.route(\"/metrics\")",
-        "function": "metrics_endpoint"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "web/app.py",
-        "route": "@app.route(\"/health\")",
-        "function": "health_check"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "web/app.py",
-        "route": "@app.route(\"/ready\")",
-        "function": "readiness_check"
-      },
-      {
-        "type": "HIGH",
-        "description": "Potential privilege escalation",
-        "file": "tests/test_time_config.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Potential privilege escalation",
-        "file": "tests/test_energy_manager.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "Audio_Training/scripts/api_server.py",
-        "route": "@app.route(\"/metrics\")",
-        "function": "metrics_endpoint"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "Audio_Training/scripts/api_server.py",
-        "route": "@app.route(\"/health\")",
-        "function": "health_check"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Route without authorization check",
-        "file": "Audio_Training/scripts/api_server.py",
-        "route": "@app.route(\"/ready\")",
-        "function": "readiness_check"
-      },
-      {
-        "type": "HIGH",
-        "description": "Potential privilege escalation",
-        "file": "NightScanPi/Program/time_config.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Potential privilege escalation",
-        "file": "NightScanPi/Program/wifi_wakeup.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Potential privilege escalation",
-        "file": "NightScanPi/Program/utils/energy_manager.py"
-      }
-    ],
-    "input_validation": [
-      {
-        "type": "HIGH",
-        "description": "Direct request parameter in SQL",
-        "file": "web/app.py",
-        "pattern": "request.args.get('page', 1, type=int)\n    per_page = min(request.args.get('per_page', 50, type=int),..."
-      },
-      {
-        "type": "HIGH",
-        "description": "Direct form input in SQL",
-        "file": "web/app.py",
-        "pattern": "request.form.get(\"username\", \"\"), 30)\n        password = request.form.get(\"password\", \"\")\n        \n ..."
-      }
-    ],
-    "file_upload": [
-      {
-        "type": "HIGH",
-        "description": "File upload without proper validation",
-        "file": "optimized_api_integration.py",
-        "recommendation": "Implement file type and size validation"
-      },
-      {
-        "type": "HIGH",
-        "description": "File upload without proper validation",
-        "file": "api_v1.py",
-        "recommendation": "Implement file type and size validation"
-      },
-      {
-        "type": "HIGH",
-        "description": "File upload vulnerable to path traversal",
-        "file": "api_v1.py",
-        "recommendation": "Use secure_filename() and validate paths"
-      },
-      {
-        "type": "HIGH",
-        "description": "File upload without proper validation",
-        "file": "Audio_Training/scripts/api_server.py",
-        "recommendation": "Implement file type and size validation"
-      },
-      {
-        "type": "HIGH",
-        "description": "File upload vulnerable to path traversal",
-        "file": "Audio_Training/scripts/api_server.py",
-        "recommendation": "Use secure_filename() and validate paths"
-      }
-    ],
-    "dependencies": [
-      {
-        "type": "HIGH",
-        "description": "Vulnerable pillow version",
-        "version": "11.2.1",
-        "recommendation": "Update pillow to latest version"
-      }
-    ],
-    "docker": [],
-    "kubernetes": [
-      {
-        "type": "MEDIUM",
-        "description": "Missing security context",
-        "file": "k8s/postgres.yaml"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing security context",
-        "file": "k8s/prediction-api.yaml"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing security context",
-        "file": "k8s/web-app.yaml"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing security context",
-        "file": "k8s/redis.yaml"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing security context",
-        "file": "k8s/monitoring.yaml"
-      }
-    ],
-    "logging": [
-      {
-        "type": "MEDIUM",
-        "description": "Secret in logs",
-        "file": "config.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Key in logs",
-        "file": "config.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Key in logs",
-        "file": "log_utils.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Password in logs",
-        "file": "notification_service.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Password in logs",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Password in print statements",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Secret in logs",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Token in logs",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Key in logs",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Key in logs",
-        "file": "cache_utils.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Key in logs",
-        "file": "backup_system.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Key in logs",
-        "file": "model_versioning.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Token in logs",
-        "file": "push_notifications.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Key in logs",
-        "file": "tests/test_wifi_wakeup.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Key in logs",
-        "file": "tests/test_flask_app.py"
-      }
-    ],
-    "encryption": [
-      {
-        "type": "HIGH",
-        "description": "MD5 hashing (weak)",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "SHA1 hashing (weak)",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "MD5 hashing (weak)",
-        "file": "analyze_conflicts.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "MD5 hashing (weak)",
-        "file": "model_versioning.py"
-      }
-    ],
-    "session_management": [
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "websocket_service.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "analytics_dashboard.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Insecure session cookies",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "openapi_spec.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "web/tasks.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "web/app.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "tests/test_flask_app.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "tests/test_analytics_dashboard.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "tests/test_websocket_service.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "tests/test_web_tasks.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Missing HttpOnly flag on cookies",
-        "file": "tests/test_notification_service.py"
-      }
-    ],
-    "cors": [
-      {
-        "type": "HIGH",
-        "description": "CORS wildcard origin",
-        "file": "security_audit.py"
-      }
-    ],
-    "ssl_tls": [],
-    "environment": [
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "config.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "fix_critical_conflicts.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "cache_utils.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "backup_system.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "push_notifications.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "web/tasks.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "web/app.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "tests/test_api_server.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "tests/test_config.py"
-      },
-      {
-        "type": "MEDIUM",
-        "description": "Potential environment variable exposure",
-        "file": "Audio_Training/scripts/api_server.py"
-      }
-    ],
-    "privilege_escalation": [
-      {
-        "type": "HIGH",
-        "description": "OS command execution",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code execution",
-        "file": "security_audit.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "fix_critical_conflicts.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "demo_optimized_serving.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "model_deployment.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "optimized_api_integration.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code execution",
-        "file": "tests/test_api_server.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code execution",
-        "file": "tests/test_flask_app.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "shared/training_framework.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "Picture_Training/scripts/predict.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "Picture_Training/scripts/train.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "Audio_Training/scripts/predict.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "Audio_Training/scripts/api_server.py"
-      },
-      {
-        "type": "HIGH",
-        "description": "Code evaluation",
-        "file": "Audio_Training/scripts/train.py"
-      }
-    ]
-  },
-  "compliance": {
-    "OWASP Top 10": {
-      "score": 20,
-      "framework": "OWASP Top 10 2021"
+  "secrets": [
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 18,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('DB_PASSWORD')\""
     },
-    "CIS Controls": {
-      "score": 40,
-      "framework": "CIS Controls v8"
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 26,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('REDIS_PASSWORD')\""
     },
-    "NIST Framework": {
-      "score": 50,
-      "framework": "NIST Cybersecurity Framework"
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 34,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('DB_PASSWORD')\""
     },
-    "GDPR": {
-      "score": 55,
-      "framework": "GDPR"
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 42,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('REDIS_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 50,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your-secure-database-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 58,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your-redis-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 66,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your-secure-database-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 74,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your-redis-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 82,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('DB_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 90,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('REDIS_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 98,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your-secure-database-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 106,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your-redis-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 114,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('DB_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 122,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('REDIS_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 130,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your-secure-database-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 138,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your-redis-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 146,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 154,
+      "value": "${SMTP_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SMTP_PASSWORD=${SMTP_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 162,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 170,
+      "value": "${SMTP_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SMTP_PASSWORD=${SMTP_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 178,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=CHANGE_ME_STRONG_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 186,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=CHANGE_ME_STRONG_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 194,
+      "value": "CHANGE_ME_GRAFANA_PA...",
+      "severity": "critical",
+      "context": "\"context\": \"GRAFANA_PASSWORD=CHANGE_ME_GRAFANA_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 202,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "\"context\": \"SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 210,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=CHANGE_ME_STRONG_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 218,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=CHANGE_ME_STRONG_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 226,
+      "value": "CHANGE_ME_GRAFANA_PA...",
+      "severity": "critical",
+      "context": "\"context\": \"GRAFANA_PASSWORD=CHANGE_ME_GRAFANA_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 234,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "\"context\": \"SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 242,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: ${DB_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 250,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: ${DB_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 258,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"DB_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 266,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"REDIS_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 274,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"GRAFANA_PASSWORD=$(openssl rand -base64 16)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 282,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- POSTGRES_PASSWORD=${DB_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 290,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 298,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"DB_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 306,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"REDIS_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 314,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"GRAFANA_PASSWORD=$(openssl rand -base64 16)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 322,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- POSTGRES_PASSWORD=${DB_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 330,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 336,
+      "value": "-night...",
+      "severity": "high",
+      "context": "\"value\": \"${DB_PASSWORD:-night...\","
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 338,
+      "value": "${DB_PASSWORD:-night...",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: ${DB_PASSWORD:-nightscan_secret}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 346,
+      "value": "-redis_secret}",
+      "severity": "critical",
+      "context": "\"context\": \"command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 354,
+      "value": "-nightscan_secret}@p...",
+      "severity": "critical",
+      "context": "\"context\": \"- DATABASE_URL=postgresql://nightscan:${DB_PASSWORD:-nightscan_secret}@postgres:5432/nightscan\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 362,
+      "value": "-redis_secret}@redis...",
+      "severity": "critical",
+      "context": "\"context\": \"- REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 370,
+      "value": "${GRAFANA_PASSWORD:-...",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 376,
+      "value": "-night...",
+      "severity": "high",
+      "context": "\"value\": \"${DB_PASSWORD:-night...\","
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 378,
+      "value": "${DB_PASSWORD:-night...",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: ${DB_PASSWORD:-nightscan_secret}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 386,
+      "value": "-redis_secret}",
+      "severity": "critical",
+      "context": "\"context\": \"command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 394,
+      "value": "-nightscan_secret}@p...",
+      "severity": "critical",
+      "context": "\"context\": \"- DATABASE_URL=postgresql://nightscan:${DB_PASSWORD:-nightscan_secret}@postgres:5432/nightscan\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 402,
+      "value": "-redis_secret}@redis...",
+      "severity": "critical",
+      "context": "\"context\": \"- REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 410,
+      "value": "${GRAFANA_PASSWORD:-...",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 418,
+      "value": "request.form.get(\\\\\\",
+      "severity": "high",
+      "context": "\"context\": \"\\\"pattern\\\": \\\"request.form.get(\\\\\\\"username\\\\\\\", \\\\\\\"\\\\\\\"), 30)\\\\n        password = request.form.get(\\\\\\\"password\\\\\\\", \\\\\\\"\\\\\\\")\\\\n        \\\\n ...\\\"\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 426,
+      "value": "request.form.get(\\\\\\",
+      "severity": "high",
+      "context": "\"context\": \"\\\"pattern\\\": \\\"request.form.get(\\\\\\\"username\\\\\\\", \\\\\\\"\\\\\\\"), 30)\\\\n        password = request.form.get(\\\\\\\"password\\\\\\\", \\\\\\\"\\\\\\\")\\\\n        \\\\n ...\\\"\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 458,
+      "value": "your_secure_password",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your_secure_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 466,
+      "value": "your_redis_password",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your_redis_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 474,
+      "value": "your_grafana_passwor...",
+      "severity": "critical",
+      "context": "\"context\": \"GRAFANA_PASSWORD=your_grafana_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 482,
+      "value": "your_secure_password",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your_secure_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 490,
+      "value": "your_redis_password",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your_redis_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 498,
+      "value": "your_grafana_passwor...",
+      "severity": "critical",
+      "context": "\"context\": \"GRAFANA_PASSWORD=your_grafana_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 506,
+      "value": "bmlnaHRzY2FuX3NlY3Jl...",
+      "severity": "high",
+      "context": "\"context\": \"password: bmlnaHRzY2FuX3NlY3JldA==  # INSECURE!\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 514,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"NEW_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 530,
+      "value": "bmlnaHRzY2FuX3NlY3Jl...",
+      "severity": "high",
+      "context": "\"context\": \"password: bmlnaHRzY2FuX3NlY3JldA==  # INSECURE!\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 538,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"NEW_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 554,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = request.form.get(\\\"password\\\", \\\"\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 562,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = request.form.get(\\\"password\\\", \\\"\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 578,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = request.form.get(\\\"password\\\", \\\"\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 586,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = request.form.get(\\\"password\\\", \\\"\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 626,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local db_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 634,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local redis_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 666,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local db_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 674,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local redis_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 682,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local db_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 690,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local redis_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 722,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local db_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 730,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local redis_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 738,
+      "value": "test_password",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: test_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 746,
+      "value": "test_password",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: test_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 770,
+      "value": "data.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = data.get(\\\"password\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 778,
+      "value": "data.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = data.get(\\\"password\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 786,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "\"context\": \"body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 794,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "\"context\": \"body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 802,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "\"context\": \"body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 810,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "\"context\": \"body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 18,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('DB_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 26,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('REDIS_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 34,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('DB_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 42,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('REDIS_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 50,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your-secure-database-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 58,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your-redis-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 66,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your-secure-database-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 74,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your-redis-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 82,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('DB_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 90,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('REDIS_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 98,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your-secure-database-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 106,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your-redis-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 114,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('DB_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 122,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "\"context\": \"password = self.get_secret('REDIS_PASSWORD')\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 130,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your-secure-database-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 138,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your-redis-password-here\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 146,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 154,
+      "value": "${SMTP_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SMTP_PASSWORD=${SMTP_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 162,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 170,
+      "value": "${SMTP_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SMTP_PASSWORD=${SMTP_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 178,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=CHANGE_ME_STRONG_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 186,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=CHANGE_ME_STRONG_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 194,
+      "value": "CHANGE_ME_GRAFANA_PA...",
+      "severity": "critical",
+      "context": "\"context\": \"GRAFANA_PASSWORD=CHANGE_ME_GRAFANA_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 202,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "\"context\": \"SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 210,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=CHANGE_ME_STRONG_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 218,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=CHANGE_ME_STRONG_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 226,
+      "value": "CHANGE_ME_GRAFANA_PA...",
+      "severity": "critical",
+      "context": "\"context\": \"GRAFANA_PASSWORD=CHANGE_ME_GRAFANA_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 234,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "\"context\": \"SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 242,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: ${DB_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 250,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: ${DB_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 258,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"DB_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 266,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"REDIS_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 274,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"GRAFANA_PASSWORD=$(openssl rand -base64 16)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 282,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- POSTGRES_PASSWORD=${DB_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 290,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 298,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"DB_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 306,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"REDIS_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 314,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"GRAFANA_PASSWORD=$(openssl rand -base64 16)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 322,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- POSTGRES_PASSWORD=${DB_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 330,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 336,
+      "value": "-night...",
+      "severity": "high",
+      "context": "\"value\": \"${DB_PASSWORD:-night...\","
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 338,
+      "value": "${DB_PASSWORD:-night...",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: ${DB_PASSWORD:-nightscan_secret}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 346,
+      "value": "-redis_secret}",
+      "severity": "critical",
+      "context": "\"context\": \"command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 354,
+      "value": "-nightscan_secret}@p...",
+      "severity": "critical",
+      "context": "\"context\": \"- DATABASE_URL=postgresql://nightscan:${DB_PASSWORD:-nightscan_secret}@postgres:5432/nightscan\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 362,
+      "value": "-redis_secret}@redis...",
+      "severity": "critical",
+      "context": "\"context\": \"- REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 370,
+      "value": "${GRAFANA_PASSWORD:-...",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 376,
+      "value": "-night...",
+      "severity": "high",
+      "context": "\"value\": \"${DB_PASSWORD:-night...\","
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 378,
+      "value": "${DB_PASSWORD:-night...",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: ${DB_PASSWORD:-nightscan_secret}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 386,
+      "value": "-redis_secret}",
+      "severity": "critical",
+      "context": "\"context\": \"command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 394,
+      "value": "-nightscan_secret}@p...",
+      "severity": "critical",
+      "context": "\"context\": \"- DATABASE_URL=postgresql://nightscan:${DB_PASSWORD:-nightscan_secret}@postgres:5432/nightscan\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 402,
+      "value": "-redis_secret}@redis...",
+      "severity": "critical",
+      "context": "\"context\": \"- REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 410,
+      "value": "${GRAFANA_PASSWORD:-...",
+      "severity": "critical",
+      "context": "\"context\": \"- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 418,
+      "value": "request.form.get(\\\\\\",
+      "severity": "high",
+      "context": "\"context\": \"\\\"pattern\\\": \\\"request.form.get(\\\\\\\"username\\\\\\\", \\\\\\\"\\\\\\\"), 30)\\\\n        password = request.form.get(\\\\\\\"password\\\\\\\", \\\\\\\"\\\\\\\")\\\\n        \\\\n ...\\\"\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 426,
+      "value": "request.form.get(\\\\\\",
+      "severity": "high",
+      "context": "\"context\": \"\\\"pattern\\\": \\\"request.form.get(\\\\\\\"username\\\\\\\", \\\\\\\"\\\\\\\"), 30)\\\\n        password = request.form.get(\\\\\\\"password\\\\\\\", \\\\\\\"\\\\\\\")\\\\n        \\\\n ...\\\"\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 458,
+      "value": "your_secure_password",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your_secure_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 466,
+      "value": "your_redis_password",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your_redis_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 474,
+      "value": "your_grafana_passwor...",
+      "severity": "critical",
+      "context": "\"context\": \"GRAFANA_PASSWORD=your_grafana_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 482,
+      "value": "your_secure_password",
+      "severity": "critical",
+      "context": "\"context\": \"DB_PASSWORD=your_secure_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 490,
+      "value": "your_redis_password",
+      "severity": "critical",
+      "context": "\"context\": \"REDIS_PASSWORD=your_redis_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 498,
+      "value": "your_grafana_passwor...",
+      "severity": "critical",
+      "context": "\"context\": \"GRAFANA_PASSWORD=your_grafana_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 506,
+      "value": "bmlnaHRzY2FuX3NlY3Jl...",
+      "severity": "high",
+      "context": "\"context\": \"password: bmlnaHRzY2FuX3NlY3JldA==  # INSECURE!\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 514,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"NEW_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 530,
+      "value": "bmlnaHRzY2FuX3NlY3Jl...",
+      "severity": "high",
+      "context": "\"context\": \"password: bmlnaHRzY2FuX3NlY3JldA==  # INSECURE!\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 538,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "\"context\": \"NEW_PASSWORD=$(openssl rand -base64 32)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 554,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = request.form.get(\\\"password\\\", \\\"\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 562,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = request.form.get(\\\"password\\\", \\\"\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 578,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = request.form.get(\\\"password\\\", \\\"\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 586,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = request.form.get(\\\"password\\\", \\\"\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 626,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local db_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 634,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local redis_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 666,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local db_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 674,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local redis_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 682,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local db_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 690,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local redis_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 722,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local db_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 730,
+      "value": "$(generate_password",
+      "severity": "critical",
+      "context": "\"context\": \"local redis_password=$(generate_password 24)\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 738,
+      "value": "test_password",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: test_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 746,
+      "value": "test_password",
+      "severity": "critical",
+      "context": "\"context\": \"POSTGRES_PASSWORD: test_password\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 770,
+      "value": "data.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = data.get(\\\"password\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 778,
+      "value": "data.get(\\",
+      "severity": "high",
+      "context": "\"context\": \"password = data.get(\\\"password\\\")\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 786,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "\"context\": \"body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 794,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "\"context\": \"body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 802,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "\"context\": \"body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_baseline.json",
+      "line": 810,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "\"context\": \"body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,\""
+    },
+    {
+      "type": "database_url",
+      "file": "security_audit_baseline.json",
+      "line": 602,
+      "value": "postgres://[^:\\\\s]+:...",
+      "severity": "high",
+      "context": "\"context\": \"r'postgres://[^:\\\\s]+:[^@\\\\s]+@[^/\\\\s]+/[^\\\\s]+',\""
+    },
+    {
+      "type": "database_url",
+      "file": "security_audit_baseline.json",
+      "line": 434,
+      "value": "mysql://user:pass@ho...",
+      "severity": "high",
+      "context": "\"context\": \"\\\"\\\"\\\"Parse ``mysql://user:pass@host/db`` and return connection kwargs.\\\"\\\"\\\"\""
+    },
+    {
+      "type": "database_url",
+      "file": "security_audit_baseline.json",
+      "line": 442,
+      "value": "mysql://user:pass@ho...",
+      "severity": "high",
+      "context": "\"context\": \"help=\\\"mysql://user:pass@host/db for the Flask app\\\",\""
+    },
+    {
+      "type": "database_url",
+      "file": "security_audit_baseline.json",
+      "line": 450,
+      "value": "mysql://user:pass@ho...",
+      "severity": "high",
+      "context": "\"context\": \"help=\\\"mysql://user:pass@host/db for WordPress\\\",\""
+    },
+    {
+      "type": "database_url",
+      "file": "security_audit_baseline.json",
+      "line": 610,
+      "value": "mysql://[^:\\\\s]+:[^@...",
+      "severity": "high",
+      "context": "\"context\": \"r'mysql://[^:\\\\s]+:[^@\\\\s]+@[^/\\\\s]+/[^\\\\s]+',\""
+    },
+    {
+      "type": "database_url",
+      "file": "security_audit_baseline.json",
+      "line": 754,
+      "value": "mysql://appuser:secr...",
+      "severity": "critical",
+      "context": "\"context\": \"--flask-dsn mysql://appuser:secret@localhost/nightscan \\\\\""
+    },
+    {
+      "type": "database_url",
+      "file": "security_audit_baseline.json",
+      "line": 762,
+      "value": "mysql://wpuser:secre...",
+      "severity": "critical",
+      "context": "\"context\": \"--wp-dsn mysql://wpuser:secret@localhost/wordpress\""
+    },
+    {
+      "type": "database_url",
+      "file": "security_audit_baseline.json",
+      "line": 618,
+      "value": "mongodb://[^:\\\\s]+:[...",
+      "severity": "high",
+      "context": "\"context\": \"r'mongodb://[^:\\\\s]+:[^@\\\\s]+@[^/\\\\s]+/[^\\\\s]+'\""
+    },
+    {
+      "type": "password",
+      "file": "secure_secrets.py",
+      "line": 66,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "password = self.get_secret('DB_PASSWORD')"
+    },
+    {
+      "type": "password",
+      "file": "secure_secrets.py",
+      "line": 112,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "password = self.get_secret('REDIS_PASSWORD')"
+    },
+    {
+      "type": "password",
+      "file": "secure_secrets.py",
+      "line": 66,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "password = self.get_secret('DB_PASSWORD')"
+    },
+    {
+      "type": "password",
+      "file": "secure_secrets.py",
+      "line": 112,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "password = self.get_secret('REDIS_PASSWORD')"
+    },
+    {
+      "type": "password",
+      "file": ".env.secure",
+      "line": 9,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "DB_PASSWORD=your-secure-database-password-here"
+    },
+    {
+      "type": "password",
+      "file": ".env.secure",
+      "line": 19,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=your-redis-password-here"
+    },
+    {
+      "type": "password",
+      "file": ".env.secure",
+      "line": 9,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "DB_PASSWORD=your-secure-database-password-here"
+    },
+    {
+      "type": "password",
+      "file": ".env.secure",
+      "line": 19,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=your-redis-password-here"
+    },
+    {
+      "type": "password",
+      "file": "security_fixes.py",
+      "line": 109,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "password = self.get_secret('DB_PASSWORD')"
+    },
+    {
+      "type": "password",
+      "file": "security_fixes.py",
+      "line": 155,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "password = self.get_secret('REDIS_PASSWORD')"
+    },
+    {
+      "type": "password",
+      "file": "security_fixes.py",
+      "line": 199,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "DB_PASSWORD=your-secure-database-password-here"
+    },
+    {
+      "type": "password",
+      "file": "security_fixes.py",
+      "line": 209,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=your-redis-password-here"
+    },
+    {
+      "type": "password",
+      "file": "security_fixes.py",
+      "line": 109,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "password = self.get_secret('DB_PASSWORD')"
+    },
+    {
+      "type": "password",
+      "file": "security_fixes.py",
+      "line": 155,
+      "value": "self.get_secret(",
+      "severity": "critical",
+      "context": "password = self.get_secret('REDIS_PASSWORD')"
+    },
+    {
+      "type": "password",
+      "file": "security_fixes.py",
+      "line": 199,
+      "value": "your-secure-database...",
+      "severity": "critical",
+      "context": "DB_PASSWORD=your-secure-database-password-here"
+    },
+    {
+      "type": "password",
+      "file": "security_fixes.py",
+      "line": 209,
+      "value": "your-redis-password-...",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=your-redis-password-here"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.monitoring.yml",
+      "line": 99,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.monitoring.yml",
+      "line": 106,
+      "value": "${SMTP_PASSWORD}",
+      "severity": "critical",
+      "context": "- GF_SMTP_PASSWORD=${SMTP_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.monitoring.yml",
+      "line": 99,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.monitoring.yml",
+      "line": 106,
+      "value": "${SMTP_PASSWORD}",
+      "severity": "critical",
+      "context": "- GF_SMTP_PASSWORD=${SMTP_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": ".env.production.example",
+      "line": 10,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "DB_PASSWORD=CHANGE_ME_STRONG_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": ".env.production.example",
+      "line": 14,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=CHANGE_ME_STRONG_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": ".env.production.example",
+      "line": 28,
+      "value": "CHANGE_ME_GRAFANA_PA...",
+      "severity": "critical",
+      "context": "GRAFANA_PASSWORD=CHANGE_ME_GRAFANA_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": ".env.production.example",
+      "line": 34,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": ".env.production.example",
+      "line": 10,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "DB_PASSWORD=CHANGE_ME_STRONG_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": ".env.production.example",
+      "line": 14,
+      "value": "CHANGE_ME_STRONG_PAS...",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=CHANGE_ME_STRONG_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": ".env.production.example",
+      "line": 28,
+      "value": "CHANGE_ME_GRAFANA_PA...",
+      "severity": "critical",
+      "context": "GRAFANA_PASSWORD=CHANGE_ME_GRAFANA_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": ".env.production.example",
+      "line": 34,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.production.yml",
+      "line": 60,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "POSTGRES_PASSWORD: ${DB_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.production.yml",
+      "line": 60,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "POSTGRES_PASSWORD: ${DB_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 63,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "DB_PASSWORD=$(openssl rand -base64 32)"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 64,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=$(openssl rand -base64 32)"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 68,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=$(openssl rand -base64 16)"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 178,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "- POSTGRES_PASSWORD=${DB_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 418,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 63,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "DB_PASSWORD=$(openssl rand -base64 32)"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 64,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=$(openssl rand -base64 32)"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 68,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=$(openssl rand -base64 16)"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 178,
+      "value": "${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "- POSTGRES_PASSWORD=${DB_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "PRODUCTION_VPS_LITE_PLAN.md",
+      "line": 418,
+      "value": "${GRAFANA_PASSWORD}",
+      "severity": "critical",
+      "context": "- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 10,
+      "value": "${DB_PASSWORD:-night...",
+      "severity": "critical",
+      "context": "POSTGRES_PASSWORD: ${DB_PASSWORD:-nightscan_secret}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 27,
+      "value": "-redis_secret}",
+      "severity": "critical",
+      "context": "command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 78,
+      "value": "-nightscan_secret}@p...",
+      "severity": "critical",
+      "context": "- DATABASE_URL=postgresql://nightscan:${DB_PASSWORD:-nightscan_secret}@postgres:5432/nightscan"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 79,
+      "value": "-redis_secret}@redis...",
+      "severity": "critical",
+      "context": "- REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 151,
+      "value": "${GRAFANA_PASSWORD:-...",
+      "severity": "critical",
+      "context": "- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 10,
+      "value": "${DB_PASSWORD:-night...",
+      "severity": "critical",
+      "context": "POSTGRES_PASSWORD: ${DB_PASSWORD:-nightscan_secret}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 27,
+      "value": "-redis_secret}",
+      "severity": "critical",
+      "context": "command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 78,
+      "value": "-nightscan_secret}@p...",
+      "severity": "critical",
+      "context": "- DATABASE_URL=postgresql://nightscan:${DB_PASSWORD:-nightscan_secret}@postgres:5432/nightscan"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 79,
+      "value": "-redis_secret}@redis...",
+      "severity": "critical",
+      "context": "- REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0"
+    },
+    {
+      "type": "password",
+      "file": "docker-compose.yml",
+      "line": 151,
+      "value": "${GRAFANA_PASSWORD:-...",
+      "severity": "critical",
+      "context": "- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}"
+    },
+    {
+      "type": "password",
+      "file": "security_audit_report.json",
+      "line": 393,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"pattern\": \"request.form.get(\\\"username\\\", \\\"\\\"), 30)\\n        password = request.form.get(\\\"password\\\", \\\"\\\")\\n        \\n ...\""
+    },
+    {
+      "type": "password",
+      "file": "security_audit_report.json",
+      "line": 393,
+      "value": "request.form.get(\\",
+      "severity": "high",
+      "context": "\"pattern\": \"request.form.get(\\\"username\\\", \\\"\\\"), 30)\\n        password = request.form.get(\\\"password\\\", \\\"\\\")\\n        \\n ...\""
+    },
+    {
+      "type": "database_url",
+      "file": "export_predictions.py",
+      "line": 12,
+      "value": "mysql://user:pass@ho...",
+      "severity": "high",
+      "context": "\"\"\"Parse ``mysql://user:pass@host/db`` and return connection kwargs.\"\"\""
+    },
+    {
+      "type": "database_url",
+      "file": "export_predictions.py",
+      "line": 49,
+      "value": "mysql://user:pass@ho...",
+      "severity": "high",
+      "context": "help=\"mysql://user:pass@host/db for the Flask app\","
+    },
+    {
+      "type": "database_url",
+      "file": "export_predictions.py",
+      "line": 54,
+      "value": "mysql://user:pass@ho...",
+      "severity": "high",
+      "context": "help=\"mysql://user:pass@host/db for WordPress\","
+    },
+    {
+      "type": "password",
+      "file": "README-Docker.md",
+      "line": 23,
+      "value": "your_secure_password",
+      "severity": "critical",
+      "context": "DB_PASSWORD=your_secure_password"
+    },
+    {
+      "type": "password",
+      "file": "README-Docker.md",
+      "line": 24,
+      "value": "your_redis_password",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=your_redis_password"
+    },
+    {
+      "type": "password",
+      "file": "README-Docker.md",
+      "line": 31,
+      "value": "your_grafana_passwor...",
+      "severity": "critical",
+      "context": "GRAFANA_PASSWORD=your_grafana_password"
+    },
+    {
+      "type": "password",
+      "file": "README-Docker.md",
+      "line": 23,
+      "value": "your_secure_password",
+      "severity": "critical",
+      "context": "DB_PASSWORD=your_secure_password"
+    },
+    {
+      "type": "password",
+      "file": "README-Docker.md",
+      "line": 24,
+      "value": "your_redis_password",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=your_redis_password"
+    },
+    {
+      "type": "password",
+      "file": "README-Docker.md",
+      "line": 31,
+      "value": "your_grafana_passwor...",
+      "severity": "critical",
+      "context": "GRAFANA_PASSWORD=your_grafana_password"
+    },
+    {
+      "type": "password",
+      "file": "SECURITY.md",
+      "line": 54,
+      "value": "bmlnaHRzY2FuX3NlY3Jl...",
+      "severity": "high",
+      "context": "password: bmlnaHRzY2FuX3NlY3JldA==  # INSECURE!"
+    },
+    {
+      "type": "password",
+      "file": "SECURITY.md",
+      "line": 213,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "NEW_PASSWORD=$(openssl rand -base64 32)"
+    },
+    {
+      "type": "password",
+      "file": "SECURITY.md",
+      "line": 214,
+      "value": "$NEW_PASSWORD",
+      "severity": "critical",
+      "context": "vault kv put secret/nightscan/postgres password=\"$NEW_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "SECURITY.md",
+      "line": 54,
+      "value": "bmlnaHRzY2FuX3NlY3Jl...",
+      "severity": "high",
+      "context": "password: bmlnaHRzY2FuX3NlY3JldA==  # INSECURE!"
+    },
+    {
+      "type": "password",
+      "file": "SECURITY.md",
+      "line": 213,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "NEW_PASSWORD=$(openssl rand -base64 32)"
+    },
+    {
+      "type": "password",
+      "file": "SECURITY.md",
+      "line": 214,
+      "value": "$NEW_PASSWORD",
+      "severity": "critical",
+      "context": "vault kv put secret/nightscan/postgres password=\"$NEW_PASSWORD\""
+    },
+    {
+      "type": "password",
+      "file": "web/app.py",
+      "line": 354,
+      "value": "request.form.get(",
+      "severity": "high",
+      "context": "password = request.form.get(\"password\", \"\")"
+    },
+    {
+      "type": "password",
+      "file": "web/app.py",
+      "line": 405,
+      "value": "request.form.get(",
+      "severity": "high",
+      "context": "password = request.form.get(\"password\", \"\")"
+    },
+    {
+      "type": "password",
+      "file": "web/app.py",
+      "line": 407,
+      "value": "record_failed_login(...",
+      "severity": "high",
+      "context": "if not username or not password:"
+    },
+    {
+      "type": "password",
+      "file": "web/app.py",
+      "line": 354,
+      "value": "request.form.get(",
+      "severity": "high",
+      "context": "password = request.form.get(\"password\", \"\")"
+    },
+    {
+      "type": "password",
+      "file": "web/app.py",
+      "line": 405,
+      "value": "request.form.get(",
+      "severity": "high",
+      "context": "password = request.form.get(\"password\", \"\")"
+    },
+    {
+      "type": "password",
+      "file": "web/app.py",
+      "line": 407,
+      "value": "record_failed_login(...",
+      "severity": "high",
+      "context": "if not username or not password:"
+    },
+    {
+      "type": "database_url",
+      "file": "scripts/security-audit.py",
+      "line": 54,
+      "value": "postgres://[^:\\s]+:[...",
+      "severity": "high",
+      "context": "r'postgres://[^:\\s]+:[^@\\s]+@[^/\\s]+/[^\\s]+',"
+    },
+    {
+      "type": "database_url",
+      "file": "scripts/security-audit.py",
+      "line": 55,
+      "value": "mysql://[^:\\s]+:[^@\\...",
+      "severity": "high",
+      "context": "r'mysql://[^:\\s]+:[^@\\s]+@[^/\\s]+/[^\\s]+',"
+    },
+    {
+      "type": "database_url",
+      "file": "scripts/security-audit.py",
+      "line": 56,
+      "value": "mongodb://[^:\\s]+:[^...",
+      "severity": "high",
+      "context": "r'mongodb://[^:\\s]+:[^@\\s]+@[^/\\s]+/[^\\s]+'"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 67,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "DB_PASSWORD=$(openssl rand -base64 32 | tr -d \"=+/\" | cut -c1-25)"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 68,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d \"=+/\" | cut -c1-25)"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 72,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=$(openssl rand -base64 16 | tr -d \"=+/\" | cut -c1-12)"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 93,
+      "value": "$DB_PASSWORD",
+      "severity": "critical",
+      "context": "DB_PASSWORD=$DB_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 96,
+      "value": "$REDIS_PASSWORD",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=$REDIS_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 104,
+      "value": "$GRAFANA_PASSWORD",
+      "severity": "critical",
+      "context": "GRAFANA_PASSWORD=$GRAFANA_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 110,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 237,
+      "value": "\\${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "warn \"   Exemple: DB_PASSWORD=\\${DB_PASSWORD} au lieu de DB_PASSWORD=nightscan_secret\""
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 237,
+      "value": "nightscan_secret",
+      "severity": "critical",
+      "context": "warn \"   Exemple: DB_PASSWORD=\\${DB_PASSWORD} au lieu de DB_PASSWORD=nightscan_secret\""
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 67,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "DB_PASSWORD=$(openssl rand -base64 32 | tr -d \"=+/\" | cut -c1-25)"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 68,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d \"=+/\" | cut -c1-25)"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 72,
+      "value": "$(openssl",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=$(openssl rand -base64 16 | tr -d \"=+/\" | cut -c1-12)"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 93,
+      "value": "$DB_PASSWORD",
+      "severity": "critical",
+      "context": "DB_PASSWORD=$DB_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 96,
+      "value": "$REDIS_PASSWORD",
+      "severity": "critical",
+      "context": "REDIS_PASSWORD=$REDIS_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 104,
+      "value": "$GRAFANA_PASSWORD",
+      "severity": "critical",
+      "context": "GRAFANA_PASSWORD=$GRAFANA_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 110,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 237,
+      "value": "\\${DB_PASSWORD}",
+      "severity": "critical",
+      "context": "warn \"   Exemple: DB_PASSWORD=\\${DB_PASSWORD} au lieu de DB_PASSWORD=nightscan_secret\""
+    },
+    {
+      "type": "password",
+      "file": "scripts/setup-secrets.sh",
+      "line": 237,
+      "value": "nightscan_secret",
+      "severity": "critical",
+      "context": "warn \"   Exemple: DB_PASSWORD=\\${DB_PASSWORD} au lieu de DB_PASSWORD=nightscan_secret\""
+    },
+    {
+      "type": "password",
+      "file": ".github/workflows/test-comprehensive.yml",
+      "line": 26,
+      "value": "test_password",
+      "severity": "critical",
+      "context": "POSTGRES_PASSWORD: test_password"
+    },
+    {
+      "type": "password",
+      "file": ".github/workflows/test-comprehensive.yml",
+      "line": 26,
+      "value": "test_password",
+      "severity": "critical",
+      "context": "POSTGRES_PASSWORD: test_password"
+    },
+    {
+      "type": "database_url",
+      "file": "docs/en/wordpress_plugin.md",
+      "line": 44,
+      "value": "mysql://appuser:secr...",
+      "severity": "critical",
+      "context": "--flask-dsn mysql://appuser:secret@localhost/nightscan \\"
+    },
+    {
+      "type": "database_url",
+      "file": "docs/en/wordpress_plugin.md",
+      "line": 45,
+      "value": "mysql://wpuser:secre...",
+      "severity": "critical",
+      "context": "--wp-dsn mysql://wpuser:secret@localhost/wordpress"
+    },
+    {
+      "type": "password",
+      "file": "secrets/production/.env",
+      "line": 10,
+      "value": "wBfdXxlqV04Ubu7FYgB6...",
+      "severity": "high",
+      "context": "DB_PASSWORD=wBfdXxlqV04Ubu7FYgB6vRYU3"
+    },
+    {
+      "type": "password",
+      "file": "secrets/production/.env",
+      "line": 13,
+      "value": "TniWmLo4DV0Ue0w1a6at...",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=TniWmLo4DV0Ue0w1a6at1oATb"
+    },
+    {
+      "type": "password",
+      "file": "secrets/production/.env",
+      "line": 22,
+      "value": "7ebSCQdEIePS",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=7ebSCQdEIePS"
+    },
+    {
+      "type": "password",
+      "file": "secrets/production/.env",
+      "line": 28,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD"
+    },
+    {
+      "type": "password",
+      "file": "secrets/production/.env",
+      "line": 10,
+      "value": "wBfdXxlqV04Ubu7FYgB6...",
+      "severity": "high",
+      "context": "DB_PASSWORD=wBfdXxlqV04Ubu7FYgB6vRYU3"
+    },
+    {
+      "type": "password",
+      "file": "secrets/production/.env",
+      "line": 13,
+      "value": "TniWmLo4DV0Ue0w1a6at...",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=TniWmLo4DV0Ue0w1a6at1oATb"
+    },
+    {
+      "type": "password",
+      "file": "secrets/production/.env",
+      "line": 22,
+      "value": "7ebSCQdEIePS",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=7ebSCQdEIePS"
+    },
+    {
+      "type": "password",
+      "file": "secrets/production/.env",
+      "line": 28,
+      "value": "CHANGE_ME_SMTP_PASSW...",
+      "severity": "critical",
+      "context": "SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD"
+    },
+    {
+      "type": "secret_key",
+      "file": "secrets/production/.env",
+      "line": 16,
+      "value": "GHNA9iIMYTMOVji9t41M...",
+      "severity": "high",
+      "context": "SECRET_KEY=GHNA9iIMYTMOVji9t41Mg6FuaNPdnCgu9hA0gaJdCqmbzbicZb0Dm8YShMhCzV"
+    },
+    {
+      "type": "secret_key",
+      "file": "secrets/production/.env",
+      "line": 18,
+      "value": "UeHfpdQIgY4p3F3oHnSm...",
+      "severity": "high",
+      "context": "CSRF_SECRET_KEY=UeHfpdQIgY4p3F3oHnSmar0OuZUSAodvL0Rjxqo8enM"
+    },
+    {
+      "type": "secret_key",
+      "file": "secrets/production/.env",
+      "line": 16,
+      "value": "GHNA9iIMYTMOVji9t41M...",
+      "severity": "high",
+      "context": "SECRET_KEY=GHNA9iIMYTMOVji9t41Mg6FuaNPdnCgu9hA0gaJdCqmbzbicZb0Dm8YShMhCzV"
+    },
+    {
+      "type": "secret_key",
+      "file": "secrets/production/.env",
+      "line": 18,
+      "value": "UeHfpdQIgY4p3F3oHnSm...",
+      "severity": "high",
+      "context": "CSRF_SECRET_KEY=UeHfpdQIgY4p3F3oHnSmar0OuZUSAodvL0Rjxqo8enM"
+    },
+    {
+      "type": "jwt_secret",
+      "file": "secrets/production/.env",
+      "line": 19,
+      "value": "Vsq3SfM5JFs2EsIvkKco...",
+      "severity": "high",
+      "context": "JWT_SECRET=Vsq3SfM5JFs2EsIvkKcosQEedHCKfW70iDRS6cExuI"
+    },
+    {
+      "type": "jwt_secret",
+      "file": "secrets/production/.env",
+      "line": 19,
+      "value": "Vsq3SfM5JFs2EsIvkKco...",
+      "severity": "high",
+      "context": "JWT_SECRET=Vsq3SfM5JFs2EsIvkKcosQEedHCKfW70iDRS6cExuI"
+    },
+    {
+      "type": "password",
+      "file": "NightScanPi/Program/wifi_service.py",
+      "line": 144,
+      "value": "data.get(",
+      "severity": "high",
+      "context": "password = data.get(\"password\")"
+    },
+    {
+      "type": "password",
+      "file": "NightScanPi/Program/wifi_service.py",
+      "line": 144,
+      "value": "data.get(",
+      "severity": "high",
+      "context": "password = data.get(\"password\")"
+    },
+    {
+      "type": "password",
+      "file": "ios-app/services/api.js",
+      "line": 164,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,"
+    },
+    {
+      "type": "password",
+      "file": "ios-app/services/api.js",
+      "line": 183,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,"
+    },
+    {
+      "type": "password",
+      "file": "ios-app/services/api.js",
+      "line": 164,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,"
+    },
+    {
+      "type": "password",
+      "file": "ios-app/services/api.js",
+      "line": 183,
+      "value": "${encodeURIComponent...",
+      "severity": "critical",
+      "context": "body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,"
     }
-  },
-  "timestamp": "2025-07-06T08:12:20.625642"
+  ],
+  "vulnerabilities": [],
+  "docker_security": [
+    {
+      "type": "docker_security",
+      "file": "docker-compose.monitoring.yml",
+      "line": 0,
+      "issue": "Container running in privileged mode",
+      "severity": "critical",
+      "recommendation": "Remove privileged mode unless absolutely necessary"
+    },
+    {
+      "type": "docker_security",
+      "file": "docker-compose.yml",
+      "line": 0,
+      "issue": "Database/SSH port 5432 exposed externally",
+      "severity": "high",
+      "recommendation": "Do not expose port 5432 externally"
+    },
+    {
+      "type": "docker_security",
+      "file": "docker-compose.yml",
+      "line": 0,
+      "issue": "Database/SSH port 6379 exposed externally",
+      "severity": "high",
+      "recommendation": "Do not expose port 6379 externally"
+    }
+  ],
+  "file_permissions": [],
+  "recommendations": [
+    "🚨 CRITIQUE: Remplacer tous les secrets par défaut immédiatement",
+    "🔐 Implémenter git-crypt pour chiffrer les secrets",
+    "🔑 Utiliser des variables d'environnement pour les secrets",
+    "🐳 Revoir la configuration Docker pour réduire les privilèges",
+    "🛡️ Activer fail2ban pour protéger SSH",
+    "🔥 Configurer UFW firewall avec règles restrictives",
+    "📱 Implémenter monitoring des intrusions",
+    "🔄 Mettre en place rotation automatique des secrets",
+    "📊 Activer audit logging pour les accès privilégiés"
+  ]
 }

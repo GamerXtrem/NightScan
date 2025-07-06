@@ -8,3 +8,8 @@ ios-app/assets/wake_tone.wav
 
 # Ignore packaged plugin archives
 wp-plugin/*.zip
+
+# Secrets (sensibles)
+secrets/
+.env.production
+.env.staging

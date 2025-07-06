@@ -1,0 +1,242 @@
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy avec SSL automatique
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy:alpine
+    container_name: nightscan-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./nginx/certs:/etc/nginx/certs
+      - ./nginx/vhost.d:/etc/nginx/vhost.d
+      - ./nginx/html:/usr/share/nginx/html
+      - letsencrypt:/etc/acme.sh
+      - upload_data:/var/www/uploads:ro
+    networks:
+      - nightscan-net
+    environment:
+      - DEFAULT_HOST=${DOMAIN_NAME}
+    mem_limit: 120m
+    cpus: 0.3
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Let's Encrypt Companion
+  letsencrypt:
+    image: nginxproxy/acme-companion
+    container_name: nightscan-letsencrypt
+    restart: always
+    volumes_from:
+      - nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/etc/acme.sh
+    environment:
+      - DEFAULT_EMAIL=${ADMIN_EMAIL}
+    mem_limit: 100m
+    cpus: 0.2
+    security_opt:
+      - no-new-privileges:true
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:13-alpine
+    container_name: nightscan-db
+    restart: always
+    env_file:
+      - ./secrets/production/.env
+    environment:
+      POSTGRES_DB: nightscan
+      POSTGRES_USER: nightscan
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - nightscan-net
+    mem_limit: 350m
+    cpus: 0.4
+    security_opt:
+      - no-new-privileges:true
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c effective_cache_size=384MB
+      -c maintenance_work_mem=32MB
+      -c checkpoint_completion_target=0.7
+      -c wal_buffers=4MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=2MB
+      -c min_wal_size=1GB
+      -c max_wal_size=2GB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nightscan"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Cache
+  redis:
+    image: redis:6-alpine
+    container_name: nightscan-cache
+    restart: always
+    env_file:
+      - ./secrets/production/.env
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 150mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis_data:/data
+    networks:
+      - nightscan-net
+    mem_limit: 150m
+    cpus: 0.3
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prediction API Server
+  prediction-api:
+    image: ghcr.io/gamerxtrem/nightscan/prediction-api:${VERSION:-latest}
+    container_name: nightscan-ml
+    restart: always
+    env_file:
+      - ./secrets/production/.env
+    environment:
+      - VIRTUAL_HOST=api.${DOMAIN_NAME}
+      - VIRTUAL_PORT=8001
+      - LETSENCRYPT_HOST=api.${DOMAIN_NAME}
+      - CUDA_VISIBLE_DEVICES=
+      - TORCH_DEVICE=cpu
+      - MODEL_PATH=/app/models/wildlife_model.pth
+      - LABELS_PATH=/app/models/labels.json
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - API_BATCH_SIZE=4
+      - MAX_WORKERS=2
+    volumes:
+      - ./models:/app/models:ro
+      - model_cache:/app/.cache
+    networks:
+      - nightscan-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    mem_limit: 1.4g
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Main Web Application
+  web:
+    image: ghcr.io/gamerxtrem/nightscan/web:${VERSION:-latest}
+    container_name: nightscan-web
+    restart: always
+    env_file:
+      - ./secrets/production/.env
+    environment:
+      - VIRTUAL_HOST=${DOMAIN_NAME},www.${DOMAIN_NAME}
+      - VIRTUAL_PORT=8000
+      - LETSENCRYPT_HOST=${DOMAIN_NAME},www.${DOMAIN_NAME}
+      - NIGHTSCAN_ENV=production
+      - DATABASE_URL=postgresql://nightscan:${DB_PASSWORD}@postgres:5432/nightscan
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - PREDICT_API_URL=http://prediction-api:8001/api/predict
+      - SECRET_KEY=${SECRET_KEY}
+      - CSRF_SECRET_KEY=${CSRF_SECRET_KEY}
+      - WEBSOCKET_URL=wss://${DOMAIN_NAME}
+      - GUNICORN_WORKERS=2
+      - GUNICORN_THREADS=2
+    volumes:
+      - upload_data:/app/uploads
+      - logs_data:/app/logs
+    networks:
+      - nightscan-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      prediction-api:
+        condition: service_healthy
+    mem_limit: 700m
+    cpus: 0.8
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  upload_data:
+    driver: local
+  logs_data:
+    driver: local
+  model_cache:
+    driver: local
+  letsencrypt:
+    driver: local
+
+networks:
+  nightscan-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

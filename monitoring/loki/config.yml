@@ -1,0 +1,86 @@
+# Configuration Loki optimisée pour VPS Lite (4GB RAM)
+# Remplace ELK Stack avec 90% moins de RAM
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: info
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100  # Limité pour VPS Lite
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://localhost:9093
+
+# Optimisations VPS Lite
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h  # 7 jours
+  max_query_parallelism: 2  # Limité pour 2 vCPU
+  max_query_series: 1000
+  max_query_length: 721h  # 30 jours max
+  max_streams_per_user: 0
+  max_line_size: 256KB
+  ingestion_rate_mb: 4  # Limité pour VPS Lite
+  ingestion_burst_size_mb: 6
+  per_stream_rate_limit: 3MB
+  per_stream_rate_limit_burst: 15MB
+  max_entries_limit_per_query: 5000
+  max_cache_freshness_per_query: 10m
+
+# Retention automatique
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 168h  # 7 jours pour économiser espace
+
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/boltdb-shipper-active
+    cache_location: /loki/boltdb-shipper-cache
+    cache_ttl: 24h
+    shared_store: filesystem
+  filesystem:
+    directory: /loki/chunks
+
+chunk_store_config:
+  max_look_back_period: 0s
+
+analytics:
+  reporting_enabled: false

@@ -1,0 +1,205 @@
+version: '3.8'
+
+services:
+  # Loki - Log aggregation (remplace ELK)
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: nightscan-loki
+    restart: always
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - nightscan-net
+    mem_limit: 250m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    user: "10001:10001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Promtail - Log collector
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: nightscan-promtail
+    restart: always
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - nightscan-net
+    mem_limit: 80m
+    cpus: 0.2
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nightscan-prometheus
+    restart: always
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=2GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - nightscan-net
+    mem_limit: 200m
+    cpus: 0.3
+    security_opt:
+      - no-new-privileges:true
+    user: "65534:65534"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana - Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nightscan-grafana
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=redis-datasource
+      - GF_SERVER_ROOT_URL=https://monitoring.${DOMAIN_NAME}
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=${SMTP_HOST}
+      - GF_SMTP_USER=${SMTP_USER}
+      - GF_SMTP_PASSWORD=${SMTP_PASSWORD}
+      - GF_SMTP_FROM_ADDRESS=alerts@${DOMAIN_NAME}
+      - VIRTUAL_HOST=monitoring.${DOMAIN_NAME}
+      - VIRTUAL_PORT=3000
+      - LETSENCRYPT_HOST=monitoring.${DOMAIN_NAME}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/notifiers:/etc/grafana/provisioning/notifiers:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - nightscan-net
+    depends_on:
+      - prometheus
+      - loki
+    mem_limit: 150m
+    cpus: 0.3
+    security_opt:
+      - no-new-privileges:true
+    user: "472:472"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Node Exporter - Host metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: nightscan-node-exporter
+    restart: always
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    networks:
+      - nightscan-net
+    mem_limit: 50m
+    cpus: 0.1
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # cAdvisor - Container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: nightscan-cadvisor
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - nightscan-net
+    mem_limit: 80m
+    cpus: 0.2
+    security_opt:
+      - no-new-privileges:true
+    devices:
+      - /dev/kmsg
+    privileged: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  loki_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  nightscan-net:
+    external: true

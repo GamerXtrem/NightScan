@@ -376,7 +376,7 @@ def create_example_config(output_file: str = "config/example.json"):
             "default_ttl": 3600
         },
         "security": {
-            "secret_key": "your-secret-key-here",
+            "secret_key": os.environ.get("SECRET_KEY"),
             "force_https": True,
             "lockout_threshold": 5
         },

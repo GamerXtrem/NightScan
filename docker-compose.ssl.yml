@@ -1,0 +1,222 @@
+# Configuration SSL/TLS automatique pour NightScan VPS Lite
+# Nginx + Let's Encrypt avec renouvellement automatique
+
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy avec SSL
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nightscan_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Configuration Nginx
+      - ./nginx/nginx.production.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      
+      # Certificats SSL
+      - letsencrypt_certs:/etc/letsencrypt:ro
+      - letsencrypt_challenges:/var/www/certbot:ro
+      
+      # Logs Nginx
+      - nginx_logs:/var/log/nginx
+      
+      # Page de maintenance
+      - ./nginx/maintenance:/var/www/maintenance:ro
+      
+      # Authentification basique pour monitoring
+      - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+    depends_on:
+      - web
+      - prediction-api
+      - grafana
+    networks:
+      - nightscan_network
+    labels:
+      - "nightscan.service=nginx"
+      - "nightscan.role=reverse-proxy"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:noexec,nosuid,size=50m
+      - /var/run:noexec,nosuid,size=10m
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Certbot pour Let's Encrypt
+  certbot:
+    image: certbot/certbot:latest
+    container_name: nightscan_certbot
+    restart: "no"
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt
+      - letsencrypt_challenges:/var/www/certbot
+      - certbot_logs:/var/log/letsencrypt
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+    command: >
+      sh -c "
+        echo 'Attente de Nginx...' &&
+        sleep 30 &&
+        echo 'Demande de certificat SSL pour ${DOMAIN_NAME}...' &&
+        certbot certonly
+          --webroot
+          --webroot-path=/var/www/certbot
+          --email ${ADMIN_EMAIL}
+          --agree-tos
+          --no-eff-email
+          --force-renewal
+          --domains ${DOMAIN_NAME},www.${DOMAIN_NAME},api.${DOMAIN_NAME},monitoring.${DOMAIN_NAME}
+          --verbose &&
+        echo 'Certificat SSL obtenu avec succès!'
+      "
+    depends_on:
+      - nginx
+    networks:
+      - nightscan_network
+    labels:
+      - "nightscan.service=certbot"
+      - "nightscan.role=ssl-management"
+
+  # Service de renouvellement automatique SSL
+  ssl-renewer:
+    image: certbot/certbot:latest
+    container_name: nightscan_ssl_renewer
+    restart: unless-stopped
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt
+      - letsencrypt_challenges:/var/www/certbot
+      - certbot_logs:/var/log/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+    command: >
+      sh -c "
+        echo 'Démarrage du service de renouvellement SSL...' &&
+        while true; do
+          echo 'Vérification du renouvellement SSL - $(date)' &&
+          certbot renew --quiet --webroot --webroot-path=/var/www/certbot &&
+          if [ $$? -eq 0 ]; then
+            echo 'Renouvellement SSL réussi - rechargement Nginx' &&
+            docker exec nightscan_nginx nginx -s reload
+          fi &&
+          echo 'Prochaine vérification dans 12 heures...' &&
+          sleep 43200
+        done
+      "
+    depends_on:
+      - nginx
+      - certbot
+    networks:
+      - nightscan_network
+    labels:
+      - "nightscan.service=ssl-renewer"
+      - "nightscan.role=ssl-automation"
+    mem_limit: 128m
+    cpus: 0.2
+
+  # Service de monitoring SSL
+  ssl-monitor:
+    image: alpine:latest
+    container_name: nightscan_ssl_monitor
+    restart: unless-stopped
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt:ro
+      - ssl_monitor_logs:/var/log/ssl-monitor
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+    command: >
+      sh -c "
+        apk add --no-cache openssl curl &&
+        echo 'Démarrage du monitoring SSL...' &&
+        while true; do
+          # Vérifier expiration certificat
+          EXPIRY_DATE=$$(openssl x509 -enddate -noout -in /etc/letsencrypt/live/${DOMAIN_NAME}/cert.pem 2>/dev/null | cut -d= -f2) &&
+          EXPIRY_EPOCH=$$(date -d \"$$EXPIRY_DATE\" +%s 2>/dev/null) &&
+          CURRENT_EPOCH=$$(date +%s) &&
+          DAYS_UNTIL_EXPIRY=$$((($${EXPIRY_EPOCH} - $${CURRENT_EPOCH}) / 86400)) &&
+          
+          echo \"[$(date)] Certificat SSL expire dans $$DAYS_UNTIL_EXPIRY jours\" &&
+          
+          if [ $$DAYS_UNTIL_EXPIRY -lt 30 ]; then
+            echo \"[ALERTE] Certificat SSL expire bientôt ($$DAYS_UNTIL_EXPIRY jours)\" &&
+            # Ici on pourrait envoyer une alerte email/Slack
+            echo \"Certificat ${DOMAIN_NAME} expire dans $$DAYS_UNTIL_EXPIRY jours\" > /var/log/ssl-monitor/alert.log
+          fi &&
+          
+          # Vérifier validité HTTPS
+          if curl -f -s -I https://${DOMAIN_NAME}/ > /dev/null 2>&1; then
+            echo \"[$(date)] HTTPS ${DOMAIN_NAME} opérationnel\"
+          else
+            echo \"[ERREUR] HTTPS ${DOMAIN_NAME} inaccessible\" &&
+            echo \"HTTPS ${DOMAIN_NAME} erreur - $(date)\" >> /var/log/ssl-monitor/errors.log
+          fi &&
+          
+          sleep 3600
+        done
+      "
+    depends_on:
+      - nginx
+    networks:
+      - nightscan_network
+    labels:
+      - "nightscan.service=ssl-monitor"
+      - "nightscan.role=ssl-monitoring"
+    mem_limit: 64m
+    cpus: 0.1
+
+volumes:
+  # Volumes SSL persistants
+  letsencrypt_certs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./ssl/letsencrypt
+      
+  letsencrypt_challenges:
+    driver: local
+    driver_opts:
+      type: none 
+      o: bind
+      device: ./ssl/challenges
+      
+  certbot_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/certbot
+      
+  nginx_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/nginx
+      
+  ssl_monitor_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/ssl-monitor
+
+networks:
+  nightscan_network:
+    external: true

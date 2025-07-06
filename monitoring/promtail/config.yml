@@ -1,0 +1,38 @@
+# Configuration Promtail pour NightScan VPS Lite
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Logs Nginx
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          service: reverse-proxy
+          environment: production
+          __path__: /var/log/nginx/*.log
+
+  # Logs Docker containers
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/nightscan_(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_label_nightscan_service']
+        target_label: 'service'
+
+target_config:
+  sync_period: 10s

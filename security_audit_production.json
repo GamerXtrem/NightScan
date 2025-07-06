@@ -1,0 +1,634 @@
+{
+  "timestamp": "2025-07-06T20:36:33.220542",
+  "audit_scope": "production_only",
+  "files_checked": [
+    "docker-compose.production.yml",
+    "docker-compose.monitoring.yml",
+    "config.py",
+    "web/app.py",
+    "scripts/deploy-vps-lite.sh",
+    "scripts/setup-secrets.sh",
+    "monitoring/prometheus/prometheus.yml",
+    ".env.production.example"
+  ],
+  "critical_issues": [
+    {
+      "file": "docker-compose.production.yml",
+      "line": 189,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "- SECRET_KEY=${SECRET_KEY}"
+    },
+    {
+      "file": "docker-compose.production.yml",
+      "line": 190,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "- CSRF_SECRET_KEY=${CSRF_SECRET_KEY}"
+    },
+    {
+      "file": "docker-compose.monitoring.yml",
+      "line": 99,
+      "type": "hardcoded_secret",
+      "secret_type": "admin",
+      "severity": "critical",
+      "context": "- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}"
+    },
+    {
+      "file": "docker-compose.monitoring.yml",
+      "line": 99,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "- GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}"
+    },
+    {
+      "file": "docker-compose.monitoring.yml",
+      "line": 106,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "- GF_SMTP_PASSWORD=${SMTP_PASSWORD}"
+    },
+    {
+      "file": "config.py",
+      "line": 44,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "secret_key: Optional[str] = None"
+    },
+    {
+      "file": "config.py",
+      "line": 45,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "csrf_secret_key: Optional[str] = None"
+    },
+    {
+      "file": "config.py",
+      "line": 200,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "if not v.secret_key:"
+    },
+    {
+      "file": "config.py",
+      "line": 201,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "v.secret_key = os.urandom(32).hex()"
+    },
+    {
+      "file": "config.py",
+      "line": 202,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "logging.warning(\"Generated random SECRET_KEY. Set NIGHTSCAN_SECURITY__SECRET_KEY for production.\")"
+    },
+    {
+      "file": "config.py",
+      "line": 270,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "if os.getenv(\"SECRET_KEY\"):"
+    },
+    {
+      "file": "config.py",
+      "line": 271,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "self.security.secret_key = os.getenv(\"SECRET_KEY\")"
+    },
+    {
+      "file": "config.py",
+      "line": 351,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "if config.environment == \"production\" and not config.security.secret_key:"
+    },
+    {
+      "file": "config.py",
+      "line": 352,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "errors.append(\"SECRET_KEY is required in production\")"
+    },
+    {
+      "file": "config.py",
+      "line": 379,
+      "type": "hardcoded_secret",
+      "secret_type": "your-secret-key-here",
+      "severity": "critical",
+      "context": "\"secret_key\": os.environ.get(\"SECRET_KEY\", \"your-secret-key-here\"),"
+    },
+    {
+      "file": "config.py",
+      "line": 379,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "\"secret_key\": os.environ.get(\"SECRET_KEY\", \"your-secret-key-here\"),"
+    },
+    {
+      "file": "web/app.py",
+      "line": 5,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "import secrets"
+    },
+    {
+      "file": "web/app.py",
+      "line": 58,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "app.secret_key = config.security.secret_key"
+    },
+    {
+      "file": "web/app.py",
+      "line": 59,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "app.config[\"WTF_CSRF_SECRET_KEY\"] = config.security.csrf_secret_key or config.security.secret_key"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 60,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "generate_secrets() {"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 61,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "log \"🔐 Génération des secrets sécurisés...\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 64,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "mkdir -p \"$PROJECT_ROOT/secrets/$ENVIRONMENT\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 67,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "DB_PASSWORD=$(openssl rand -base64 32 | tr -d \"=+/\" | cut -c1-25)"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 68,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d \"=+/\" | cut -c1-25)"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 69,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "SECRET_KEY=$(openssl rand -base64 64 | tr -d \"=+/\")"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 70,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "CSRF_SECRET_KEY=$(openssl rand -base64 32 | tr -d \"=+/\")"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 71,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "JWT_SECRET=$(openssl rand -base64 32 | tr -d \"=+/\")"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 72,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=$(openssl rand -base64 16 | tr -d \"=+/\" | cut -c1-12)"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 74,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "success \"Secrets générés\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 81,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "ENV_FILE=\"$PROJECT_ROOT/secrets/$ENVIRONMENT/.env\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 90,
+      "type": "hardcoded_secret",
+      "secret_type": "admin",
+      "severity": "critical",
+      "context": "ADMIN_EMAIL=admin@yourdomain.com"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 93,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "DB_PASSWORD=$DB_PASSWORD"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 96,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=$REDIS_PASSWORD"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 99,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "SECRET_KEY=$SECRET_KEY"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 100,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "CSRF_SECRET_KEY=$CSRF_SECRET_KEY"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 101,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "JWT_SECRET=$JWT_SECRET"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 104,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=$GRAFANA_PASSWORD"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 110,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 178,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "if ! grep -q \"secrets/\\*\\*/\\.env\" .gitattributes; then"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 200,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "if ! grep -q \"secrets/\" .gitignore; then"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 202,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "echo \"# Secrets (sensibles)\" >> .gitignore"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 203,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "echo \"secrets/\" >> .gitignore"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 208,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "warn \"Secrets non versionnés (ajoutés à .gitignore)\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 209,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "warn \"⚠️  Important: Sauvegarder les secrets séparément!\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 213,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "remove_hardcoded_secrets() {"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 214,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "log \"🧹 Suppression des secrets hardcodés...\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 217,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "SECRET_FILES=()"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 221,
+      "type": "hardcoded_secret",
+      "secret_type": "nightscan_secret",
+      "severity": "critical",
+      "context": "if grep -l \"nightscan_secret\\|redis_secret\\|your-secret-key\" \"$file\" 2>/dev/null; then"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 221,
+      "type": "hardcoded_secret",
+      "secret_type": "redis_secret",
+      "severity": "critical",
+      "context": "if grep -l \"nightscan_secret\\|redis_secret\\|your-secret-key\" \"$file\" 2>/dev/null; then"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 221,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "if grep -l \"nightscan_secret\\|redis_secret\\|your-secret-key\" \"$file\" 2>/dev/null; then"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 222,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "SECRET_FILES+=(\"$file\")"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 226,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "if [ ${#SECRET_FILES[@]} -eq 0 ]; then"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 227,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "success \"Aucun secret hardcodé trouvé\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 231,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "echo \"📋 Fichiers avec secrets hardcodés détectés:\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 232,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "for file in \"${SECRET_FILES[@]}\"; do"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 236,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "warn \"⚠️  Veuillez remplacer manuellement les secrets hardcodés par des variables d'environnement\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 237,
+      "type": "hardcoded_secret",
+      "secret_type": "nightscan_secret",
+      "severity": "critical",
+      "context": "warn \"   Exemple: DB_PASSWORD=\\${DB_PASSWORD} au lieu de DB_PASSWORD=nightscan_secret\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 237,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "warn \"   Exemple: DB_PASSWORD=\\${DB_PASSWORD} au lieu de DB_PASSWORD=nightscan_secret\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 237,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "warn \"   Exemple: DB_PASSWORD=\\${DB_PASSWORD} au lieu de DB_PASSWORD=nightscan_secret\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 242,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "log \"🛡️  Configuration des secrets sécurisés NightScan VPS Lite\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 248,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "generate_secrets"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 252,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "remove_hardcoded_secrets"
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 254,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "success \"🎉 Configuration des secrets terminée!\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 258,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "echo \"1. 🔍 Vérifier et modifier secrets/$ENVIRONMENT/.env selon vos besoins\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 259,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "echo \"2. 🔄 Remplacer les secrets hardcodés dans le code\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 261,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "echo \"4. 🔒 Sauvegarder les secrets en lieu sûr\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 264,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "echo \"- Ne jamais commiter le répertoire secrets/ sans chiffrement\""
+    },
+    {
+      "file": "scripts/setup-secrets.sh",
+      "line": 266,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "echo \"- Effectuer une rotation régulière des secrets\""
+    },
+    {
+      "file": ".env.production.example",
+      "line": 6,
+      "type": "hardcoded_secret",
+      "secret_type": "admin",
+      "severity": "critical",
+      "context": "ADMIN_EMAIL=admin@yourdomain.com"
+    },
+    {
+      "file": ".env.production.example",
+      "line": 10,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "DB_PASSWORD=CHANGE_ME_STRONG_PASSWORD"
+    },
+    {
+      "file": ".env.production.example",
+      "line": 14,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "REDIS_PASSWORD=CHANGE_ME_STRONG_PASSWORD"
+    },
+    {
+      "file": ".env.production.example",
+      "line": 18,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "SECRET_KEY=CHANGE_ME_STRONG_SECRET_KEY"
+    },
+    {
+      "file": ".env.production.example",
+      "line": 21,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "CSRF_SECRET_KEY=CHANGE_ME_CSRF_SECRET"
+    },
+    {
+      "file": ".env.production.example",
+      "line": 24,
+      "type": "hardcoded_secret",
+      "secret_type": "secret",
+      "severity": "critical",
+      "context": "JWT_SECRET=CHANGE_ME_JWT_SECRET"
+    },
+    {
+      "file": ".env.production.example",
+      "line": 28,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "GRAFANA_PASSWORD=CHANGE_ME_GRAFANA_PASSWORD"
+    },
+    {
+      "file": ".env.production.example",
+      "line": 34,
+      "type": "weak_password",
+      "severity": "high",
+      "context": "SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD"
+    },
+    {
+      "file": "secrets/production/.env",
+      "type": "default_secret_in_env",
+      "severity": "critical",
+      "context": "Secret par défaut détecté: admin"
+    },
+    {
+      "file": "secrets/production/.env",
+      "type": "default_secret_in_env",
+      "severity": "critical",
+      "context": "Secret par défaut détecté: secret"
+    }
+  ],
+  "recommendations": [
+    "🚨 Remplacer tous les secrets hardcodés par des variables d'environnement",
+    "🔐 S'assurer que secrets/production/.env contient des valeurs sécurisées",
+    "🐳 Vérifier la configuration Docker pour la production",
+    "🔒 Utiliser des mots de passe forts générés aléatoirement"
+  ],
+  "summary": {
+    "total_files_checked": 8,
+    "critical_issues_count": 78,
+    "security_score": "0/10",
+    "production_ready": false
+  }
+}

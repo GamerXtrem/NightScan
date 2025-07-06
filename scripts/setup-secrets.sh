@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# NightScan Secure Secrets Setup Script
-# This script securely initializes secrets in HashiCorp Vault or AWS Secrets Manager
+# Configuration sécurisée des secrets pour NightScan VPS Lite
+# Usage: ./setup-secrets.sh --env production
 
 set -e
 
@@ -10,20 +10,15 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # Configuration
-VAULT_ADDR="${VAULT_ADDR:-http://localhost:8200}"
-VAULT_TOKEN="${VAULT_TOKEN:-}"
-AWS_REGION="${AWS_REGION:-us-east-1}"
-SECRET_BACKEND="${SECRET_BACKEND:-vault}" # vault or aws-secrets-manager
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+ENVIRONMENT="${1:-production}"
 
 log() {
-    echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')] $1${NC}"
-}
-
-success() {
-    echo -e "${GREEN}[SUCCESS] $1${NC}"
+    echo -e "${BLUE}[$(date +'%H:%M:%S')] $1${NC}"
 }
 
 warn() {
@@ -35,316 +30,252 @@ error() {
     exit 1
 }
 
-# Generate secure random passwords
-generate_password() {
-    local length="${1:-32}"
-    openssl rand -base64 $length | tr -d "=+/" | cut -c1-$length
+success() {
+    echo -e "${GREEN}[SUCCESS] $1${NC}"
 }
 
-# Generate secret key
-generate_secret_key() {
-    python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-}
-
-# Check dependencies
-check_dependencies() {
-    log "Checking dependencies..."
+# Vérifier les prérequis
+check_prerequisites() {
+    log "🔍 Vérification des prérequis..."
     
-    if [ "$SECRET_BACKEND" = "vault" ]; then
-        command -v vault >/dev/null 2>&1 || error "HashiCorp Vault CLI is required but not installed"
-        [ -z "$VAULT_TOKEN" ] && error "VAULT_TOKEN environment variable is required"
-    elif [ "$SECRET_BACKEND" = "aws-secrets-manager" ]; then
-        command -v aws >/dev/null 2>&1 || error "AWS CLI is required but not installed"
-        aws sts get-caller-identity >/dev/null 2>&1 || error "AWS credentials not configured"
+    # Vérifier openssl
+    if ! command -v openssl >/dev/null 2>&1; then
+        error "openssl n'est pas installé"
+    fi
+    
+    # Vérifier git
+    if ! command -v git >/dev/null 2>&1; then
+        error "git n'est pas installé"
+    fi
+    
+    # Vérifier si on est dans un repo git
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+        error "Pas dans un repository git"
+    fi
+    
+    success "Prérequis validés"
+}
+
+# Générer des secrets forts
+generate_secrets() {
+    log "🔐 Génération des secrets sécurisés..."
+    
+    # Créer le répertoire secrets
+    mkdir -p "$PROJECT_ROOT/secrets/$ENVIRONMENT"
+    
+    # Générer les secrets
+    DB_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+    REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+    SECRET_KEY=$(openssl rand -base64 64 | tr -d "=+/")
+    CSRF_SECRET_KEY=$(openssl rand -base64 32 | tr -d "=+/")
+    JWT_SECRET=$(openssl rand -base64 32 | tr -d "=+/")
+    GRAFANA_PASSWORD=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-12)
+    
+    success "Secrets générés"
+}
+
+# Créer le fichier .env sécurisé
+create_env_file() {
+    log "📝 Création du fichier .env.$ENVIRONMENT..."
+    
+    ENV_FILE="$PROJECT_ROOT/secrets/$ENVIRONMENT/.env"
+    
+    cat > "$ENV_FILE" << EOF
+# NightScan VPS Lite - Variables d'environnement $ENVIRONMENT
+# Généré le $(date)
+# ATTENTION: Ce fichier contient des secrets sensibles
+
+# === DOMAIN CONFIGURATION ===
+DOMAIN_NAME=nightscan.yourdomain.com
+ADMIN_EMAIL=admin@yourdomain.com
+
+# === DATABASE CONFIGURATION ===
+DB_PASSWORD=$DB_PASSWORD
+
+# === REDIS CONFIGURATION ===
+REDIS_PASSWORD=$REDIS_PASSWORD
+
+# === APPLICATION SECRETS ===
+SECRET_KEY=$SECRET_KEY
+CSRF_SECRET_KEY=$CSRF_SECRET_KEY
+JWT_SECRET=$JWT_SECRET
+
+# === MONITORING ===
+GRAFANA_PASSWORD=$GRAFANA_PASSWORD
+
+# === EMAIL NOTIFICATIONS (À configurer) ===
+SMTP_HOST=smtp.yourdomain.com
+SMTP_PORT=587
+SMTP_USER=alerts@yourdomain.com
+SMTP_PASSWORD=CHANGE_ME_SMTP_PASSWORD
+
+# === DOCKER IMAGE VERSIONS ===
+VERSION=latest
+
+# === RESOURCE LIMITS (VPS Lite optimized) ===
+WEB_MEMORY_LIMIT=1g
+WEB_CPU_LIMIT=1.0
+PREDICTION_MEMORY_LIMIT=2g
+PREDICTION_CPU_LIMIT=1.5
+DB_MEMORY_LIMIT=500m
+DB_CPU_LIMIT=0.5
+REDIS_MEMORY_LIMIT=200m
+REDIS_CPU_LIMIT=0.3
+
+# === PERFORMANCE TUNING ===
+GUNICORN_WORKERS=2
+GUNICORN_THREADS=2
+API_BATCH_SIZE=4
+MAX_WORKERS=2
+
+# === BACKUP CONFIGURATION ===
+BACKUP_RETENTION_DAYS=7
+BACKUP_SCHEDULE="0 3 * * *"
+
+# === SSL CONFIGURATION ===
+LETSENCRYPT_EMAIL=\${ADMIN_EMAIL}
+LETSENCRYPT_HOST=\${DOMAIN_NAME},www.\${DOMAIN_NAME},api.\${DOMAIN_NAME},monitoring.\${DOMAIN_NAME}
+
+# === SECURITY ===
+FORCE_HTTPS=true
+SECURE_COOKIES=true
+HSTS_ENABLED=true
+EOF
+    
+    # Permissions restrictives
+    chmod 600 "$ENV_FILE"
+    
+    success "Fichier .env.$ENVIRONMENT créé avec permissions 600"
+}
+
+# Initialiser git-crypt si pas déjà fait
+init_git_crypt() {
+    log "🔒 Configuration de git-crypt..."
+    
+    # Vérifier si git-crypt est installé
+    if ! command -v git-crypt >/dev/null 2>&1; then
+        warn "git-crypt n'est pas installé. Installation recommandée:"
+        echo "  macOS: brew install git-crypt"
+        echo "  Ubuntu: apt-get install git-crypt"
+        echo "  Manual: https://github.com/AGWA/git-crypt"
+        
+        # Utiliser alternative simple avec permissions
+        setup_simple_encryption
+        return
+    fi
+    
+    # Vérifier si git-crypt est déjà initialisé
+    if [ ! -f ".git-crypt/.git-crypt" ]; then
+        log "Initialisation de git-crypt..."
+        git-crypt init
+        
+        # Créer .gitattributes pour chiffrer les secrets
+        if [ ! -f ".gitattributes" ]; then
+            echo "secrets/**/.env filter=git-crypt diff=git-crypt" > .gitattributes
+            echo "*.key filter=git-crypt diff=git-crypt" >> .gitattributes
+            echo "*.pem filter=git-crypt diff=git-crypt" >> .gitattributes
+        else
+            if ! grep -q "secrets/\*\*/\.env" .gitattributes; then
+                echo "secrets/**/.env filter=git-crypt diff=git-crypt" >> .gitattributes
+                echo "*.key filter=git-crypt diff=git-crypt" >> .gitattributes
+                echo "*.pem filter=git-crypt diff=git-crypt" >> .gitattributes
+            fi
+        fi
+        
+        success "git-crypt initialisé"
     else
-        error "Unknown SECRET_BACKEND: $SECRET_BACKEND. Use 'vault' or 'aws-secrets-manager'"
-    fi
-    
-    command -v openssl >/dev/null 2>&1 || error "OpenSSL is required but not installed"
-    command -v python3 >/dev/null 2>&1 || error "Python 3 is required but not installed"
-    
-    success "Dependencies check passed"
-}
-
-# Initialize Vault secrets
-setup_vault_secrets() {
-    log "Setting up secrets in HashiCorp Vault..."
-    
-    export VAULT_ADDR="$VAULT_ADDR"
-    export VAULT_TOKEN="$VAULT_TOKEN"
-    
-    # Enable KV secrets engine if not already enabled
-    vault secrets list | grep -q "secret/" || vault secrets enable -path=secret kv-v2
-    
-    # Generate secrets
-    local db_password=$(generate_password 24)
-    local redis_password=$(generate_password 24)
-    local secret_key=$(generate_secret_key)
-    local csrf_secret=$(generate_secret_key)
-    local jwt_secret=$(generate_secret_key)
-    local encryption_key=$(generate_secret_key)
-    
-    # Store database secrets
-    vault kv put secret/nightscan/postgres \
-        username="nightscan" \
-        password="$db_password" \
-        database="nightscan"
-    
-    # Store Redis secrets
-    vault kv put secret/nightscan/redis \
-        password="$redis_password"
-    
-    # Store application secrets
-    vault kv put secret/nightscan/app \
-        secret_key="$secret_key" \
-        csrf_secret_key="$csrf_secret" \
-        jwt_secret="$jwt_secret" \
-        encryption_key="$encryption_key"
-    
-    # Store API keys (user will need to update these)
-    vault kv put secret/nightscan/aws \
-        access_key_id="CHANGE_ME" \
-        secret_access_key="CHANGE_ME"
-    
-    vault kv put secret/nightscan/external-apis \
-        openai_api_key="CHANGE_ME"
-    
-    vault kv put secret/nightscan/notifications \
-        slack_webhook_url="CHANGE_ME"
-    
-    vault kv put secret/nightscan/smtp \
-        username="noreply@nightscan.com" \
-        password="CHANGE_ME" \
-        host="smtp.gmail.com" \
-        port="587"
-    
-    success "Vault secrets configured successfully"
-    
-    # Display summary
-    cat << EOF
-
-${GREEN}=== VAULT SECRETS SUMMARY ===${NC}
-
-✅ Database credentials stored at: secret/nightscan/postgres
-✅ Redis credentials stored at: secret/nightscan/redis  
-✅ Application secrets stored at: secret/nightscan/app
-✅ AWS credentials template at: secret/nightscan/aws
-✅ External API keys template at: secret/nightscan/external-apis
-✅ Notification config template at: secret/nightscan/notifications
-✅ SMTP config template at: secret/nightscan/smtp
-
-${YELLOW}⚠️  ACTION REQUIRED:${NC}
-Update the following secrets with real values:
-- AWS credentials: vault kv put secret/nightscan/aws access_key_id="..." secret_access_key="..."
-- OpenAI API key: vault kv put secret/nightscan/external-apis openai_api_key="..."
-- Slack webhook: vault kv put secret/nightscan/notifications slack_webhook_url="..."
-- SMTP password: vault kv put secret/nightscan/smtp password="..."
-
-EOF
-}
-
-# Initialize AWS Secrets Manager secrets
-setup_aws_secrets() {
-    log "Setting up secrets in AWS Secrets Manager..."
-    
-    # Generate secrets
-    local db_password=$(generate_password 24)
-    local redis_password=$(generate_password 24)
-    local secret_key=$(generate_secret_key)
-    local csrf_secret=$(generate_secret_key)
-    local jwt_secret=$(generate_secret_key)
-    local encryption_key=$(generate_secret_key)
-    
-    # Store database secrets
-    aws secretsmanager create-secret \
-        --region "$AWS_REGION" \
-        --name "nightscan/postgres" \
-        --description "NightScan PostgreSQL credentials" \
-        --secret-string "{\"username\":\"nightscan\",\"password\":\"$db_password\",\"database\":\"nightscan\"}" \
-        2>/dev/null || \
-    aws secretsmanager update-secret \
-        --region "$AWS_REGION" \
-        --secret-id "nightscan/postgres" \
-        --secret-string "{\"username\":\"nightscan\",\"password\":\"$db_password\",\"database\":\"nightscan\"}"
-    
-    # Store Redis secrets
-    aws secretsmanager create-secret \
-        --region "$AWS_REGION" \
-        --name "nightscan/redis" \
-        --description "NightScan Redis credentials" \
-        --secret-string "{\"password\":\"$redis_password\"}" \
-        2>/dev/null || \
-    aws secretsmanager update-secret \
-        --region "$AWS_REGION" \
-        --secret-id "nightscan/redis" \
-        --secret-string "{\"password\":\"$redis_password\"}"
-    
-    # Store application secrets
-    aws secretsmanager create-secret \
-        --region "$AWS_REGION" \
-        --name "nightscan/app" \
-        --description "NightScan application secrets" \
-        --secret-string "{\"secret_key\":\"$secret_key\",\"csrf_secret_key\":\"$csrf_secret\",\"jwt_secret\":\"$jwt_secret\",\"encryption_key\":\"$encryption_key\"}" \
-        2>/dev/null || \
-    aws secretsmanager update-secret \
-        --region "$AWS_REGION" \
-        --secret-id "nightscan/app" \
-        --secret-string "{\"secret_key\":\"$secret_key\",\"csrf_secret_key\":\"$csrf_secret\",\"jwt_secret\":\"$jwt_secret\",\"encryption_key\":\"$encryption_key\"}"
-    
-    # Store API keys templates
-    aws secretsmanager create-secret \
-        --region "$AWS_REGION" \
-        --name "nightscan/aws" \
-        --description "NightScan AWS credentials" \
-        --secret-string "{\"access_key_id\":\"CHANGE_ME\",\"secret_access_key\":\"CHANGE_ME\"}" \
-        2>/dev/null || true
-    
-    aws secretsmanager create-secret \
-        --region "$AWS_REGION" \
-        --name "nightscan/external-apis" \
-        --description "NightScan external API keys" \
-        --secret-string "{\"openai_api_key\":\"CHANGE_ME\"}" \
-        2>/dev/null || true
-    
-    success "AWS Secrets Manager secrets configured successfully"
-    
-    # Display summary
-    cat << EOF
-
-${GREEN}=== AWS SECRETS MANAGER SUMMARY ===${NC}
-
-✅ Database credentials stored: nightscan/postgres
-✅ Redis credentials stored: nightscan/redis
-✅ Application secrets stored: nightscan/app
-✅ AWS credentials template: nightscan/aws
-✅ External API keys template: nightscan/external-apis
-
-${YELLOW}⚠️  ACTION REQUIRED:${NC}
-Update the following secrets with real values:
-- AWS credentials: aws secretsmanager update-secret --secret-id nightscan/aws --secret-string '{"access_key_id":"...","secret_access_key":"..."}'
-- OpenAI API: aws secretsmanager update-secret --secret-id nightscan/external-apis --secret-string '{"openai_api_key":"..."}'
-
-EOF
-}
-
-# Setup Kubernetes RBAC for External Secrets
-setup_kubernetes_rbac() {
-    log "Setting up Kubernetes RBAC for External Secrets..."
-    
-    cat << EOF | kubectl apply -f -
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: external-secrets
-  namespace: external-secrets
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: external-secrets-controller
-rules:
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["create", "update", "delete", "get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["events"]
-  verbs: ["create", "patch"]
-- apiGroups: ["external-secrets.io"]
-  resources: ["*"]
-  verbs: ["*"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: external-secrets-controller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: external-secrets-controller
-subjects:
-- kind: ServiceAccount
-  name: external-secrets
-  namespace: external-secrets
-EOF
-    
-    success "Kubernetes RBAC configured for External Secrets"
-}
-
-# Verify secrets are accessible
-verify_secrets() {
-    log "Verifying secrets accessibility..."
-    
-    if [ "$SECRET_BACKEND" = "vault" ]; then
-        vault kv get secret/nightscan/postgres >/dev/null && success "✅ Database secrets accessible"
-        vault kv get secret/nightscan/redis >/dev/null && success "✅ Redis secrets accessible"
-        vault kv get secret/nightscan/app >/dev/null && success "✅ Application secrets accessible"
-    elif [ "$SECRET_BACKEND" = "aws-secrets-manager" ]; then
-        aws secretsmanager get-secret-value --region "$AWS_REGION" --secret-id "nightscan/postgres" >/dev/null && success "✅ Database secrets accessible"
-        aws secretsmanager get-secret-value --region "$AWS_REGION" --secret-id "nightscan/redis" >/dev/null && success "✅ Redis secrets accessible"
-        aws secretsmanager get-secret-value --region "$AWS_REGION" --secret-id "nightscan/app" >/dev/null && success "✅ Application secrets accessible"
+        success "git-crypt déjà configuré"
     fi
 }
 
-# Main execution
+# Alternative simple sans git-crypt
+setup_simple_encryption() {
+    log "🔐 Configuration encryption simple (sans git-crypt)..."
+    
+    # Ajouter secrets/ au .gitignore
+    if [ ! -f ".gitignore" ]; then
+        touch .gitignore
+    fi
+    
+    if ! grep -q "secrets/" .gitignore; then
+        echo "" >> .gitignore
+        echo "# Secrets (sensibles)" >> .gitignore
+        echo "secrets/" >> .gitignore
+        echo ".env.production" >> .gitignore
+        echo ".env.staging" >> .gitignore
+    fi
+    
+    warn "Secrets non versionnés (ajoutés à .gitignore)"
+    warn "⚠️  Important: Sauvegarder les secrets séparément!"
+}
+
+# Supprimer les secrets hardcodés
+remove_hardcoded_secrets() {
+    log "🧹 Suppression des secrets hardcodés..."
+    
+    # Lister les fichiers avec secrets par défaut
+    SECRET_FILES=()
+    
+    # Rechercher dans tous les fichiers
+    while IFS= read -r -d '' file; do
+        if grep -l "nightscan_secret\|redis_secret\|your-secret-key" "$file" 2>/dev/null; then
+            SECRET_FILES+=("$file")
+        fi
+    done < <(find "$PROJECT_ROOT" -type f \( -name "*.py" -o -name "*.yml" -o -name "*.yaml" \) -print0)
+    
+    if [ ${#SECRET_FILES[@]} -eq 0 ]; then
+        success "Aucun secret hardcodé trouvé"
+        return
+    fi
+    
+    echo "📋 Fichiers avec secrets hardcodés détectés:"
+    for file in "${SECRET_FILES[@]}"; do
+        echo "  - $file"
+    done
+    
+    warn "⚠️  Veuillez remplacer manuellement les secrets hardcodés par des variables d'environnement"
+    warn "   Exemple: DB_PASSWORD=\${DB_PASSWORD} au lieu de DB_PASSWORD=nightscan_secret"
+}
+
+# Fonction principale
 main() {
-    log "=== NightScan Secure Secrets Setup ==="
-    log "Backend: $SECRET_BACKEND"
+    log "🛡️  Configuration des secrets sécurisés NightScan VPS Lite"
+    log "Environment: $ENVIRONMENT"
     
-    check_dependencies
+    cd "$PROJECT_ROOT"
     
-    if [ "$SECRET_BACKEND" = "vault" ]; then
-        setup_vault_secrets
-    elif [ "$SECRET_BACKEND" = "aws-secrets-manager" ]; then
-        setup_aws_secrets
-    fi
+    check_prerequisites
+    generate_secrets
+    create_env_file
+    init_git_crypt
+    setup_simple_encryption
+    remove_hardcoded_secrets
     
-    setup_kubernetes_rbac
-    verify_secrets
+    success "🎉 Configuration des secrets terminée!"
     
-    cat << EOF
-
-${GREEN}=== SETUP COMPLETE ===${NC}
-
-Next steps:
-1. Install External Secrets Operator: kubectl apply -f k8s/secrets-management.yaml
-2. Update placeholder values for API keys and external services
-3. Deploy NightScan with: ./scripts/deploy.sh
-
-${YELLOW}Security Notes:${NC}
-- All secrets are now stored securely outside of your codebase
-- Rotate secrets regularly using your secret management system
-- Monitor secret access through audit logs
-- Use principle of least privilege for secret access
-
-EOF
-    
-    success "Secure secrets setup completed successfully!"
+    echo ""
+    echo "📋 PROCHAINES ÉTAPES:"
+    echo "1. 🔍 Vérifier et modifier secrets/$ENVIRONMENT/.env selon vos besoins"
+    echo "2. 🔄 Remplacer les secrets hardcodés dans le code"
+    echo "3. 🧪 Tester avec: ./scripts/deploy-vps-lite.sh"
+    echo "4. 🔒 Sauvegarder les secrets en lieu sûr"
+    echo ""
+    echo "⚠️  ATTENTION:"
+    echo "- Ne jamais commiter le répertoire secrets/ sans chiffrement"
+    echo "- Utiliser des mots de passe uniques pour chaque environnement"
+    echo "- Effectuer une rotation régulière des secrets"
 }
 
-# Parse command line arguments
-case "${1:-setup}" in
-    "setup")
-        main
+# Parse arguments
+case "${1:-}" in
+    --env)
+        ENVIRONMENT="$2"
         ;;
-    "verify")
-        check_dependencies
-        verify_secrets
-        ;;
-    "help")
-        echo "Usage: $0 [setup|verify|help]"
-        echo ""
-        echo "Commands:"
-        echo "  setup   - Set up secure secrets (default)"
-        echo "  verify  - Verify secrets are accessible"
-        echo "  help    - Show this help"
-        echo ""
-        echo "Environment variables:"
-        echo "  SECRET_BACKEND  - 'vault' or 'aws-secrets-manager' (default: vault)"
-        echo "  VAULT_ADDR      - Vault server address (default: http://localhost:8200)"
-        echo "  VAULT_TOKEN     - Vault authentication token (required for vault)"
-        echo "  AWS_REGION      - AWS region (default: us-east-1)"
-        ;;
-    *)
-        error "Unknown command: $1. Use 'help' for usage information."
+    --help|-h)
+        echo "Usage: $0 [--env ENVIRONMENT]"
+        echo "  ENVIRONMENT: production, staging (default: production)"
+        exit 0
         ;;
 esac
+
+main "$@"
