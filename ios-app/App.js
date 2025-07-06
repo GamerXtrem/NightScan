@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from './screens/HomeScreen';
+import ModernHomeScreen from './screens/ModernHomeScreen';
 import ScanScreen from './screens/ScanScreen';
 import MapScreen from './screens/MapScreen';
 import DetectionListScreen from './screens/DetectionListScreen';
@@ -12,6 +13,7 @@ import DetectionDetailScreen from './screens/DetectionDetailScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import ModernSettingsScreen from './screens/ModernSettingsScreen';
 import CameraPreviewScreen from './screens/CameraPreviewScreen';
 import PiInstallationScreen from './screens/PiInstallationScreen';
 import AudioThresholdScreen from './screens/AudioThresholdScreen';
@@ -30,59 +32,67 @@ function MainTabs() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
-          if (route.name === 'Map') {
-            iconName = focused ? 'map' : 'map-outline';
-          } else if (route.name === 'Detections') {
+          if (route.name === 'Accueil') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Détections') {
             iconName = focused ? 'list' : 'list-outline';
-          } else if (route.name === 'Scan') {
+          } else if (route.name === 'Scanner') {
             iconName = focused ? 'scan' : 'scan-outline';
-          } else if (route.name === 'Settings') {
+          } else if (route.name === 'Paramètres') {
             iconName = focused ? 'settings' : 'settings-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#4CAF50',
-        tabBarInactiveTintColor: 'gray',
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.6)',
         tabBarStyle: {
-          backgroundColor: 'white',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
           borderTopWidth: 0,
           elevation: 10,
-          shadowOpacity: 0.1,
-          shadowRadius: 10,
+          shadowOpacity: 0.3,
+          shadowRadius: 15,
           shadowOffset: { width: 0, height: -5 },
+          position: 'absolute',
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingTop: 5,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
         },
       })}
     >
       <Tab.Screen 
-        name="Map" 
-        component={MapScreen}
+        name="Accueil" 
+        component={ModernHomeScreen}
         options={{
-          title: 'Live Map',
+          title: 'Accueil',
           headerShown: false,
         }}
       />
       <Tab.Screen 
-        name="Detections" 
+        name="Détections" 
         component={DetectionListScreen}
         options={{
-          title: 'Detections',
+          title: 'Détections',
           headerShown: false,
         }}
       />
       <Tab.Screen 
-        name="Scan" 
+        name="Scanner" 
         component={ScanScreen}
         options={{
-          title: 'Scan Audio',
+          title: 'Scanner',
           headerShown: false,
         }}
       />
       <Tab.Screen 
-        name="Settings" 
-        component={SettingsScreen}
+        name="Paramètres" 
+        component={ModernSettingsScreen}
         options={{
-          title: 'Settings',
+          title: 'Paramètres',
           headerShown: false,
         }}
       />
@@ -162,7 +172,7 @@ function RootNavigator() {
       >
         <Stack.Screen 
           name="Home" 
-          component={HomeScreen}
+          component={ModernHomeScreen}
           options={{
             title: 'NightScan',
             headerShown: false,
