@@ -46,6 +46,7 @@ from openapi_spec import create_openapi_endpoint
 from config import get_config
 from websocket_service import FlaskWebSocketIntegration, get_websocket_manager
 from analytics_dashboard import analytics_bp
+from notification_service import get_notification_service
 
 logger = logging.getLogger(__name__)
 setup_logging()
@@ -283,6 +284,11 @@ class Detection(db.Model):
     longitude = db.Column(db.Float)
     zone = db.Column(db.String(100))
     image_url = db.Column(db.String(200))
+    confidence = db.Column(db.Float, default=0.0)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    description = db.Column(db.Text)
+
+    user = db.relationship("User", backref=db.backref("detections", lazy=True))
 
     def to_dict(self) -> dict:
         return {
@@ -293,6 +299,42 @@ class Detection(db.Model):
             "longitude": self.longitude,
             "zone": self.zone,
             "image": self.image_url,
+            "confidence": self.confidence,
+            "description": self.description,
+            "timestamp": self.time.isoformat() if self.time else None,
+        }
+
+
+class NotificationPreference(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
+    email_notifications = db.Column(db.Boolean, default=True)
+    push_notifications = db.Column(db.Boolean, default=True)
+    email_address = db.Column(db.String(200))
+    min_priority = db.Column(db.String(20), default='normal')
+    species_filter = db.Column(db.Text)  # JSON string
+    zone_filter = db.Column(db.Text)     # JSON string
+    quiet_hours_start = db.Column(db.String(5))  # HH:MM
+    quiet_hours_end = db.Column(db.String(5))    # HH:MM
+    slack_webhook = db.Column(db.String(500))
+    discord_webhook = db.Column(db.String(500))
+
+    user = db.relationship("User", backref=db.backref("notification_preferences", uselist=False))
+
+    def to_dict(self) -> dict:
+        import json
+        return {
+            "user_id": self.user_id,
+            "email_notifications": self.email_notifications,
+            "push_notifications": self.push_notifications,
+            "email_address": self.email_address,
+            "min_priority": self.min_priority,
+            "species_filter": json.loads(self.species_filter) if self.species_filter else [],
+            "zone_filter": json.loads(self.zone_filter) if self.zone_filter else [],
+            "quiet_hours_start": self.quiet_hours_start,
+            "quiet_hours_end": self.quiet_hours_end,
+            "slack_webhook": self.slack_webhook,
+            "discord_webhook": self.discord_webhook,
         }
 
 
@@ -552,6 +594,14 @@ def readiness_check():
     }), status_code
 
 
+@app.route("/dashboard")
+@login_required
+@track_request_metrics
+def dashboard():
+    """Live dashboard with real-time notifications."""
+    return render_template("dashboard.html")
+
+
 @app.route("/api/detections")
 @login_required
 @limiter.limit("30 per minute")
@@ -576,6 +626,109 @@ def api_detections():
             "has_next": detections.has_next,
             "has_prev": detections.has_prev
         }
+    })
+
+
+@app.route("/api/notifications/preferences", methods=["GET", "POST"])
+@login_required
+@limiter.limit("20 per minute")
+@track_request_metrics
+def notification_preferences():
+    """Get or update user notification preferences."""
+    if request.method == "GET":
+        prefs = NotificationPreference.query.filter_by(user_id=current_user.id).first()
+        if prefs:
+            return jsonify(prefs.to_dict())
+        else:
+            # Return default preferences
+            return jsonify({
+                "user_id": current_user.id,
+                "email_notifications": True,
+                "push_notifications": True,
+                "email_address": None,
+                "min_priority": "normal",
+                "species_filter": [],
+                "zone_filter": [],
+                "quiet_hours_start": None,
+                "quiet_hours_end": None,
+                "slack_webhook": None,
+                "discord_webhook": None
+            })
+    
+    elif request.method == "POST":
+        import json
+        data = request.get_json()
+        
+        prefs = NotificationPreference.query.filter_by(user_id=current_user.id).first()
+        if not prefs:
+            prefs = NotificationPreference(user_id=current_user.id)
+        
+        # Update preferences
+        prefs.email_notifications = data.get('email_notifications', True)
+        prefs.push_notifications = data.get('push_notifications', True)
+        prefs.email_address = validate_input(data.get('email_address', ''), 200)
+        prefs.min_priority = data.get('min_priority', 'normal')
+        prefs.species_filter = json.dumps(data.get('species_filter', []))
+        prefs.zone_filter = json.dumps(data.get('zone_filter', []))
+        prefs.quiet_hours_start = data.get('quiet_hours_start')
+        prefs.quiet_hours_end = data.get('quiet_hours_end')
+        prefs.slack_webhook = validate_input(data.get('slack_webhook', ''), 500)
+        prefs.discord_webhook = validate_input(data.get('discord_webhook', ''), 500)
+        
+        db.session.add(prefs)
+        db.session.commit()
+        
+        return jsonify({"status": "success", "message": "Preferences updated"})
+
+
+@app.route("/api/simulate/detection", methods=["POST"])
+@login_required
+@limiter.limit("5 per minute")
+@track_request_metrics  
+def simulate_detection():
+    """Simulate a new detection for testing (development only)."""
+    if not app.debug:
+        return jsonify({"error": "Only available in debug mode"}), 403
+    
+    data = request.get_json() or {}
+    
+    # Create a new detection
+    detection = Detection(
+        species=data.get('species', 'Great Horned Owl'),
+        zone=data.get('zone', 'Test Zone'),
+        latitude=data.get('latitude', 46.2044),
+        longitude=data.get('longitude', 6.1432),
+        confidence=data.get('confidence', 0.95),
+        description=data.get('description', 'Simulated detection for testing'),
+        user_id=current_user.id
+    )
+    
+    db.session.add(detection)
+    db.session.commit()
+    
+    # Send real-time notification via WebSocket
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    if hasattr(application, 'websocket_manager'):
+        loop.create_task(application.websocket_manager.notify_new_detection(
+            detection.to_dict(), current_user.id
+        ))
+    
+    # Send notification via notification service
+    notification_service = get_notification_service(db)
+    loop.create_task(notification_service.send_detection_notification(
+        detection.to_dict(), [current_user.id]
+    ))
+    
+    return jsonify({
+        "status": "success", 
+        "message": "Detection simulated",
+        "detection": detection.to_dict()
     })
 
 

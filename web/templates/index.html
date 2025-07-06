@@ -1,43 +1,705 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>NightScan</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NightScan - Wildlife Detection Platform</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .logo i {
+            font-size: 48px;
+            color: #4CAF50;
+        }
+
+        .logo h1 {
+            font-size: 36px;
+            color: #2a5298;
+            font-weight: bold;
+        }
+
+        .user-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-links a {
+            color: #2a5298;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .nav-links a:hover {
+            background: #2a5298;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .nav-links a.dashboard-link {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: 2px solid #4CAF50;
+        }
+
+        .nav-links a.dashboard-link:hover {
+            background: linear-gradient(135deg, #45a049, #3d8b40);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .upload-section, .predictions-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #2a5298;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .file-upload-area {
+            border: 3px dashed #4CAF50;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: rgba(76, 175, 80, 0.05);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-upload-area:hover {
+            background: rgba(76, 175, 80, 0.1);
+            border-color: #45a049;
+        }
+
+        .file-upload-area.dragover {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: #2e7d32;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            font-size: 14px;
+            color: #999;
+        }
+
+        #file {
+            display: none;
+        }
+
+        .quota-info {
+            background: rgba(33, 150, 243, 0.1);
+            border: 2px solid #2196F3;
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 14px;
+            color: #1976D2;
+        }
+
+        .quota-bar {
+            width: 100%;
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .quota-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #FFC107, #f44336);
+            transition: width 0.3s ease;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .predictions-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .prediction-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 4px solid #4CAF50;
+            transition: all 0.3s ease;
+        }
+
+        .prediction-item:hover {
+            background: rgba(76, 175, 80, 0.2);
+            transform: translateX(5px);
+        }
+
+        .prediction-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+        }
+
+        .prediction-info h4 {
+            margin-bottom: 5px;
+            color: #2a5298;
+        }
+
+        .prediction-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+
+        .status-pending {
+            background: #FFF3E0;
+            color: #F57C00;
+        }
+
+        .status-completed {
+            background: #E8F5E8;
+            color: #2E7D32;
+        }
+
+        .status-error {
+            background: #FFEBEE;
+            color: #C62828;
+        }
+
+        .messages {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .message {
+            background: rgba(76, 175, 80, 0.95);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.5s ease;
+        }
+
+        .message.error {
+            background: rgba(244, 67, 54, 0.95);
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .login-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .login-links {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .login-links a {
+            background: linear-gradient(135deg, #2a5298, #1e3c72);
+            color: white;
+            text-decoration: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .login-links a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .connection-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 15px;
+            border-radius: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .user-nav {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <h1>NightScan Audio Prediction</h1>
-  {% if current_user.is_authenticated %}
-  <p>Logged in as {{ current_user.username }} | <a href="{{ url_for('logout') }}">Logout</a></p>
-  <form action="/" method="post" enctype="multipart/form-data">
-    {{ csrf_token() }}
-    <input type="file" name="file" accept="audio/wav" required>
-    <p>Maximum 100 MB per file, 10 GB total for your account. WAV files only.</p>
-    <p>Remaining quota: {{ '%.2f' % (remaining_bytes / (1024 * 1024 * 1024)) }} GB</p>
-    <input type="submit" value="Analyze">
-  </form>
-  {% else %}
-  <p><a href="{{ url_for('login') }}">Login</a> | <a href="{{ url_for('register') }}">Register</a></p>
-  {% endif %}
-  {% if result %}
-  <h2>Result</h2>
-  <pre>{{ result }}</pre>
-  {% endif %}
-  {% if predictions %}
-  <h2>Previous Predictions</h2>
-  <ul>
-    {% for p in predictions %}
-      <li>{{ p.filename }} - {{ p.result }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <ul>
-    {% for message in messages %}
-      <li>{{ message }}</li>
-    {% endfor %}
-    </ul>
-  {% endif %}
-  {% endwith %}
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-moon"></i>
+                <h1>NightScan</h1>
+            </div>
+            
+            {% if current_user.is_authenticated %}
+            <div class="user-nav">
+                <div class="user-info">
+                    <i class="fas fa-user-circle" style="font-size: 24px; color: #4CAF50;"></i>
+                    <span>Welcome, <strong>{{ current_user.username }}</strong></span>
+                </div>
+                <div class="nav-links">
+                    <a href="{{ url_for('dashboard') }}" class="dashboard-link">
+                        <i class="fas fa-tachometer-alt"></i> Live Dashboard
+                    </a>
+                    <a href="{{ url_for('logout') }}">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </header>
+
+        {% if current_user.is_authenticated %}
+        <div class="main-content">
+            <!-- Upload Section -->
+            <div class="upload-section">
+                <div class="section-title">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    Upload Audio File
+                </div>
+                
+                <form action="/" method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+                    {{ csrf_token() }}
+                    
+                    <div class="file-upload-area" onclick="document.getElementById('file').click()" 
+                         ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                        <div class="upload-icon">
+                            <i class="fas fa-file-audio"></i>
+                        </div>
+                        <div class="upload-text">
+                            <strong>Click to upload</strong> or drag and drop
+                        </div>
+                        <div class="upload-hint">
+                            WAV files only, max 100 MB per file
+                        </div>
+                    </div>
+                    
+                    <input type="file" name="file" id="file" accept="audio/wav" required onchange="handleFileSelect(event)">
+                    
+                    <div class="quota-info">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fas fa-database"></i> Storage Used</span>
+                            <span><strong>{{ '%.2f' | format((10*1024*1024*1024 - remaining_bytes) / (1024*1024*1024)) }} GB / 10 GB</strong></span>
+                        </div>
+                        <div class="quota-bar">
+                            <div class="quota-fill" style="width: {{ ((10*1024*1024*1024 - remaining_bytes) / (10*1024*1024*1024) * 100) | round(1) }}%"></div>
+                        </div>
+                        <div style="margin-top: 5px; font-size: 12px;">
+                            Remaining: <strong>{{ '%.2f' | format(remaining_bytes / (1024*1024*1024)) }} GB</strong>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <i class="fas fa-magic"></i>
+                        Analyze Audio
+                    </button>
+                </form>
+            </div>
+
+            <!-- Predictions Section -->
+            <div class="predictions-section">
+                <div class="section-title">
+                    <i class="fas fa-history"></i>
+                    Recent Predictions
+                    <span style="background: #4CAF50; color: white; font-size: 12px; padding: 4px 8px; border-radius: 12px; margin-left: auto;">
+                        {{ predictions|length }}
+                    </span>
+                </div>
+                
+                <div class="predictions-list" id="predictionsList">
+                    {% if predictions %}
+                        {% for p in predictions %}
+                        <div class="prediction-item">
+                            <div class="prediction-icon">
+                                {% if p.result == 'PENDING' %}
+                                    <i class="fas fa-clock"></i>
+                                {% elif 'error' in p.result.lower() or 'failed' in p.result.lower() %}
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                {% else %}
+                                    <i class="fas fa-check"></i>
+                                {% endif %}
+                            </div>
+                            <div class="prediction-info" style="flex: 1;">
+                                <h4>{{ p.filename }}</h4>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                                    <span class="prediction-status {% if p.result == 'PENDING' %}status-pending{% elif 'error' in p.result.lower() or 'failed' in p.result.lower() %}status-error{% else %}status-completed{% endif %}">
+                                        {{ p.result[:50] }}{% if p.result|length > 50 %}...{% endif %}
+                                    </span>
+                                    <small style="color: #666;">{{ '%.1f' | format(p.file_size / (1024*1024)) }} MB</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align: center; color: #666; padding: 40px;">
+                            <i class="fas fa-file-audio" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+                            <p>No predictions yet. Upload an audio file to get started!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Login Section -->
+        <div class="login-section">
+            <div style="font-size: 48px; color: #4CAF50; margin-bottom: 20px;">
+                <i class="fas fa-paw"></i>
+            </div>
+            <h2 style="color: #2a5298; margin-bottom: 15px;">Welcome to NightScan</h2>
+            <p style="color: #666; margin-bottom: 30px; line-height: 1.6;">
+                Advanced wildlife detection using AI-powered audio analysis. 
+                Discover what nocturnal animals are active in your area.
+            </p>
+            
+            <div class="login-links">
+                <a href="{{ url_for('login') }}">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </a>
+                <a href="{{ url_for('register') }}">
+                    <i class="fas fa-user-plus"></i> Register
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Messages -->
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="message {% if 'error' in message.lower() or 'failed' in message.lower() %}error{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Connection Indicator -->
+    {% if current_user.is_authenticated %}
+    <div class="connection-indicator" id="connectionIndicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="connectionText">Connecting...</span>
+    </div>
+    {% endif %}
+
+    <!-- Scripts -->
+    {% if current_user.is_authenticated %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script>
+        let socket;
+
+        // Initialize WebSocket connection
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeWebSocket();
+            
+            // Auto-hide messages after 5 seconds
+            setTimeout(() => {
+                const messages = document.querySelectorAll('.message');
+                messages.forEach(msg => {
+                    msg.style.animation = 'slideOut 0.5s ease forwards';
+                    setTimeout(() => msg.remove(), 500);
+                });
+            }, 5000);
+        });
+
+        function initializeWebSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                updateConnectionStatus(true);
+                
+                // Authenticate user
+                socket.emit('authenticate', {
+                    user_id: {{ current_user.id }},
+                    token: 'user-session-token'
+                });
+                
+                // Subscribe to prediction updates
+                socket.emit('subscribe', {
+                    event_types: ['prediction_complete']
+                });
+            });
+
+            socket.on('disconnect', function() {
+                updateConnectionStatus(false);
+            });
+
+            socket.on('notification', function(data) {
+                if (data.event_type === 'prediction_complete') {
+                    updatePredictionStatus(data.data);
+                    showNotification('Prediction Complete', 
+                        `${data.data.filename} has been processed`);
+                }
+            });
+        }
+
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('statusDot');
+            const text = document.getElementById('connectionText');
+            
+            if (connected) {
+                indicator.style.background = '#4CAF50';
+                text.textContent = 'Connected';
+            } else {
+                indicator.style.background = '#f44336';
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        function updatePredictionStatus(data) {
+            // Update prediction in the list
+            const predictionsList = document.getElementById('predictionsList');
+            // In a real implementation, you would update the specific prediction item
+            console.log('Prediction updated:', data);
+        }
+
+        function showNotification(title, message) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, {
+                    body: message,
+                    icon: '/static/nightscan-icon.png'
+                });
+            }
+        }
+
+        // File upload handlers
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                updateFileInfo(file);
+            }
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const uploadArea = event.target.closest('.file-upload-area');
+            uploadArea.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'audio/wav' || file.name.toLowerCase().endsWith('.wav')) {
+                    document.getElementById('file').files = files;
+                    updateFileInfo(file);
+                } else {
+                    showMessage('Please select a WAV file', 'error');
+                }
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.target.closest('.file-upload-area').classList.add('dragover');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.target.closest('.file-upload-area').classList.remove('dragover');
+        }
+
+        function updateFileInfo(file) {
+            const uploadText = document.querySelector('.upload-text');
+            uploadText.innerHTML = `<strong>Selected:</strong> ${file.name}<br><small>${(file.size / (1024*1024)).toFixed(1)} MB</small>`;
+        }
+
+        function showMessage(text, type = 'success') {
+            const messagesContainer = document.querySelector('.messages') || createMessagesContainer();
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            messagesContainer.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.style.animation = 'slideOut 0.5s ease forwards';
+                setTimeout(() => messageDiv.remove(), 500);
+            }, 5000);
+        }
+
+        function createMessagesContainer() {
+            const container = document.createElement('div');
+            container.className = 'messages';
+            document.body.appendChild(container);
+            return container;
+        }
+
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    </script>
+
+    <style>
+        @keyframes slideOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(100px); }
+        }
+    </style>
+    {% endif %}
 </body>
 </html>
