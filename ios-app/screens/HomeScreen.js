@@ -63,6 +63,11 @@ export default function HomeScreen({ navigation }) {
         title="🎤 Sensibilité Microphone" 
         onPress={() => navigation.navigate('AudioThreshold')} 
       />
+      <View style={styles.spacing} />
+      <Button 
+        title="🔋 Gestion Énergétique" 
+        onPress={() => navigation.navigate('EnergyManagement')} 
+      />
     </View>
   );
 }

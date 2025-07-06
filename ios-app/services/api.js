@@ -649,5 +649,97 @@ export async function getLiveAudioLevels() {
   return apiService.getLiveAudioLevels();
 }
 
+// Energy management functions
+export async function getEnergyStatus() {
+  try {
+    const response = await fetch(`${PI_SERVICE_URL}/energy/status`);
+    if (!response.ok) {
+      throw new Error(`Energy status request failed: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Energy status error:', error);
+    throw error;
+  }
+}
+
+export async function activateWifi(durationMinutes = 10) {
+  try {
+    const response = await fetch(`${PI_SERVICE_URL}/energy/wifi/activate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ duration_minutes: durationMinutes }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to activate WiFi');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('WiFi activation error:', error);
+    throw error;
+  }
+}
+
+export async function deactivateWifi() {
+  try {
+    const response = await fetch(`${PI_SERVICE_URL}/energy/wifi/deactivate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to deactivate WiFi');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('WiFi deactivation error:', error);
+    throw error;
+  }
+}
+
+export async function extendWifi(additionalMinutes = 10) {
+  try {
+    const response = await fetch(`${PI_SERVICE_URL}/energy/wifi/extend`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ additional_minutes: additionalMinutes }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to extend WiFi');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('WiFi extend error:', error);
+    throw error;
+  }
+}
+
+export async function getWifiStatus() {
+  try {
+    const response = await fetch(`${PI_SERVICE_URL}/energy/wifi/status`);
+    if (!response.ok) {
+      throw new Error(`WiFi status request failed: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('WiFi status error:', error);
+    throw error;
+  }
+}
+
 // Export the enhanced service
 export default apiService;

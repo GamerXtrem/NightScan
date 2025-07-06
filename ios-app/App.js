@@ -15,6 +15,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import CameraPreviewScreen from './screens/CameraPreviewScreen';
 import PiInstallationScreen from './screens/PiInstallationScreen';
 import AudioThresholdScreen from './screens/AudioThresholdScreen';
+import EnergyManagementScreen from './screens/EnergyManagementScreen';
 import { AppProvider, AppContext } from './AppContext';
 import { initializeNotificationService, setupNotificationActionHandlers, removeNotificationListeners, handleWebSocketNotification } from './services/notifications';
 import websocketService from './services/websocket';
@@ -222,6 +223,15 @@ function RootNavigator() {
           component={AudioThresholdScreen}
           options={{
             title: 'Audio Threshold',
+            headerShown: false,
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen 
+          name="EnergyManagement" 
+          component={EnergyManagementScreen}
+          options={{
+            title: 'Energy Management',
             headerShown: false,
             presentation: 'modal',
           }}

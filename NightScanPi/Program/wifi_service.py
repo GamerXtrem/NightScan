@@ -13,6 +13,7 @@ from flask_cors import CORS
 from . import wifi_config
 from . import camera_trigger
 from . import audio_threshold
+from .utils.smart_scheduler import get_wifi_manager, get_process_manager
 
 
 class CameraPreviewService:
@@ -397,6 +398,104 @@ def create_app(config_path: Path | None = None) -> Flask:
                 "threshold_db": detector.config.threshold_db,
                 "noise_floor_db": detector.adaptive_noise_floor,
                 "above_threshold": current_db > detector.config.threshold_db,
+                "timestamp": time.time()
+            })
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # Energy management endpoints
+    @app.get("/energy/status")
+    def get_energy_status():
+        """Get current energy management status."""
+        try:
+            process_manager = get_process_manager()
+            status = process_manager.get_system_status()
+            return jsonify(status)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.post("/energy/wifi/activate")
+    def activate_wifi():
+        """Activate WiFi for specified duration."""
+        try:
+            data = request.get_json() or {}
+            duration_minutes = data.get('duration_minutes', 10)
+            
+            if not isinstance(duration_minutes, (int, float)) or duration_minutes < 1 or duration_minutes > 120:
+                return jsonify({"error": "Duration must be between 1 and 120 minutes"}), 400
+            
+            wifi_manager = get_wifi_manager()
+            success = wifi_manager.activate_wifi(int(duration_minutes))
+            
+            if success:
+                return jsonify({
+                    "status": "activated",
+                    "duration_minutes": duration_minutes,
+                    "message": f"WiFi activated for {duration_minutes} minutes"
+                })
+            else:
+                return jsonify({"error": "Failed to activate WiFi"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.post("/energy/wifi/deactivate")
+    def deactivate_wifi():
+        """Deactivate WiFi immediately."""
+        try:
+            wifi_manager = get_wifi_manager()
+            success = wifi_manager.deactivate_wifi()
+            
+            if success:
+                return jsonify({
+                    "status": "deactivated",
+                    "message": "WiFi deactivated successfully"
+                })
+            else:
+                return jsonify({"error": "Failed to deactivate WiFi"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.post("/energy/wifi/extend")
+    def extend_wifi():
+        """Extend current WiFi session."""
+        try:
+            data = request.get_json() or {}
+            additional_minutes = data.get('additional_minutes', 10)
+            
+            if not isinstance(additional_minutes, (int, float)) or additional_minutes < 1 or additional_minutes > 60:
+                return jsonify({"error": "Additional time must be between 1 and 60 minutes"}), 400
+            
+            wifi_manager = get_wifi_manager()
+            
+            if not wifi_manager.is_wifi_active():
+                return jsonify({"error": "WiFi is not currently active"}), 400
+            
+            success = wifi_manager.extend_wifi_session(int(additional_minutes))
+            
+            if success:
+                return jsonify({
+                    "status": "extended",
+                    "additional_minutes": additional_minutes,
+                    "message": f"WiFi session extended by {additional_minutes} minutes"
+                })
+            else:
+                return jsonify({"error": "Failed to extend WiFi session"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.get("/energy/wifi/status")
+    def get_wifi_status():
+        """Get WiFi activation status."""
+        try:
+            wifi_manager = get_wifi_manager()
+            is_active = wifi_manager.is_wifi_active()
+            
+            return jsonify({
+                "wifi_active": is_active,
                 "timestamp": time.time()
             })
             
