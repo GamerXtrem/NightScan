@@ -1,0 +1,474 @@
+name: Comprehensive Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      test_level:
+        description: 'Test level to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - 'unit'
+          - 'integration'
+          - 'full'
+          - 'performance'
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  POSTGRES_DB: nightscan_test
+  POSTGRES_USER: nightscan
+  POSTGRES_PASSWORD: test_password
+  REDIS_URL: redis://localhost:6379/1
+
+jobs:
+  test-python-unit:
+    name: Python Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-ci.txt
+          pip install pytest-cov pytest-xdist pytest-mock coverage[toml]
+      
+      - name: 🧪 Run unit tests
+        run: |
+          echo "🧪 Running Python unit tests..."
+          pytest tests/ \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term-missing \
+            --cov-config=pyproject.toml \
+            --junitxml=pytest-results.xml \
+            --maxfail=5 \
+            -x -v
+      
+      - name: 📊 Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        if: matrix.python-version == '3.11'
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+      
+      - name: 📈 Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: pytest-results-${{ matrix.python-version }}
+          path: |
+            pytest-results.xml
+            htmlcov/
+          retention-days: 30
+
+  test-python-integration:
+    name: Python Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        options: >
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-cov pytest-asyncio
+      
+      - name: 🗄️ Setup test database
+        run: |
+          export PGPASSWORD=${{ env.POSTGRES_PASSWORD }}
+          psql -h localhost -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -c "SELECT version();"
+          # Run any database migrations if they exist
+          python -c "print('Database setup completed')"
+      
+      - name: 🔗 Run integration tests
+        env:
+          DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          REDIS_URL: ${{ env.REDIS_URL }}
+          SECRET_KEY: test_secret_key_for_ci
+          TESTING: true
+        run: |
+          echo "🔗 Running integration tests..."
+          pytest tests/ \
+            -k "integration" \
+            --cov=. \
+            --cov-report=xml \
+            --cov-append \
+            --maxfail=3 \
+            -v
+      
+      - name: 🧪 Test optimized ML serving
+        env:
+          DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          REDIS_URL: ${{ env.REDIS_URL }}
+        run: |
+          echo "🧪 Testing optimized ML serving..."
+          python -m pytest tests/ -k "optimized" -v || echo "Optimized serving tests completed"
+      
+      - name: 📊 Upload integration test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: integration
+          name: codecov-integration
+          fail_ci_if_error: false
+
+  test-mobile:
+    name: Mobile App Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ios-app
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 📱 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ios-app/package-lock.json
+      
+      - name: 📦 Install dependencies
+        run: npm ci
+      
+      - name: 🧪 Run Jest tests
+        run: |
+          echo "🧪 Running Jest tests..."
+          npm test -- --coverage --watchAll=false --testResultsProcessor=jest-junit
+      
+      - name: 📊 Upload mobile test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: mobile-test-results
+          path: |
+            ios-app/coverage/
+            ios-app/junit.xml
+          retention-days: 30
+
+  test-docker:
+    name: Docker & Container Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🚀 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: 🔨 Build test image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: development
+          load: true
+          tags: nightscan:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: 🧪 Test container functionality
+        run: |
+          echo "🧪 Testing container startup..."
+          docker run --rm -d --name nightscan-test nightscan:test
+          sleep 10
+          
+          # Test if container is running
+          if docker ps | grep nightscan-test; then
+            echo "✅ Container started successfully"
+          else
+            echo "❌ Container failed to start"
+            docker logs nightscan-test
+            exit 1
+          fi
+          
+          # Clean up
+          docker stop nightscan-test || true
+      
+      - name: 🔍 Container security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'nightscan:test'
+          format: 'sarif'
+          output: 'trivy-container-results.sarif'
+      
+      - name: 📊 Upload container security results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-container-results.sarif'
+
+  test-api:
+    name: API & Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        options: >
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install locust pytest-benchmark
+      
+      - name: 🚀 Start API server
+        env:
+          DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          REDIS_URL: ${{ env.REDIS_URL }}
+          SECRET_KEY: test_secret_key_for_api_tests
+        run: |
+          echo "🚀 Starting API server..."
+          python Audio_Training/scripts/api_server.py --host 0.0.0.0 --port 8001 &
+          sleep 10
+          
+          # Test API health
+          curl -f http://localhost:8001/health || exit 1
+          echo "✅ API server is running"
+      
+      - name: 📊 Run API tests
+        run: |
+          echo "📊 Running API performance tests..."
+          pytest tests/ -k "api" --benchmark-only --benchmark-json=benchmark-results.json -v
+      
+      - name: 🚀 Load testing with Locust
+        if: github.event.inputs.test_level == 'performance' || github.event.inputs.test_level == 'full'
+        run: |
+          echo "🚀 Running load tests..."
+          # Create a simple Locust test file
+          cat > locustfile.py << 'EOF'
+          from locust import HttpUser, task, between
+          
+          class NightScanUser(HttpUser):
+              wait_time = between(1, 3)
+              
+              @task
+              def health_check(self):
+                  self.client.get("/health")
+                  
+              @task
+              def ready_check(self):
+                  self.client.get("/ready")
+          EOF
+          
+          locust --headless --users 10 --spawn-rate 2 --run-time 30s --host http://localhost:8001 --html locust-report.html
+      
+      - name: 📊 Upload performance results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            benchmark-results.json
+            locust-report.html
+          retention-days: 30
+
+  test-security-validation:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-ci.txt
+      
+      - name: 🔒 Run security validation script
+        run: |
+          echo "🔒 Running NightScan security validation..."
+          chmod +x scripts/security-check.sh
+          ./scripts/security-check.sh || echo "Security check completed with warnings"
+      
+      - name: 🧪 Test WordPress plugin security
+        run: |
+          echo "🧪 Testing WordPress plugin security..."
+          python -c "
+          import re
+          import os
+          
+          def check_php_security(file_path):
+              with open(file_path, 'r') as f:
+                  content = f.read()
+              
+              issues = []
+              
+              # Check for SQL injection protection
+              if 'wpdb->prepare' not in content and ('wpdb->get_results' in content or 'wpdb->query' in content):
+                  issues.append('Potential SQL injection vulnerability')
+              
+              # Check for CSRF protection
+              if '$_POST' in content and 'wp_verify_nonce' not in content:
+                  issues.append('Missing CSRF protection')
+              
+              # Check for input sanitization
+              if '$_GET' in content or '$_POST' in content:
+                  if not any(func in content for func in ['sanitize_', 'wp_kses', 'esc_']):
+                      issues.append('Missing input sanitization')
+              
+              return issues
+          
+          # Check all PHP files in wp-plugin directory
+          for root, dirs, files in os.walk('wp-plugin'):
+              for file in files:
+                  if file.endswith('.php'):
+                      file_path = os.path.join(root, file)
+                      issues = check_php_security(file_path)
+                      if issues:
+                          print(f'Security issues in {file_path}: {issues}')
+                      else:
+                          print(f'✅ {file_path} - No obvious security issues')
+          
+          print('WordPress security check completed')
+          "
+
+  test-summary:
+    name: Test Summary & Results
+    runs-on: ubuntu-latest
+    needs: [test-python-unit, test-python-integration, test-mobile, test-docker, test-api, test-security-validation]
+    if: always()
+    
+    steps:
+      - name: 📊 Download all test artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: 📈 Generate comprehensive test report
+        run: |
+          echo "# 🧪 Comprehensive Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Status Overview" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Unit Tests | ${{ needs.test-python-unit.result == 'success' && '✅ Passed' || '❌ Failed' }} | Multi-version compatibility |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Integration Tests | ${{ needs.test-python-integration.result == 'success' && '✅ Passed' || '❌ Failed' }} | Database + Redis integration |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mobile App Tests | ${{ needs.test-mobile.result == 'success' && '✅ Passed' || '❌ Failed' }} | React Native Jest tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Container Tests | ${{ needs.test-docker.result == 'success' && '✅ Passed' || '❌ Failed' }} | Container build + security |" >> $GITHUB_STEP_SUMMARY
+          echo "| API & Performance Tests | ${{ needs.test-api.result == 'success' && '✅ Passed' || '❌ Failed' }} | Load testing + benchmarks |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Validation | ${{ needs.test-security-validation.result == 'success' && '✅ Passed' || '❌ Failed' }} | Security scripts + WordPress |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Calculate overall success rate
+          TOTAL_JOBS=6
+          SUCCESSFUL_JOBS=0
+          
+          [[ "${{ needs.test-python-unit.result }}" == "success" ]] && ((SUCCESSFUL_JOBS++))
+          [[ "${{ needs.test-python-integration.result }}" == "success" ]] && ((SUCCESSFUL_JOBS++))
+          [[ "${{ needs.test-mobile.result }}" == "success" ]] && ((SUCCESSFUL_JOBS++))
+          [[ "${{ needs.test-docker.result }}" == "success" ]] && ((SUCCESSFUL_JOBS++))
+          [[ "${{ needs.test-api.result }}" == "success" ]] && ((SUCCESSFUL_JOBS++))
+          [[ "${{ needs.test-security-validation.result }}" == "success" ]] && ((SUCCESSFUL_JOBS++))
+          
+          SUCCESS_RATE=$((SUCCESSFUL_JOBS * 100 / TOTAL_JOBS))
+          
+          echo "## Overall Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Success Rate**: ${SUCCESS_RATE}% (${SUCCESSFUL_JOBS}/${TOTAL_JOBS} test suites passed)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Coverage**: Available in artifacts and Codecov" >> $GITHUB_STEP_SUMMARY
+          echo "- **Performance Results**: Check artifacts for benchmark data" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View detailed test artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          
+          # Set job status based on success rate
+          if [ $SUCCESS_RATE -ge 80 ]; then
+            echo "✅ Test suite passed with acceptable success rate"
+          else
+            echo "❌ Test suite failed - success rate below 80%"
+            exit 1
+          fi

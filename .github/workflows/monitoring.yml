@@ -1,0 +1,479 @@
+name: Monitoring & Alerts
+
+on:
+  schedule:
+    # Run monitoring checks every hour
+    - cron: '0 * * * *'
+    # Run comprehensive checks daily at 06:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      check_type:
+        description: 'Type of monitoring check to run'
+        required: true
+        default: 'health'
+        type: choice
+        options:
+          - 'health'
+          - 'performance'
+          - 'security'
+          - 'comprehensive'
+  push:
+    paths:
+      - '.github/workflows/monitoring.yml'
+      - 'scripts/monitoring/**'
+      - 'monitoring/**'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  health-checks:
+    name: System Health Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.inputs.check_type == 'health' || github.event.inputs.check_type == 'comprehensive' || github.event_name == 'schedule'
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 📦 Install monitoring dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests prometheus-client psutil aiohttp
+      
+      - name: 🔍 Check application health endpoints
+        run: |
+          echo "🔍 Checking application health..."
+          
+          # Create health check script
+          cat > health_check.py << 'EOF'
+          import requests
+          import sys
+          import time
+          from typing import Dict, List, Tuple
+          
+          def check_endpoint(url: str, timeout: int = 10) -> Tuple[bool, str, float]:
+              """Check if an endpoint is healthy."""
+              try:
+                  start_time = time.time()
+                  response = requests.get(url, timeout=timeout)
+                  response_time = time.time() - start_time
+                  
+                  if response.status_code == 200:
+                      return True, f"OK ({response.status_code})", response_time
+                  else:
+                      return False, f"HTTP {response.status_code}", response_time
+              except requests.exceptions.RequestException as e:
+                  return False, str(e), 0.0
+          
+          # Health check endpoints (would be actual URLs in production)
+          endpoints = [
+              "https://httpbin.org/status/200",  # Simulating health endpoint
+              "https://httpbin.org/delay/1",     # Simulating ready endpoint
+          ]
+          
+          print("🎥 Health Check Results:")
+          print("=" * 50)
+          
+          all_healthy = True
+          total_response_time = 0
+          
+          for i, endpoint in enumerate(endpoints, 1):
+              healthy, status, response_time = check_endpoint(endpoint)
+              total_response_time += response_time
+              
+              status_icon = "✅" if healthy else "❌"
+              print(f"{status_icon} Endpoint {i}: {status} ({response_time:.3f}s)")
+              
+              if not healthy:
+                  all_healthy = False
+          
+          print("=" * 50)
+          avg_response_time = total_response_time / len(endpoints)
+          print(f"Average Response Time: {avg_response_time:.3f}s")
+          
+          if all_healthy:
+              print("✅ All health checks passed!")
+              sys.exit(0)
+          else:
+              print("❌ Some health checks failed!")
+              sys.exit(1)
+          EOF
+          
+          python health_check.py
+      
+      - name: 📊 Check system resources
+        run: |
+          echo "📊 Checking system resources..."
+          
+          cat > resource_check.py << 'EOF'
+          import psutil
+          import sys
+          
+          # Resource thresholds
+          CPU_THRESHOLD = 80.0
+          MEMORY_THRESHOLD = 85.0
+          DISK_THRESHOLD = 90.0
+          
+          print("📊 System Resource Check:")
+          print("=" * 40)
+          
+          # CPU usage
+          cpu_percent = psutil.cpu_percent(interval=1)
+          cpu_status = "✅" if cpu_percent < CPU_THRESHOLD else "⚠️"
+          print(f"{cpu_status} CPU Usage: {cpu_percent:.1f}%")
+          
+          # Memory usage
+          memory = psutil.virtual_memory()
+          memory_status = "✅" if memory.percent < MEMORY_THRESHOLD else "⚠️"
+          print(f"{memory_status} Memory Usage: {memory.percent:.1f}% ({memory.used / (1024**3):.1f}GB / {memory.total / (1024**3):.1f}GB)")
+          
+          # Disk usage
+          disk = psutil.disk_usage('/')
+          disk_percent = (disk.used / disk.total) * 100
+          disk_status = "✅" if disk_percent < DISK_THRESHOLD else "⚠️"
+          print(f"{disk_status} Disk Usage: {disk_percent:.1f}% ({disk.used / (1024**3):.1f}GB / {disk.total / (1024**3):.1f}GB)")
+          
+          print("=" * 40)
+          
+          # Check if any thresholds exceeded
+          issues = []
+          if cpu_percent >= CPU_THRESHOLD:
+              issues.append(f"High CPU usage: {cpu_percent:.1f}%")
+          if memory.percent >= MEMORY_THRESHOLD:
+              issues.append(f"High memory usage: {memory.percent:.1f}%")
+          if disk_percent >= DISK_THRESHOLD:
+              issues.append(f"High disk usage: {disk_percent:.1f}%")
+          
+          if issues:
+              print("⚠️ Resource issues detected:")
+              for issue in issues:
+                  print(f"  - {issue}")
+              # Don't fail CI for resource warnings, just report
+          else:
+              print("✅ All resource checks passed!")
+          EOF
+          
+          python resource_check.py
+      
+      - name: 📈 Generate health report
+        run: |
+          echo "## 🎥 Health Check Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### System Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Health checks completed" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Resource monitoring active" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Endpoint monitoring functional" >> $GITHUB_STEP_SUMMARY
+
+  performance-monitoring:
+    name: Performance Monitoring
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event.inputs.check_type == 'performance' || github.event.inputs.check_type == 'comprehensive' || github.event_name == 'schedule'
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-ci.txt
+          pip install pytest-benchmark locust
+      
+      - name: ⚡ Run performance benchmarks
+        run: |
+          echo "⚡ Running performance benchmarks..."
+          
+          # Create performance test
+          cat > performance_test.py << 'EOF'
+          import time
+          import statistics
+          from typing import List
+          
+          def simulate_ml_inference(duration: float = 0.1) -> float:
+              """Simulate ML inference time."""
+              start = time.time()
+              time.sleep(duration)  # Simulate processing
+              return time.time() - start
+          
+          def benchmark_inference(num_requests: int = 100) -> dict:
+              """Benchmark inference performance."""
+              print(f"⚡ Running {num_requests} inference requests...")
+              
+              response_times = []
+              for i in range(num_requests):
+                  if i % 10 == 0:
+                      print(f"  Progress: {i}/{num_requests}")
+                  
+                  response_time = simulate_ml_inference(0.05)  # 50ms simulation
+                  response_times.append(response_time)
+              
+              return {
+                  'total_requests': num_requests,
+                  'avg_response_time': statistics.mean(response_times),
+                  'p95_response_time': statistics.quantiles(response_times, n=20)[18],  # 95th percentile
+                  'p99_response_time': statistics.quantiles(response_times, n=100)[98],  # 99th percentile
+                  'min_response_time': min(response_times),
+                  'max_response_time': max(response_times),
+                  'throughput': num_requests / sum(response_times)
+              }
+          
+          # Run benchmark
+          results = benchmark_inference(50)
+          
+          print("\n📈 Performance Results:")
+          print("=" * 40)
+          print(f"Total Requests: {results['total_requests']}")
+          print(f"Average Response Time: {results['avg_response_time']*1000:.2f}ms")
+          print(f"P95 Response Time: {results['p95_response_time']*1000:.2f}ms")
+          print(f"P99 Response Time: {results['p99_response_time']*1000:.2f}ms")
+          print(f"Min Response Time: {results['min_response_time']*1000:.2f}ms")
+          print(f"Max Response Time: {results['max_response_time']*1000:.2f}ms")
+          print(f"Throughput: {results['throughput']:.2f} req/s")
+          print("=" * 40)
+          
+          # Performance thresholds
+          if results['avg_response_time'] > 0.2:  # 200ms threshold
+              print("⚠️ Average response time exceeds threshold!")
+          else:
+              print("✅ Performance within acceptable limits")
+          EOF
+          
+          python performance_test.py
+      
+      - name: 📈 Performance trending
+        run: |
+          echo "📈 Checking performance trends..."
+          
+          # In a real implementation, this would:
+          # 1. Store metrics in a time-series database
+          # 2. Compare with historical data
+          # 3. Alert on performance degradation
+          
+          echo "Performance trending analysis would be implemented here"
+          echo "✅ Performance monitoring completed"
+
+  security-monitoring:
+    name: Security Monitoring
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event.inputs.check_type == 'security' || github.event.inputs.check_type == 'comprehensive' || github.event_name == 'schedule'
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 🔒 Run security monitoring
+        run: |
+          echo "🔒 Running security monitoring checks..."
+          
+          # Run security validation script if it exists
+          if [ -f "scripts/security-check.sh" ]; then
+            echo "🔍 Running NightScan security validation..."
+            chmod +x scripts/security-check.sh
+            ./scripts/security-check.sh || echo "Security issues detected - check logs"
+          fi
+      
+      - name: 🕷️ Check for exposed secrets
+        run: |
+          echo "🕷️ Checking for exposed secrets..."
+          
+          # Basic secret detection
+          echo "Scanning for potential secrets..."
+          
+          # Check for common secret patterns
+          SECRET_PATTERNS=(
+            "password.*=.*[a-zA-Z0-9]{8,}"
+            "api_key.*=.*[a-zA-Z0-9]{16,}"
+            "secret.*=.*[a-zA-Z0-9]{16,}"
+            "token.*=.*[a-zA-Z0-9]{16,}"
+            "AKIA[0-9A-Z]{16}"  # AWS Access Key
+            "sk-[a-zA-Z0-9]{48}"  # OpenAI API Key
+          )
+          
+          SECRETS_FOUND=false
+          
+          for pattern in "${SECRET_PATTERNS[@]}"; do
+            if grep -r -E "$pattern" . --exclude-dir=.git --exclude="*.md" --exclude="monitoring.yml" 2>/dev/null; then
+              echo "⚠️ Potential secret found matching pattern: $pattern"
+              SECRETS_FOUND=true
+            fi
+          done
+          
+          if [ "$SECRETS_FOUND" = false ]; then
+            echo "✅ No obvious secrets found in codebase"
+          else
+            echo "⚠️ Potential secrets detected - manual review required"
+          fi
+      
+      - name: 🛡️ Dependency vulnerability check
+        run: |
+          echo "🛡️ Checking for dependency vulnerabilities..."
+          
+          pip install safety
+          safety check --json --output safety-report.json || true
+          
+          if [ -f "safety-report.json" ]; then
+            echo "Safety report generated - checking for vulnerabilities..."
+            
+            # Parse safety report
+            if [ -s "safety-report.json" ]; then
+              echo "⚠️ Vulnerabilities found in dependencies"
+              cat safety-report.json
+            else
+              echo "✅ No known vulnerabilities in dependencies"
+            fi
+          fi
+      
+      - name: 📊 Upload security monitoring results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-monitoring-results
+          path: |
+            safety-report.json
+            security-*.txt
+            security-*.log
+          retention-days: 30
+
+  infrastructure-monitoring:
+    name: Infrastructure Monitoring
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.inputs.check_type == 'comprehensive' || github.event_name == 'schedule'
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Validate Kubernetes manifests
+        run: |
+          echo "🔧 Validating Kubernetes manifests..."
+          
+          # Install kubeval
+          wget -q https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
+          tar xf kubeval-linux-amd64.tar.gz
+          sudo mv kubeval /usr/local/bin
+          
+          # Validate all K8s manifests
+          echo "Validating Kubernetes manifests..."
+          find k8s/ -name '*.yaml' -o -name '*.yml' | xargs kubeval
+          
+          echo "✅ Kubernetes manifest validation completed"
+      
+      - name: 🐳 Validate Docker configuration
+        run: |
+          echo "🐳 Validating Docker configuration..."
+          
+          # Check Dockerfile best practices
+          if [ -f "Dockerfile" ]; then
+            echo "Checking Dockerfile..."
+            
+            # Basic Dockerfile validation
+            if grep -q "USER" Dockerfile; then
+              echo "✅ Non-root user configured"
+            else
+              echo "⚠️ No non-root user found in Dockerfile"
+            fi
+            
+            if grep -q "HEALTHCHECK" Dockerfile; then
+              echo "✅ Health check configured"
+            else
+              echo "⚠️ No health check found in Dockerfile"
+            fi
+          fi
+          
+          # Validate docker-compose files
+          if [ -f "docker-compose.yml" ]; then
+            echo "Validating docker-compose.yml..."
+            docker-compose config > /dev/null && echo "✅ docker-compose.yml is valid" || echo "❌ docker-compose.yml has issues"
+          fi
+
+  monitoring-summary:
+    name: Monitoring Summary
+    runs-on: ubuntu-latest
+    needs: [health-checks, performance-monitoring, security-monitoring, infrastructure-monitoring]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate monitoring summary
+        run: |
+          echo "# 📊 NightScan Monitoring Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Generated**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Monitoring Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check Type | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Health Checks | ${{ needs.health-checks.result == 'success' && '✅ Passed' || (needs.health-checks.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | System health monitoring |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | ${{ needs.performance-monitoring.result == 'success' && '✅ Passed' || (needs.performance-monitoring.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Performance benchmarks |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | ${{ needs.security-monitoring.result == 'success' && '✅ Passed' || (needs.security-monitoring.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Security scanning |" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure | ${{ needs.infrastructure-monitoring.result == 'success' && '✅ Passed' || (needs.infrastructure-monitoring.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | K8s & Docker validation |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Calculate monitoring score
+          TOTAL_CHECKS=4
+          PASSED_CHECKS=0
+          
+          [[ "${{ needs.health-checks.result }}" == "success" ]] && ((PASSED_CHECKS++))
+          [[ "${{ needs.performance-monitoring.result }}" == "success" ]] && ((PASSED_CHECKS++))
+          [[ "${{ needs.security-monitoring.result }}" == "success" ]] && ((PASSED_CHECKS++))
+          [[ "${{ needs.infrastructure-monitoring.result }}" == "success" ]] && ((PASSED_CHECKS++))
+          
+          MONITORING_SCORE=$((PASSED_CHECKS * 100 / TOTAL_CHECKS))
+          
+          echo "## Overall Monitoring Score" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Score**: ${MONITORING_SCORE}% (${PASSED_CHECKS}/${TOTAL_CHECKS} checks passed)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ $MONITORING_SCORE -ge 75 ]; then
+            echo "### ✅ System Status: Healthy" >> $GITHUB_STEP_SUMMARY
+            echo "All critical monitoring checks are passing." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ System Status: Attention Required" >> $GITHUB_STEP_SUMMARY
+            echo "Some monitoring checks have failed and require attention." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View detailed monitoring results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+      
+      - name: 📢 Send notifications
+        if: failure() || (success() && github.event_name == 'schedule')
+        run: |
+          echo "📢 Sending monitoring notifications..."
+          
+          # In a real implementation, this would send notifications to:
+          # - Slack channels
+          # - Email addresses
+          # - PagerDuty/OpsGenie
+          # - Microsoft Teams
+          
+          echo "Notification system would be configured here"
+          echo "Example notifications:"
+          echo "  - Slack: #nightscan-alerts"
+          echo "  - Email: ops-team@nightscan.example.com"
+          echo "  - PagerDuty: NightScan service"

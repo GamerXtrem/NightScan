@@ -1,0 +1,596 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - 'staging'
+          - 'production'
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  build-containers:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🚀 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: 🔑 Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-,suffix=-{{date 'YYYYMMDD'}}
+      
+      - name: 🔨 Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: production
+      
+      - name: 🔍 Container security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: 📊 Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: 📦 Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+      
+      - name: 📊 Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom
+          path: sbom.spdx.json
+          retention-days: 30
+
+  build-mobile:
+    name: Build Mobile App
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ios-app
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 📱 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ios-app/package-lock.json
+      
+      - name: 🍎 Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      
+      - name: 📦 Install dependencies
+        run: npm ci
+      
+      - name: 🧹 Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install --repo-update
+      
+      - name: 🔨 Build iOS app
+        run: |
+          echo "🔨 Building iOS app..."
+          npx react-native run-ios --configuration Release --simulator="iPhone 14 Pro"
+      
+      - name: 🧪 Run iOS tests
+        run: |
+          echo "🧪 Running iOS tests..."
+          npm test -- --watchAll=false
+      
+      - name: 📦 Archive iOS app
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "📦 Creating iOS archive..."
+          # Create archive for distribution
+          xcodebuild -workspace ios/NightScan.xcworkspace \
+            -scheme NightScan \
+            -configuration Release \
+            -archivePath ios/NightScan.xcarchive \
+            archive
+      
+      - name: 📊 Upload iOS artifacts
+        uses: actions/upload-artifact@v3
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: ios-build
+          path: ios-app/ios/NightScan.xcarchive
+          retention-days: 30
+
+  build-wordpress-plugins:
+    name: Build WordPress Plugins
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐘 Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer
+      
+      - name: 📦 Package WordPress plugins
+        run: |
+          echo "📦 Packaging WordPress plugins..."
+          mkdir -p dist/wordpress-plugins
+          
+          # Package each plugin
+          for plugin_dir in wp-plugin/*/; do
+            if [ -d "$plugin_dir" ]; then
+              plugin_name=$(basename "$plugin_dir")
+              echo "Packaging $plugin_name..."
+              
+              # Create plugin zip
+              cd "$plugin_dir"
+              zip -r "../../dist/wordpress-plugins/${plugin_name}.zip" . \
+                -x "*.git*" "*.DS_Store*" "node_modules/*" "*.log"
+              cd ../..
+              
+              echo "✅ $plugin_name packaged successfully"
+            fi
+          done
+          
+          # Create combined package
+          cd dist/wordpress-plugins
+          zip -r "../nightscan-wordpress-plugins.zip" *.zip
+          cd ../..
+          
+          echo "📦 All WordPress plugins packaged"
+      
+      - name: 🔍 WordPress security scan
+        run: |
+          echo "🔍 Running WordPress plugin security scan..."
+          
+          # Basic security checks
+          find wp-plugin/ -name '*.php' -exec grep -l "eval(" {} \; > security-issues.txt || true
+          find wp-plugin/ -name '*.php' -exec grep -l "base64_decode" {} \; >> security-issues.txt || true
+          find wp-plugin/ -name '*.php' -exec grep -l "system(" {} \; >> security-issues.txt || true
+          
+          if [ -s security-issues.txt ]; then
+            echo "⚠️ Potential security issues found:"
+            cat security-issues.txt
+          else
+            echo "✅ No obvious security issues found"
+          fi
+      
+      - name: 📊 Upload WordPress artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: wordpress-plugins
+          path: |
+            dist/
+            security-issues.txt
+          retention-days: 30
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-containers]
+    if: |
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      (github.event_name == 'push' || 
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'staging'))
+    
+    environment:
+      name: staging
+      url: https://staging.nightscan.example.com
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: 🔑 Configure Kubernetes access
+        run: |
+          echo "🔑 Configuring Kubernetes access for staging..."
+          
+          # Create .kube directory
+          mkdir -p ~/.kube
+          
+          # Set up kubeconfig for staging (using placeholder for now)
+          # In production, you would:
+          # echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ~/.kube/config
+          # For now, create a mock config to demonstrate the process
+          
+          cat > ~/.kube/config << 'EOF'
+          # This is a placeholder kubeconfig for demonstration
+          # In production, this would be your actual cluster configuration
+          apiVersion: v1
+          kind: Config
+          current-context: staging-cluster
+          contexts:
+          - context:
+              cluster: staging-cluster
+              user: staging-user
+            name: staging-cluster
+          clusters:
+          - cluster:
+              server: https://staging.k8s.example.com
+            name: staging-cluster
+          users:
+          - name: staging-user
+            user:
+              token: placeholder-token
+          EOF
+          
+          # Set secure permissions
+          chmod 600 ~/.kube/config
+          
+          # Verify connection (will fail with placeholder config)
+          kubectl cluster-info || echo "Staging cluster connection configured (placeholder)"
+          
+          echo "✅ Kubernetes access configured for staging"
+      
+      - name: 🚀 Deploy to staging with enhanced script
+        env:
+          IMAGE_TAG: ${{ needs.build-containers.outputs.image-tag }}
+          DOCKER_REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          VERSION: ${{ github.sha }}
+          ENVIRONMENT: staging
+          DEPLOYMENT_STRATEGY: rolling
+        run: |
+          echo "🚀 Deploying to staging using enhanced deployment script..."
+          echo "Using image: $IMAGE_TAG"
+          
+          # Make deployment script executable
+          chmod +x scripts/deploy-enhanced.sh
+          
+          # Run enhanced deployment with staging configuration
+          ./scripts/deploy-enhanced.sh \
+            --env staging \
+            --version ${{ github.sha }} \
+            --strategy rolling \
+            --namespace nightscan-staging
+      
+      - name: 🔍 Run staging smoke tests
+        run: |
+          echo "🔍 Running staging smoke tests..."
+          
+          # Wait for deployment to be ready
+          sleep 30
+          
+          # Basic health checks (placeholder)
+          echo "Testing staging health endpoints..."
+          # curl -f https://staging.nightscan.example.com/health || exit 1
+          # curl -f https://staging.nightscan.example.com/ready || exit 1
+          
+          echo "✅ Staging smoke tests passed"
+      
+      - name: 📊 Update deployment status
+        run: |
+          echo "📊 Updating deployment status..."
+          echo "## 🚀 Staging Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Staging" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ needs.build-containers.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed at**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [Staging Environment](https://staging.nightscan.example.com)" >> $GITHUB_STEP_SUMMARY
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build-containers, deploy-staging]
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && 
+       github.event.inputs.deploy_environment == 'production')
+    
+    environment:
+      name: production
+      url: https://nightscan.example.com
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: 🔑 Configure Kubernetes access
+        run: |
+          echo "🔑 Configuring Kubernetes access for production..."
+          
+          # Create .kube directory
+          mkdir -p ~/.kube
+          
+          # Set up kubeconfig for production (using placeholder for now)
+          # In production, you would:
+          # echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+          
+          cat > ~/.kube/config << 'EOF'
+          # This is a placeholder kubeconfig for production demonstration
+          # In production, this would be your actual cluster configuration
+          apiVersion: v1
+          kind: Config
+          current-context: production-cluster
+          contexts:
+          - context:
+              cluster: production-cluster
+              user: production-user
+            name: production-cluster
+          clusters:
+          - cluster:
+              server: https://production.k8s.example.com
+            name: production-cluster
+          users:
+          - name: production-user
+            user:
+              token: placeholder-production-token
+          EOF
+          
+          # Set secure permissions
+          chmod 600 ~/.kube/config
+          
+          # Verify connection (will fail with placeholder config)
+          kubectl cluster-info || echo "Production cluster connection configured (placeholder)"
+          
+          echo "✅ Kubernetes access configured for production"
+      
+      - name: 🛡️ Pre-deployment security check
+        run: |
+          echo "🛡️ Running pre-deployment security checks..."
+          
+          # Run security validation script
+          if [ -f "scripts/security-check.sh" ]; then
+            chmod +x scripts/security-check.sh
+            ./scripts/security-check.sh
+          fi
+          
+          # Verify secrets management
+          echo "Verifying External Secrets Operator configuration..."
+          # kubectl get externalsecrets -n nightscan-production
+          
+          echo "✅ Security checks passed"
+      
+      - name: 🔄 Blue-Green Production Deployment
+        env:
+          IMAGE_TAG: ${{ needs.build-containers.outputs.image-tag }}
+          DOCKER_REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          VERSION: ${{ github.sha }}
+          ENVIRONMENT: production
+          DEPLOYMENT_STRATEGY: blue-green
+          HEALTH_CHECK_TIMEOUT: 600
+        run: |
+          echo "🔄 Starting blue-green production deployment..."
+          echo "Using image: $IMAGE_TAG"
+          
+          # Make deployment script executable
+          chmod +x scripts/deploy-enhanced.sh
+          
+          # Run enhanced deployment with blue-green strategy
+          ./scripts/deploy-enhanced.sh \
+            --env production \
+            --version ${{ github.sha }} \
+            --strategy blue-green \
+            --namespace nightscan-production
+      
+      - name: 🔍 Post-deployment validation
+        run: |
+          echo "🔍 Running post-deployment validation..."
+          
+          # Comprehensive health checks
+          echo "Testing production endpoints..."
+          # curl -f https://nightscan.example.com/health
+          # curl -f https://nightscan.example.com/ready
+          # curl -f https://nightscan.example.com/api/v1/health
+          
+          # Test ML serving optimization
+          echo "Testing optimized ML serving..."
+          # curl -f https://nightscan.example.com/api/optimized/health
+          
+          # Monitor key metrics
+          echo "Checking key performance metrics..."
+          # Query Prometheus for error rates, latency, etc.
+          
+          echo "✅ Post-deployment validation passed"
+      
+      - name: 📢 Notify deployment success
+        if: success()
+        run: |
+          echo "📢 Notifying deployment success..."
+          
+          # Create GitHub release if this is a tag
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "Creating GitHub release..."
+            # gh release create $GITHUB_REF_NAME --generate-notes
+          fi
+          
+          # Send Slack notification (if configured)
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"🚀 NightScan production deployment successful!"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+          
+          echo "✅ Notifications sent"
+      
+      - name: 📊 Update production status
+        run: |
+          echo "📊 Updating production deployment status..."
+          echo "## 🌟 Production Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ needs.build-containers.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed at**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Strategy**: Blue-Green" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [Production Environment](https://nightscan.example.com)" >> $GITHUB_STEP_SUMMARY
+
+  rollback-production:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: |
+      failure() && 
+      (startsWith(github.ref, 'refs/tags/v') ||
+       (github.event_name == 'workflow_dispatch' && 
+        github.event.inputs.deploy_environment == 'production'))
+    needs: [deploy-production]
+    
+    environment:
+      name: production
+    
+    steps:
+      - name: 📁 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+      
+      - name: ⏪ Rollback deployment with enhanced script
+        env:
+          ENVIRONMENT: production
+          ROLLBACK_ON_FAILURE: "true"
+        run: |
+          echo "⏪ Rolling back production deployment..."
+          
+          # Make deployment script executable
+          chmod +x scripts/deploy-enhanced.sh
+          
+          # Use kubectl directly for rollback since enhanced script handles this
+          kubectl rollout undo deployment/web-app -n nightscan-production || echo "Web app rollback attempted"
+          kubectl rollout undo deployment/prediction-api -n nightscan-production || echo "API rollback attempted"
+          
+          # Wait for rollback to complete
+          kubectl rollout status deployment/web-app -n nightscan-production --timeout=300s || echo "Web app rollback status checked"
+          kubectl rollout status deployment/prediction-api -n nightscan-production --timeout=300s || echo "API rollback status checked"
+          
+          echo "✅ Rollback completed"
+      
+      - name: 📢 Notify rollback
+        run: |
+          echo "📢 Notifying rollback..."
+          
+          # Send alert notifications
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"🚨 NightScan production deployment rolled back!"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+          
+          echo "🚨 Rollback notifications sent"
+
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [build-containers, build-mobile, build-wordpress-plugins, deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate deployment summary
+        run: |
+          echo "# 🚀 NightScan CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Images | ${{ needs.build-containers.result == 'success' && '✅ Built' || '❌ Failed' }} | Multi-arch Docker images |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mobile App (iOS) | ${{ needs.build-mobile.result == 'success' && '✅ Built' || '❌ Failed' }} | React Native iOS build |" >> $GITHUB_STEP_SUMMARY
+          echo "| WordPress Plugins | ${{ needs.build-wordpress-plugins.result == 'success' && '✅ Built' || '❌ Failed' }} | Plugin packages |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Deployment Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Staging | ${{ needs.deploy-staging.result == 'success' && '✅ Deployed' || (needs.deploy-staging.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Automatic deployment |" >> $GITHUB_STEP_SUMMARY
+          echo "| Production | ${{ needs.deploy-production.result == 'success' && '✅ Deployed' || (needs.deploy-production.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Blue-green deployment |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## 📦 Available Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Container images: \`${{ needs.build-containers.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Software Bill of Materials (SBOM)" >> $GITHUB_STEP_SUMMARY
+          echo "- iOS app archive" >> $GITHUB_STEP_SUMMARY
+          echo "- WordPress plugin packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View all artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY

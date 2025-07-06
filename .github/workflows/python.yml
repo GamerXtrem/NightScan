@@ -1,16 +1,51 @@
-name: CI
-on: [push, pull_request]
+name: CI (Legacy)
+
+# Legacy CI workflow - kept for compatibility
+# New comprehensive testing is in test-comprehensive.yml
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  PYTHON_VERSION: '3.11'
+
 jobs:
-  test:
+  basic-test:
+    name: Basic Python Tests (Legacy)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: 🗂️ Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
-      - name: Install dependencies
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run tests
-        run: pytest
+          pip install -r requirements-ci.txt
+      
+      - name: 🧪 Run basic tests
+        run: |
+          echo "🧪 Running basic test suite..."
+          pytest tests/ -x --tb=short -q
+      
+      - name: 📊 Integration notice
+        run: |
+          echo "## 📊 Legacy CI Workflow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This is the legacy CI workflow for basic compatibility." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "For comprehensive testing, see:" >> $GITHUB_STEP_SUMMARY
+          echo "- 📋 [Comprehensive Testing](https://github.com/${{ github.repository }}/actions/workflows/test-comprehensive.yml)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✨ [Code Quality](https://github.com/${{ github.repository }}/actions/workflows/code-quality.yml)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🚀 [Build & Deploy](https://github.com/${{ github.repository }}/actions/workflows/build-deploy.yml)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Monitoring](https://github.com/${{ github.repository }}/actions/workflows/monitoring.yml)" >> $GITHUB_STEP_SUMMARY

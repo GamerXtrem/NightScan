@@ -1,0 +1,219 @@
+# Pre-commit configuration for NightScan
+# See https://pre-commit.com for more information
+
+repos:
+  # General code quality
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(wp-plugin/|ios-app/)
+      - id: end-of-file-fixer
+        exclude: ^(wp-plugin/|ios-app/)
+      - id: check-yaml
+        exclude: ^(k8s/|docker-compose)
+      - id: check-json
+        exclude: ^ios-app/
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: debug-statements
+        exclude: ^(tests/|wp-plugin/|ios-app/)
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+        exclude: ^(wp-plugin/|ios-app/)
+
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3
+        exclude: ^(wp-plugin/|ios-app/)
+
+  # Python import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+        exclude: ^(wp-plugin/|ios-app/)
+
+  # Python linting with Ruff (fast)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.8
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        exclude: ^(wp-plugin/|ios-app/)
+      - id: ruff-format
+        exclude: ^(wp-plugin/|ios-app/)
+
+  # Python type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-requests, types-redis]
+        exclude: ^(tests/|wp-plugin/|ios-app/|Audio_Training/|Picture_Training/)
+        args: [--ignore-missing-imports]
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml"]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: ^(tests/|wp-plugin/|ios-app/)
+
+  # Secrets detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(wp-plugin/|ios-app/|tests/fixtures/)
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: ["--ignore", "DL3008", "--ignore", "DL3009"]
+
+  # YAML formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [yaml]
+        exclude: ^(k8s/|docker-compose|wp-plugin/|ios-app/)
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.39.0
+    hooks:
+      - id: markdownlint
+        args: ["--fix"]
+        exclude: ^(wp-plugin/|ios-app/)
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: ["-e", "SC1091", "-e", "SC2034"]
+
+  # JavaScript/TypeScript (for mobile app)
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v8.56.0
+    hooks:
+      - id: eslint
+        files: ^ios-app/.*\.(js|jsx|ts|tsx)$
+        additional_dependencies:
+          - eslint@8.56.0
+          - '@typescript-eslint/eslint-plugin@6.16.0'
+          - '@typescript-eslint/parser@6.16.0'
+          - eslint-plugin-react@7.33.2
+          - eslint-plugin-react-hooks@4.6.0
+
+  # PHP linting (for WordPress plugins)
+  - repo: local
+    hooks:
+      - id: php-cs-fixer
+        name: PHP CS Fixer
+        entry: php-cs-fixer
+        language: system
+        files: ^wp-plugin/.*\.php$
+        args: ["fix", "--dry-run", "--diff"]
+        pass_filenames: false
+        require_serial: true
+
+  # Custom security checks
+  - repo: local
+    hooks:
+      - id: nightscan-security-check
+        name: NightScan Security Check
+        entry: scripts/security-check.sh
+        language: system
+        files: ^(k8s/|wp-plugin/|.*\.py)$
+        pass_filenames: false
+        require_serial: true
+
+  # Kubernetes manifest validation
+  - repo: local
+    hooks:
+      - id: kubeval
+        name: Kubernetes manifest validation
+        entry: bash -c
+        language: system
+        files: ^k8s/.*\.(yaml|yml)$
+        args:
+          - |
+            if command -v kubeval >/dev/null 2>&1; then
+              kubeval $@
+            else
+              echo "kubeval not installed, skipping Kubernetes validation"
+            fi
+        pass_filenames: true
+
+  # Docker Compose validation
+  - repo: local
+    hooks:
+      - id: docker-compose-check
+        name: Docker Compose validation
+        entry: bash -c
+        language: system
+        files: ^docker-compose.*\.(yml|yaml)$
+        args:
+          - |
+            if command -v docker-compose >/dev/null 2>&1; then
+              docker-compose -f $1 config >/dev/null
+            else
+              echo "docker-compose not installed, skipping validation"
+            fi
+        pass_filenames: true
+
+# Global configuration
+default_stages: [commit, push]
+default_language_version:
+  python: python3.11
+  node: '18.19.0'
+
+# Exclude patterns
+exclude: |
+  (?x)^(
+    .*\.min\.(js|css)$|
+    .*\.bundle\.(js|css)$|
+    node_modules/.*|
+    .*/node_modules/.*|
+    build/.*|
+    dist/.*|
+    .venv/.*|
+    venv/.*|
+    env/.*|
+    __pycache__/.*|
+    .*/migrations/.*|
+    .*\.egg-info/.*|
+    \.mypy_cache/.*|
+    \.pytest_cache/.*|
+    coverage\.xml|
+    .*\.coverage|
+    htmlcov/.*
+  )$
+
+# Minimum pre-commit version
+minimum_pre_commit_version: '3.0.0'
+
+# Configuration for specific hooks
+ci:
+  autofix_commit_msg: 'style: auto-fix pre-commit hooks'
+  autofix_prs: true
+  autoupdate_branch: 'main'
+  autoupdate_commit_msg: 'ci: pre-commit autoupdate'
+  autoupdate_schedule: 'weekly'
+  skip: []
+  submodules: false
