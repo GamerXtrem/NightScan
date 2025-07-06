@@ -14,6 +14,7 @@ import RegisterScreen from './screens/RegisterScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import CameraPreviewScreen from './screens/CameraPreviewScreen';
 import PiInstallationScreen from './screens/PiInstallationScreen';
+import AudioThresholdScreen from './screens/AudioThresholdScreen';
 import { AppProvider, AppContext } from './AppContext';
 import { initializeNotificationService, setupNotificationActionHandlers, removeNotificationListeners, handleWebSocketNotification } from './services/notifications';
 import websocketService from './services/websocket';
@@ -212,6 +213,15 @@ function RootNavigator() {
           component={PiInstallationScreen}
           options={{
             title: 'Pi Installation',
+            headerShown: false,
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen 
+          name="AudioThreshold" 
+          component={AudioThresholdScreen}
+          options={{
+            title: 'Audio Threshold',
             headerShown: false,
             presentation: 'modal',
           }}

@@ -58,6 +58,11 @@ export default function HomeScreen({ navigation }) {
         title="🔧 Installation Pi" 
         onPress={() => navigation.navigate('PiInstallation')} 
       />
+      <View style={styles.spacing} />
+      <Button 
+        title="🎤 Sensibilité Microphone" 
+        onPress={() => navigation.navigate('AudioThreshold')} 
+      />
     </View>
   );
 }

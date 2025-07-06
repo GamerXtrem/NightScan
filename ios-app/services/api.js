@@ -430,6 +430,154 @@ class ApiService {
       throw error;
     }
   }
+
+  // Audio threshold functions
+  async getAudioThresholdStatus() {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/audio/threshold/status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Audio threshold status request failed: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Audio threshold status error:', error);
+      throw error;
+    }
+  }
+
+  async updateAudioThresholdConfig(config) {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/audio/threshold/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update audio threshold config');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Update audio threshold config error:', error);
+      throw error;
+    }
+  }
+
+  async applyAudioThresholdPreset(presetName) {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/audio/threshold/preset/${presetName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to apply audio threshold preset');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Apply audio threshold preset error:', error);
+      throw error;
+    }
+  }
+
+  async calibrateAudioThreshold(durationSeconds = 5) {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/audio/threshold/calibrate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ duration_seconds: durationSeconds }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to calibrate audio threshold');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Calibrate audio threshold error:', error);
+      throw error;
+    }
+  }
+
+  async testAudioThreshold(durationSeconds = 3) {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/audio/threshold/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ duration_seconds: durationSeconds }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to test audio threshold');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Test audio threshold error:', error);
+      throw error;
+    }
+  }
+
+  async getAudioThresholdPresets() {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/audio/threshold/presets`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Audio threshold presets request failed: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Audio threshold presets error:', error);
+      throw error;
+    }
+  }
+
+  async getLiveAudioLevels() {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/audio/threshold/live`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Live audio levels request failed: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Live audio levels error:', error);
+      throw error;
+    }
+  }
 }
 
 const apiService = new ApiService();
@@ -470,6 +618,35 @@ export async function captureImage() {
 
 export async function getPiHealth() {
   return apiService.getPiHealth();
+}
+
+// Export audio threshold functions
+export async function getAudioThresholdStatus() {
+  return apiService.getAudioThresholdStatus();
+}
+
+export async function updateAudioThresholdConfig(config) {
+  return apiService.updateAudioThresholdConfig(config);
+}
+
+export async function applyAudioThresholdPreset(presetName) {
+  return apiService.applyAudioThresholdPreset(presetName);
+}
+
+export async function calibrateAudioThreshold(durationSeconds) {
+  return apiService.calibrateAudioThreshold(durationSeconds);
+}
+
+export async function testAudioThreshold(durationSeconds) {
+  return apiService.testAudioThreshold(durationSeconds);
+}
+
+export async function getAudioThresholdPresets() {
+  return apiService.getAudioThresholdPresets();
+}
+
+export async function getLiveAudioLevels() {
+  return apiService.getLiveAudioLevels();
 }
 
 // Export the enhanced service
