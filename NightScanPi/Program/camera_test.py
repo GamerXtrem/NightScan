@@ -6,6 +6,7 @@ Tests camera functionality and provides diagnostic information.
 
 import sys
 import json
+import time
 import argparse
 from pathlib import Path
 from datetime import datetime
@@ -59,6 +60,9 @@ def print_camera_status():
             print(f"  • Night Mode: {'✅' if recommended['night_mode'] else '❌'}")
     else:
         print(f"\n⚠️ Camera sensor detection failed or no camera detected")
+    
+    # Display night vision status
+    print_night_vision_status()
     
     print()
 
@@ -194,6 +198,95 @@ def check_system_requirements():
     return all(requirements.values())
 
 
+def print_night_vision_status():
+    """Print night vision system status."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.ir_night_vision import get_night_vision_status
+        
+        status = get_night_vision_status()
+        
+        print(f"\n🌙 Night Vision System:")
+        print(f"  • GPIO Available: {'✅' if status['gpio_available'] else '❌'}")
+        print(f"  • GPIO Initialized: {'✅' if status['gpio_initialized'] else '❌'}")
+        print(f"  • Current Mode: {status['current_mode'] or 'Unknown'}")
+        print(f"  • Night Time: {'✅' if status['is_night_time'] else '❌'}")
+        print(f"  • IR LEDs: {'✅' if status['leds_enabled'] else '❌'}")
+        print(f"  • Auto Mode: {'✅' if status['auto_mode'] else '❌'}")
+        print(f"  • IR-CUT Pin: GPIO {status['ircut_pin']}")
+        print(f"  • IR LED Pin: GPIO {status['irled_pin']}")
+        print(f"  • LED Brightness: {status['led_brightness']:.1%}")
+        print(f"  • LED Feature: {'✅' if status['led_feature_enabled'] else '❌'}")
+        
+    except ImportError:
+        print(f"\n🌙 Night Vision System: ❌ Not available")
+    except Exception as e:
+        print(f"\n🌙 Night Vision System: ⚠️ Error - {e}")
+
+
+def test_night_vision_control():
+    """Test night vision control functionality."""
+    print("🌙 Testing Night Vision Control...")
+    
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.ir_night_vision import get_night_vision
+        
+        nv = get_night_vision()
+        
+        if not nv.gpio_initialized:
+            print("❌ GPIO not initialized - hardware control not available")
+            return False
+        
+        print("📋 Testing mode switching:")
+        
+        # Test day mode
+        print("  • Setting day mode...")
+        if nv.set_day_mode():
+            print("  ✅ Day mode set successfully")
+        else:
+            print("  ❌ Failed to set day mode")
+            return False
+        
+        time.sleep(1)
+        
+        # Test night mode
+        print("  • Setting night mode...")
+        if nv.set_night_mode():
+            print("  ✅ Night mode set successfully")
+        else:
+            print("  ❌ Failed to set night mode")
+            return False
+        
+        time.sleep(1)
+        
+        # Test auto mode
+        print("  • Testing auto mode...")
+        if nv.auto_adjust_mode():
+            print(f"  ✅ Auto mode set to: {nv.current_mode}")
+        else:
+            print("  ❌ Failed to set auto mode")
+            return False
+        
+        # Test LED control
+        print("  • Testing LED brightness control...")
+        original_brightness = nv.config.irled_brightness
+        nv.set_led_brightness(0.5)
+        time.sleep(0.5)
+        nv.set_led_brightness(original_brightness)
+        print("  ✅ LED brightness control working")
+        
+        print("✅ Night vision control test PASSED")
+        return True
+        
+    except ImportError:
+        print("❌ Night vision module not available")
+        return False
+    except Exception as e:
+        print(f"❌ Night vision control test FAILED: {e}")
+        return False
+
+
 def main():
     """Main diagnostic function."""
     parser = argparse.ArgumentParser(
@@ -201,11 +294,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python camera_test.py --status          # Show camera status
-  python camera_test.py --test            # Run camera test
-  python camera_test.py --capture         # Capture test image
-  python camera_test.py --all             # Run all diagnostics
-  python camera_test.py --json            # Output in JSON format
+  python camera_test.py --status              # Show camera status
+  python camera_test.py --test                # Run camera test
+  python camera_test.py --capture             # Capture test image
+  python camera_test.py --detect-sensor       # Test sensor detection
+  python camera_test.py --test-night-vision   # Test IR-CUT and LED control
+  python camera_test.py --all                 # Run all diagnostics
+  python camera_test.py --json                # Output in JSON format
         """
     )
     
@@ -217,6 +312,8 @@ Examples:
                        help="Capture a test image")
     parser.add_argument("--detect-sensor", action="store_true",
                        help="Test sensor detection specifically")
+    parser.add_argument("--test-night-vision", action="store_true",
+                       help="Test night vision control functionality")
     parser.add_argument("--all", action="store_true",
                        help="Run all diagnostics")
     parser.add_argument("--json", action="store_true",
@@ -227,7 +324,7 @@ Examples:
     args = parser.parse_args()
     
     # If no specific action, show status by default
-    if not any([args.status, args.test, args.capture, args.detect_sensor, args.all]):
+    if not any([args.status, args.test, args.capture, args.detect_sensor, args.test_night_vision, args.all]):
         args.status = True
     
     results = {}
@@ -258,6 +355,9 @@ Examples:
         if args.detect_sensor or args.all:
             results["sensor_detection"] = test_sensor_detection()
         
+        if args.test_night_vision or args.all:
+            results["night_vision_test"] = test_night_vision_control()
+        
         print(json.dumps(results, indent=2))
         
     else:
@@ -275,6 +375,10 @@ Examples:
             
         if args.detect_sensor or args.all:
             test_sensor_detection()
+            print()
+        
+        if args.test_night_vision or args.all:
+            test_night_vision_control()
             print()
         
         if args.all:

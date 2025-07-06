@@ -68,6 +68,9 @@ class CameraManager:
             return False
         
         try:
+            # Prepare night vision system for capture
+            self._prepare_night_vision()
+            
             # Get sensor-specific settings
             sensor_settings = self._get_sensor_optimized_settings(resolution)
             
@@ -167,6 +170,9 @@ class CameraManager:
             return False
         
         try:
+            # Prepare night vision system for capture
+            self._prepare_night_vision()
+            
             with PiCamera() as camera:
                 camera.resolution = resolution
                 # Allow camera to warm up
@@ -179,6 +185,16 @@ class CameraManager:
         except Exception as e:
             logger.error(f"Legacy camera capture failed: {e}")
             return False
+    
+    def _prepare_night_vision(self) -> None:
+        """Prepare night vision system for capture."""
+        try:
+            from .utils.ir_night_vision import prepare_camera_for_capture
+            prepare_camera_for_capture()
+        except ImportError:
+            logger.debug("Night vision module not available")
+        except Exception as e:
+            logger.warning(f"Night vision preparation failed: {e}")
     
     def capture_image(self, output_path: Path, resolution: Tuple[int, int] = (1920, 1080)) -> bool:
         """Capture image using available API."""

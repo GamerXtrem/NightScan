@@ -20,6 +20,10 @@ START_HOUR = int(os.getenv("NIGHTSCAN_START_HOUR", "18"))
 STOP_HOUR = int(os.getenv("NIGHTSCAN_STOP_HOUR", "10"))
 DONE_PIN = int(os.getenv("NIGHTSCAN_DONE_PIN", "4"))
 
+# Power consumption estimates (watts)
+BASE_POWER = 3.0  # Pi Zero 2W base consumption
+IR_LED_POWER = float(os.getenv("NIGHTSCAN_IRLED_POWER", "2.0"))  # Per LED at full brightness
+
 # Mandatory sunrise/sunset scheduling
 DEFAULT_SUN_FILE = Path.home() / "sun_times.json"
 SUN_FILE = Path(os.getenv("NIGHTSCAN_SUN_FILE", str(DEFAULT_SUN_FILE)))
@@ -82,6 +86,63 @@ def next_stop_time(now: datetime | None = None) -> datetime:
     if now >= stop:
         _, stop = _sun_period(now + timedelta(days=1))
     return stop
+
+
+def get_power_consumption() -> dict:
+    """Get current power consumption estimate including IR LEDs."""
+    try:
+        from .ir_night_vision import get_night_vision_status
+        nv_status = get_night_vision_status()
+        
+        total_power = BASE_POWER
+        led_power = 0.0
+        
+        if nv_status.get('leds_enabled', False) and nv_status.get('led_feature_enabled', False):
+            # Calculate LED power based on brightness
+            brightness = nv_status.get('led_brightness', 0.8)
+            led_count = 2  # Assume 2 IR LEDs
+            led_power = IR_LED_POWER * led_count * brightness
+            total_power += led_power
+        
+        return {
+            'base_power': BASE_POWER,
+            'led_power': led_power,
+            'total_power': total_power,
+            'led_enabled': nv_status.get('leds_enabled', False),
+            'led_brightness': nv_status.get('led_brightness', 0.0)
+        }
+        
+    except Exception:
+        # Fallback if night vision not available
+        return {
+            'base_power': BASE_POWER,
+            'led_power': 0.0,
+            'total_power': BASE_POWER,
+            'led_enabled': False,
+            'led_brightness': 0.0
+        }
+
+
+def should_reduce_power() -> bool:
+    """Check if power consumption should be reduced (e.g., low battery)."""
+    power_info = get_power_consumption()
+    
+    # If total power > 4W, consider reducing LED power
+    if power_info['total_power'] > 4.0:
+        return True
+    
+    # Could add battery level monitoring here in the future
+    return False
+
+
+def optimize_led_brightness_for_power() -> float:
+    """Get optimal LED brightness for current power situation."""
+    if should_reduce_power():
+        # Reduce to 50% brightness if power consumption is too high
+        return 0.5
+    else:
+        # Use configured brightness
+        return float(os.getenv("NIGHTSCAN_IRLED_BRIGHTNESS", "0.8"))
 
 
 def schedule_shutdown(now: datetime | None = None) -> None:
