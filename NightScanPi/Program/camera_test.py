@@ -36,6 +36,30 @@ def print_camera_status():
         elif camera_manager.api_type == "picamera":
             print(f"  • Using legacy picamera (UPDATE RECOMMENDED)")
     
+    # Display sensor information
+    if info.get('sensor_type'):
+        print(f"\n📸 Camera Sensor Information:")
+        print(f"  • Detected Sensor: {info['sensor_type'].upper()}")
+        
+        sensor_info = info.get('sensor_info')
+        if sensor_info:
+            print(f"  • Model: {sensor_info['name']} ({sensor_info['model']})")
+            print(f"  • Max Resolution: {sensor_info['resolution'][0]}x{sensor_info['resolution'][1]}")
+            print(f"  • Capabilities: {', '.join(sensor_info['capabilities'])}")
+            print(f"  • IR-CUT Support: {'✅' if sensor_info['ir_cut_support'] else '❌'}")
+            print(f"  • Night Vision: {'✅' if sensor_info['night_vision'] else '❌'}")
+            print(f"  • Boot Config: dtoverlay={sensor_info['dtoverlay']}")
+            
+        recommended = info.get('recommended_settings')
+        if recommended:
+            print(f"\n⚙️ Recommended Settings:")
+            print(f"  • Default Resolution: {recommended['resolution_default'][0]}x{recommended['resolution_default'][1]}")
+            print(f"  • Max Framerate: {recommended['framerate_max']} fps")
+            print(f"  • GPU Memory: {recommended['gpu_mem']} MB")
+            print(f"  • Night Mode: {'✅' if recommended['night_mode'] else '❌'}")
+    else:
+        print(f"\n⚠️ Camera sensor detection failed or no camera detected")
+    
     print()
 
 
@@ -71,6 +95,65 @@ def capture_test_image(output_dir: str = "test_images"):
     except Exception as e:
         print(f"❌ Image capture failed: {e}")
         return None
+
+
+def test_sensor_detection():
+    """Test comprehensive sensor detection."""
+    print("🔍 Testing Camera Sensor Detection...")
+    
+    try:
+        # Import here to avoid issues if module doesn't exist
+        sys.path.insert(0, str(Path(__file__).parent))
+        from camera_sensor_detector import CameraSensorDetector
+        
+        detector = CameraSensorDetector()
+        
+        print("📋 Running detection methods:")
+        
+        # Test individual detection methods
+        methods = [
+            ("libcamera", detector.detect_via_libcamera),
+            ("dmesg", detector.detect_via_dmesg),
+            ("config.txt", detector.detect_via_config_txt),
+            ("device_tree", detector.detect_via_device_tree),
+            ("vcgencmd", detector.detect_via_vcgencmd),
+        ]
+        
+        results = {}
+        for method_name, method in methods:
+            try:
+                result = method()
+                results[method_name] = result
+                if result:
+                    print(f"  ✅ {method_name}: {result}")
+                else:
+                    print(f"  ❌ {method_name}: no detection")
+            except Exception as e:
+                results[method_name] = f"Error: {e}"
+                print(f"  ⚠️ {method_name}: error - {e}")
+        
+        # Run comprehensive detection
+        print(f"\n🎯 Comprehensive Detection:")
+        final_sensor = detector.detect_sensor()
+        if final_sensor:
+            sensor_info = detector.get_sensor_info(final_sensor)
+            print(f"  • Final Result: {final_sensor.upper()}")
+            if sensor_info:
+                print(f"  • Model: {sensor_info.model}")
+                print(f"  • Resolution: {sensor_info.resolution[0]}x{sensor_info.resolution[1]}")
+                print(f"  • IR-CUT: {'Yes' if sensor_info.ir_cut_support else 'No'}")
+                print(f"  • Night Vision: {'Yes' if sensor_info.night_vision else 'No'}")
+        else:
+            print(f"  • Final Result: No sensor detected")
+        
+        return final_sensor is not None
+        
+    except ImportError as e:
+        print(f"❌ Sensor detection module not available: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Sensor detection failed: {e}")
+        return False
 
 
 def check_system_requirements():
@@ -132,6 +215,8 @@ Examples:
                        help="Run camera functionality test")
     parser.add_argument("--capture", action="store_true",
                        help="Capture a test image")
+    parser.add_argument("--detect-sensor", action="store_true",
+                       help="Test sensor detection specifically")
     parser.add_argument("--all", action="store_true",
                        help="Run all diagnostics")
     parser.add_argument("--json", action="store_true",
@@ -142,7 +227,7 @@ Examples:
     args = parser.parse_args()
     
     # If no specific action, show status by default
-    if not any([args.status, args.test, args.capture, args.all]):
+    if not any([args.status, args.test, args.capture, args.detect_sensor, args.all]):
         args.status = True
     
     results = {}
@@ -170,6 +255,9 @@ Examples:
                     "error": str(e)
                 }
         
+        if args.detect_sensor or args.all:
+            results["sensor_detection"] = test_sensor_detection()
+        
         print(json.dumps(results, indent=2))
         
     else:
@@ -183,6 +271,10 @@ Examples:
             
         if args.capture or args.all:
             capture_test_image(args.output_dir)
+            print()
+            
+        if args.detect_sensor or args.all:
+            test_sensor_detection()
             print()
         
         if args.all:
