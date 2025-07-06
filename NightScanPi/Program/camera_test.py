@@ -308,6 +308,46 @@ def test_pi_zero_optimizations():
         return False
 
 
+def run_camera_validation():
+    """Run comprehensive camera validation tests."""
+    print("🔍 Running Comprehensive Camera Validation...")
+    
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.camera_validator import CameraValidator
+        
+        validator = CameraValidator(Path("camera_validation"))
+        results = validator.run_all_tests()
+        
+        # Display summary
+        passed = sum(1 for r in results.values() if r.success)
+        total = len(results)
+        
+        print(f"\n📊 Validation Summary:")
+        print(f"  • Total Tests: {total}")
+        print(f"  • Passed: {passed} ✅")
+        print(f"  • Failed: {total - passed} ❌")
+        print(f"  • Success Rate: {passed/total:.1%}")
+        
+        if passed == total:
+            print("✅ All validation tests PASSED")
+        else:
+            print("⚠️ Some validation tests FAILED")
+            print("\nFailed tests:")
+            for name, result in results.items():
+                if not result.success:
+                    print(f"  • {name}: {result.error_message}")
+        
+        return passed == total
+        
+    except ImportError:
+        print("❌ Camera validator module not available")
+        return False
+    except Exception as e:
+        print(f"❌ Camera validation FAILED: {e}")
+        return False
+
+
 def test_night_vision_control():
     """Test night vision control functionality."""
     print("🌙 Testing Night Vision Control...")
@@ -384,6 +424,7 @@ Examples:
   python camera_test.py --detect-sensor       # Test sensor detection
   python camera_test.py --test-night-vision   # Test IR-CUT and LED control
   python camera_test.py --test-pi-zero        # Test Pi Zero 2W optimizations
+  python camera_test.py --validate            # Run comprehensive camera validation
   python camera_test.py --all                 # Run all diagnostics
   python camera_test.py --json                # Output in JSON format
         """
@@ -401,6 +442,8 @@ Examples:
                        help="Test night vision control functionality")
     parser.add_argument("--test-pi-zero", action="store_true",
                        help="Test Pi Zero 2W memory optimizations")
+    parser.add_argument("--validate", action="store_true",
+                       help="Run comprehensive camera validation tests")
     parser.add_argument("--all", action="store_true",
                        help="Run all diagnostics")
     parser.add_argument("--json", action="store_true",
@@ -411,7 +454,7 @@ Examples:
     args = parser.parse_args()
     
     # If no specific action, show status by default
-    if not any([args.status, args.test, args.capture, args.detect_sensor, args.test_night_vision, args.test_pi_zero, args.all]):
+    if not any([args.status, args.test, args.capture, args.detect_sensor, args.test_night_vision, args.test_pi_zero, args.validate, args.all]):
         args.status = True
     
     results = {}
@@ -448,6 +491,9 @@ Examples:
         if args.test_pi_zero or args.all:
             results["pi_zero_test"] = test_pi_zero_optimizations()
         
+        if args.validate or args.all:
+            results["validation_test"] = run_camera_validation()
+        
         print(json.dumps(results, indent=2))
         
     else:
@@ -473,6 +519,10 @@ Examples:
         
         if args.test_pi_zero or args.all:
             test_pi_zero_optimizations()
+            print()
+        
+        if args.validate or args.all:
+            run_camera_validation()
             print()
         
         if args.all:

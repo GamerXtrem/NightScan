@@ -1,0 +1,22 @@
+#!/bin/bash
+# NightScan Camera Hello - Simple wrapper script for nightscan_camera_hello.py
+# Provides rpicam-hello equivalent functionality with NightScan enhancements
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+PYTHON_SCRIPT="$SCRIPT_DIR/Program/nightscan_camera_hello.py"
+
+# Check if Python script exists
+if [ ! -f "$PYTHON_SCRIPT" ]; then
+    echo "❌ Error: nightscan_camera_hello.py not found at $PYTHON_SCRIPT"
+    exit 1
+fi
+
+# Activate virtual environment if it exists
+if [ -f "$SCRIPT_DIR/env/bin/activate" ]; then
+    source "$SCRIPT_DIR/env/bin/activate"
+elif [ -f "$SCRIPT_DIR/../env/bin/activate" ]; then
+    source "$SCRIPT_DIR/../env/bin/activate"
+fi
+
+# Execute the Python script with all passed arguments
+python3 "$PYTHON_SCRIPT" "$@"
