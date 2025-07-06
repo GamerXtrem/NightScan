@@ -12,6 +12,8 @@ import DetectionDetailScreen from './screens/DetectionDetailScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import CameraPreviewScreen from './screens/CameraPreviewScreen';
+import PiInstallationScreen from './screens/PiInstallationScreen';
 import { AppProvider, AppContext } from './AppContext';
 import { initializeNotificationService, setupNotificationActionHandlers, removeNotificationListeners, handleWebSocketNotification } from './services/notifications';
 import websocketService from './services/websocket';
@@ -195,6 +197,24 @@ function RootNavigator() {
             title: route.params?.species || 'Detection Details',
             headerBackTitleVisible: false,
           })}
+        />
+        <Stack.Screen 
+          name="CameraPreview" 
+          component={CameraPreviewScreen}
+          options={{
+            title: 'Camera Preview',
+            headerShown: false,
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen 
+          name="PiInstallation" 
+          component={PiInstallationScreen}
+          options={{
+            title: 'Pi Installation',
+            headerShown: false,
+            presentation: 'modal',
+          }}
         />
       </Stack.Navigator>
       <StatusBar style={darkMode ? "light" : "dark"} />

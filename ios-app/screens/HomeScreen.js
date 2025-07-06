@@ -48,6 +48,16 @@ export default function HomeScreen({ navigation }) {
       <Button title="Register" onPress={() => navigation.navigate('Register')} />
       <View style={styles.spacing} />
       <Button title="Réveiller NightScanPi" onPress={playWakeTone} />
+      <View style={styles.spacing} />
+      <Button 
+        title="📷 Prévisualisation Caméra" 
+        onPress={() => navigation.navigate('CameraPreview')} 
+      />
+      <View style={styles.spacing} />
+      <Button 
+        title="🔧 Installation Pi" 
+        onPress={() => navigation.navigate('PiInstallation')} 
+      />
     </View>
   );
 }

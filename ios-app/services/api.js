@@ -5,6 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 export const BASE_URL = 'http://localhost:8000';
 export const API_BASE_URL = 'http://localhost:8000/api/v1';
 export const PREDICT_API_URL = process.env.PREDICT_API_URL || 'http://localhost:8001/api/v1/predict';
+export const PI_SERVICE_URL = 'http://192.168.4.1:5000';
 
 const CACHE_PREFIX = 'nightscan_cache_';
 const SYNC_QUEUE_KEY = 'nightscan_sync_queue';
@@ -325,6 +326,110 @@ class ApiService {
       throw new Error('Cannot sync while offline');
     }
   }
+
+  // Camera preview functions
+  async getCameraStatus() {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/camera/status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Camera status request failed: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Camera status error:', error);
+      throw error;
+    }
+  }
+
+  async startCameraPreview() {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/camera/preview/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to start camera preview');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Start camera preview error:', error);
+      throw error;
+    }
+  }
+
+  async stopCameraPreview() {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/camera/preview/stop`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to stop camera preview');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Stop camera preview error:', error);
+      throw error;
+    }
+  }
+
+  async captureImage() {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/camera/capture`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to capture image');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Capture image error:', error);
+      throw error;
+    }
+  }
+
+  async getPiHealth() {
+    try {
+      const response = await fetch(`${PI_SERVICE_URL}/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Pi health check failed: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Pi health check error:', error);
+      throw error;
+    }
+  }
 }
 
 const apiService = new ApiService();
@@ -344,6 +449,27 @@ export async function fetchDetections(page, species) {
 
 export async function uploadMedia(uri, mimeType) {
   return apiService.uploadMedia(uri, mimeType);
+}
+
+// Export camera preview functions
+export async function getCameraStatus() {
+  return apiService.getCameraStatus();
+}
+
+export async function startCameraPreview() {
+  return apiService.startCameraPreview();
+}
+
+export async function stopCameraPreview() {
+  return apiService.stopCameraPreview();
+}
+
+export async function captureImage() {
+  return apiService.captureImage();
+}
+
+export async function getPiHealth() {
+  return apiService.getPiHealth();
 }
 
 // Export the enhanced service
