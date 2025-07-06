@@ -116,9 +116,16 @@ get_package_list() {
     
     local camera_packages=()
     local audio_packages=(
-        "alsa-utils"
-        "pulseaudio"
-        "portaudio19-dev"
+        "alsa-utils"           # ALSA utilities
+        "alsa-tools"           # Additional ALSA tools
+        "libasound2-dev"       # ALSA development headers
+        "pulseaudio"           # PulseAudio sound server
+        "pulseaudio-utils"     # PulseAudio utilities
+        "portaudio19-dev"      # PortAudio development
+        "python3-usb"          # Python USB support for ReSpeaker Lite
+        "libusb-1.0-0-dev"     # USB library development
+        "usbutils"             # USB utilities (lsusb)
+        "dfu-util"             # Device Firmware Upgrade utility for ReSpeaker
     )
     
     # Camera packages based on OS version and Pi detection
