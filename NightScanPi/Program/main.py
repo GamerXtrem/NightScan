@@ -41,12 +41,16 @@ def run_cycle(base_dir: Path) -> None:
         
         # Capture image
         camera_start = time.time()
-        camera_trigger.capture_image(image_dir)
-        camera_duration = time.time() - camera_start
-        logging.info(f"Camera capture completed in {camera_duration:.3f}s")
+        try:
+            camera_trigger.capture_image(image_dir)
+            camera_duration = time.time() - camera_start
+            logging.info(f"Camera capture completed in {camera_duration:.3f}s")
+        except RuntimeError as exc:
+            camera_duration = time.time() - camera_start
+            logging.warning(f"Camera capture failed after {camera_duration:.3f}s: %s", exc)
         
-    except Exception as exc:  # pragma: no cover - camera may be absent
-        logging.warning("Camera capture failed: %s", exc)
+    except Exception as exc:  # pragma: no cover - audio may fail
+        logging.warning("Audio capture failed: %s", exc)
     
     total_duration = time.time() - start_time
     logging.info(f"Complete capture cycle took {total_duration:.3f}s")
