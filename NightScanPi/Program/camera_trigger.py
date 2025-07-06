@@ -109,63 +109,78 @@ class CameraManager:
             return False
     
     def _get_sensor_optimized_settings(self, resolution: Tuple[int, int]) -> dict:
-        """Get sensor-optimized camera settings."""
+        """Get sensor-optimized camera settings with advanced tuning."""
         try:
             from .camera_sensor_detector import detect_camera_sensor, get_camera_sensor_info
+            from .utils.camera_tuning import get_optimal_tuning
             
             sensor_type = detect_camera_sensor()
             sensor_info = get_camera_sensor_info(sensor_type) if sensor_type else None
             
-            # Base settings
+            # Get optimal tuning parameters
+            tuning = get_optimal_tuning(sensor_type)
+            
+            # Base settings from tuning
             settings = {
                 "controls": {
-                    "AwbEnable": True,  # Auto white balance
-                    "AeEnable": True,   # Auto exposure
+                    "AwbEnable": tuning.awb_enable,
+                    "AeEnable": tuning.ae_enable,
+                    "Brightness": tuning.brightness,
+                    "Contrast": tuning.contrast,
+                    "Saturation": tuning.saturation,
+                    "Sharpness": tuning.sharpness,
+                    "AnalogueGain": tuning.analogue_gain,
                 },
                 "settling_time": 2.0
             }
             
+            # Add advanced tuning controls
+            if tuning.exposure_time is not None:
+                settings["controls"]["ExposureTime"] = tuning.exposure_time
+                settings["controls"]["AeEnable"] = False  # Manual exposure
+            
+            if tuning.awb_mode is not None:
+                settings["controls"]["AwbMode"] = tuning.awb_mode
+            
+            if tuning.ae_constraint_mode is not None:
+                settings["controls"]["AeConstraintMode"] = tuning.ae_constraint_mode
+            
+            if tuning.ae_metering_mode is not None:
+                settings["controls"]["AeMeteringMode"] = tuning.ae_metering_mode
+            
+            if tuning.lens_position is not None:
+                settings["controls"]["LensPosition"] = tuning.lens_position
+            
+            if tuning.noise_reduction_mode is not None:
+                settings["controls"]["NoiseReductionMode"] = tuning.noise_reduction_mode
+            
+            logger.info(f"Using advanced tuning for {sensor_type or 'unknown'} sensor")
+            
             if sensor_info:
-                # Sensor-specific optimizations
-                if "ultra_low_light" in sensor_info.capabilities:
-                    # IMX290/IMX327 optimizations for low light
-                    settings["controls"].update({
-                        "AnalogueGain": 8.0,
-                        "ExposureTime": 33000,  # 33ms for low light
-                        "AwbMode": 3,  # Indoor mode
-                    })
-                    settings["settling_time"] = 3.0
-                
-                elif "global_shutter" in sensor_info.capabilities:
-                    # OV9281/IMX296 optimizations for fast capture
-                    settings["controls"].update({
-                        "AnalogueGain": 1.0,
-                        "ExposureTime": 1000,  # 1ms for fast capture
-                    })
-                    settings["settling_time"] = 1.0
-                
-                elif sensor_info.ir_cut_support:
-                    # Standard IR-CUT camera optimizations
-                    settings["controls"].update({
-                        "AnalogueGain": 2.0,
-                        "Brightness": 0.1,
-                        "Contrast": 1.1,
-                    })
-                
                 # Resolution-based adjustments
                 max_res = sensor_info.resolution
                 if resolution[0] > max_res[0] or resolution[1] > max_res[1]:
                     logger.warning(f"Requested resolution {resolution} exceeds sensor maximum {max_res}")
+                
+                # Night mode specific adjustments
+                if tuning.night_mode_enabled:
+                    settings["settling_time"] = 3.0  # Longer settling for night mode
+                    logger.info("Night mode tuning applied")
             
             return settings
             
         except Exception as e:
             logger.warning(f"Failed to get sensor-optimized settings: {e}")
-            # Return default settings
+            # Return safe fallback settings
             return {
                 "controls": {
                     "AwbEnable": True,
                     "AeEnable": True,
+                    "Brightness": 0.0,
+                    "Contrast": 1.0,
+                    "Saturation": 1.0,
+                    "Sharpness": 1.0,
+                    "AnalogueGain": 2.0,
                 },
                 "settling_time": 2.0
             }

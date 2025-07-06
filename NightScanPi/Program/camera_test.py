@@ -67,6 +67,9 @@ def print_camera_status():
     # Display Pi Zero optimization status
     print_pi_zero_status()
     
+    # Display camera tuning status
+    print_camera_tuning_status()
+    
     print()
 
 
@@ -308,6 +311,99 @@ def test_pi_zero_optimizations():
         return False
 
 
+def print_camera_tuning_status():
+    """Print camera tuning and optimization status."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.camera_tuning import get_optimal_tuning
+        from camera_sensor_detector import detect_camera_sensor
+        
+        sensor_type = detect_camera_sensor()
+        if sensor_type:
+            tuning = get_optimal_tuning(sensor_type)
+            
+            print(f"\n🎨 Camera Tuning:")
+            print(f"  • Sensor Detected: {sensor_type.upper()}")
+            print(f"  • Brightness: {tuning.brightness:.2f}")
+            print(f"  • Contrast: {tuning.contrast:.2f}")
+            print(f"  • Saturation: {tuning.saturation:.2f}")
+            print(f"  • Sharpness: {tuning.sharpness:.2f}")
+            print(f"  • Analogue Gain: {tuning.analogue_gain:.1f}")
+            print(f"  • Auto Exposure: {'✅' if tuning.ae_enable else '❌'}")
+            print(f"  • Auto White Balance: {'✅' if tuning.awb_enable else '❌'}")
+            print(f"  • Night Mode: {'✅' if tuning.night_mode_enabled else '❌'}")
+            
+            if tuning.exposure_time:
+                print(f"  • Manual Exposure: {tuning.exposure_time}µs")
+        else:
+            print(f"\n🎨 Camera Tuning: ❌ No sensor detected")
+        
+    except ImportError:
+        print(f"\n🎨 Camera Tuning: ❌ Not available")
+    except Exception as e:
+        print(f"\n🎨 Camera Tuning: ⚠️ Error - {e}")
+
+
+def test_camera_tuning():
+    """Test camera tuning functionality."""
+    print("🎨 Testing Camera Tuning...")
+    
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.camera_tuning import get_tuning_manager, get_optimal_tuning
+        from camera_sensor_detector import detect_camera_sensor
+        
+        manager = get_tuning_manager()
+        sensor_type = detect_camera_sensor()
+        
+        if not sensor_type:
+            sensor_type = "imx219"  # Default for testing
+            print(f"ℹ️ Using default sensor: {sensor_type}")
+        
+        print("📋 Testing tuning functions:")
+        
+        # Test getting optimal tuning
+        print(f"  • Getting optimal tuning for {sensor_type}...")
+        tuning = get_optimal_tuning(sensor_type, "auto")
+        print(f"    ✅ Auto mode: brightness={tuning.brightness:.2f}, gain={tuning.analogue_gain:.1f}")
+        
+        # Test day/night modes
+        day_tuning = get_optimal_tuning(sensor_type, "day")
+        night_tuning = get_optimal_tuning(sensor_type, "night")
+        print(f"    ✅ Day mode: contrast={day_tuning.contrast:.2f}")
+        print(f"    ✅ Night mode: gain={night_tuning.analogue_gain:.1f}")
+        
+        # Test presets
+        sensor_tuning = manager.get_sensor_tuning(sensor_type)
+        if sensor_tuning and sensor_tuning.quality_presets:
+            preset_name = list(sensor_tuning.quality_presets.keys())[0]
+            preset_tuning = get_optimal_tuning(sensor_type, preset=preset_name)
+            print(f"    ✅ Preset '{preset_name}': sharpness={preset_tuning.sharpness:.1f}")
+        
+        # Test tuning file generation
+        print(f"  • Testing tuning file generation...")
+        try:
+            tuning_path = manager.generate_tuning_file(sensor_type)
+            if tuning_path.exists():
+                print(f"    ✅ Tuning file generated: {tuning_path.name}")
+                # Clean up test file
+                tuning_path.unlink()
+            else:
+                print(f"    ❌ Tuning file not created")
+        except Exception as e:
+            print(f"    ⚠️ Tuning file generation failed: {e}")
+        
+        print("✅ Camera tuning test PASSED")
+        return True
+        
+    except ImportError:
+        print("❌ Camera tuning module not available")
+        return False
+    except Exception as e:
+        print(f"❌ Camera tuning test FAILED: {e}")
+        return False
+
+
 def run_camera_validation():
     """Run comprehensive camera validation tests."""
     print("🔍 Running Comprehensive Camera Validation...")
@@ -425,6 +521,7 @@ Examples:
   python camera_test.py --test-night-vision   # Test IR-CUT and LED control
   python camera_test.py --test-pi-zero        # Test Pi Zero 2W optimizations
   python camera_test.py --validate            # Run comprehensive camera validation
+  python camera_test.py --test-tuning         # Test camera tuning functionality
   python camera_test.py --all                 # Run all diagnostics
   python camera_test.py --json                # Output in JSON format
         """
@@ -444,6 +541,8 @@ Examples:
                        help="Test Pi Zero 2W memory optimizations")
     parser.add_argument("--validate", action="store_true",
                        help="Run comprehensive camera validation tests")
+    parser.add_argument("--test-tuning", action="store_true",
+                       help="Test camera tuning functionality")
     parser.add_argument("--all", action="store_true",
                        help="Run all diagnostics")
     parser.add_argument("--json", action="store_true",
@@ -454,7 +553,7 @@ Examples:
     args = parser.parse_args()
     
     # If no specific action, show status by default
-    if not any([args.status, args.test, args.capture, args.detect_sensor, args.test_night_vision, args.test_pi_zero, args.validate, args.all]):
+    if not any([args.status, args.test, args.capture, args.detect_sensor, args.test_night_vision, args.test_pi_zero, args.validate, args.test_tuning, args.all]):
         args.status = True
     
     results = {}
@@ -494,6 +593,9 @@ Examples:
         if args.validate or args.all:
             results["validation_test"] = run_camera_validation()
         
+        if args.test_tuning or args.all:
+            results["tuning_test"] = test_camera_tuning()
+        
         print(json.dumps(results, indent=2))
         
     else:
@@ -523,6 +625,10 @@ Examples:
         
         if args.validate or args.all:
             run_camera_validation()
+            print()
+        
+        if args.test_tuning or args.all:
+            test_camera_tuning()
             print()
         
         if args.all:
