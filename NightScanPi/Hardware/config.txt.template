@@ -1,0 +1,175 @@
+# Raspberry Pi config.txt Template for NightScanPi IR-CUT Camera
+# This is a template showing the required configuration for IR-CUT cameras
+# The actual configuration will be applied by configure_camera_boot.sh
+
+# ============================================================================
+# BASIC SYSTEM CONFIGURATION
+# ============================================================================
+
+# Enable ARM (CPU) frequency scaling
+arm_freq=1000
+
+# GPU memory allocation (adjust based on Pi model)
+# Pi Zero 2W: 64MB, Pi 4: 128MB
+gpu_mem=64
+
+# Disable rainbow splash screen for faster boot
+disable_splash=1
+
+# Enable hardware-accelerated video decoding
+start_x=1
+
+# ============================================================================
+# CAMERA CONFIGURATION
+# ============================================================================
+
+# CRITICAL: Disable automatic camera detection for third-party cameras
+camera_auto_detect=0
+
+# Camera interface enable
+start_x=1
+
+# Sensor-specific overlays (CHOOSE ONE based on your camera):
+
+# For IMX219 sensors (most common in IR-CUT cameras)
+dtoverlay=imx219
+
+# For OV5647 sensors (original Pi camera sensor)
+#dtoverlay=ov5647
+
+# For IMX477 sensors (HQ camera sensor)
+#dtoverlay=imx477
+
+# For IMX290/IMX327 sensors (low-light specialized)
+#dtoverlay=imx290,clock-frequency=37125000
+
+# For OV9281 sensors (global shutter)
+#dtoverlay=ov9281
+
+# For IMX378 sensors
+#dtoverlay=imx378
+
+# For IMX519 sensors (requires driver)
+#dtoverlay=imx519
+
+# For IMX708 sensors (Camera Module 3)
+#dtoverlay=imx708
+
+# For IMX296 sensors (Global Shutter Camera)
+#dtoverlay=imx296
+
+# ============================================================================
+# IR-CUT CAMERA OPTIMIZATIONS
+# ============================================================================
+
+# Optimize GPU memory based on total RAM
+gpu_mem_256=64    # For Pi Zero with 256MB (unlikely)
+gpu_mem_512=64    # For Pi Zero 2W with 512MB
+gpu_mem_1024=128  # For Pi 4 with 1GB+
+
+# Disable unused interfaces to save power (Pi Zero optimization)
+#dtparam=audio=off
+#dtparam=spi=off
+#dtparam=i2c_arm=off
+
+# ============================================================================
+# PI ZERO 2W SPECIFIC OPTIMIZATIONS
+# ============================================================================
+
+# Disable overscan for maximum screen usage
+disable_overscan=1
+
+# Reduce GPU memory for Pi Zero (limited RAM)
+gpu_mem=64
+
+# Enable hardware acceleration
+gpu_mem_256=64
+gpu_mem_512=64
+
+# Power management for low-power operation
+dtparam=pwr_led_trigger=default-on
+dtparam=pwr_led_activelow=off
+
+# ============================================================================
+# EXPERIMENTAL/ADVANCED SETTINGS
+# ============================================================================
+
+# Increase I2C baudrate for faster communication (if using I2C sensors)
+#dtparam=i2c_baudrate=400000
+
+# Enable hardware watchdog (useful for unattended operation)
+#dtparam=watchdog=on
+
+# Overclock settings for Pi Zero 2W (use with caution)
+#arm_freq=1200
+#gpu_freq=500
+#over_voltage=6
+
+# ============================================================================
+# SENSOR-SPECIFIC NOTES
+# ============================================================================
+
+# IMX219: Most common in third-party cameras, good balance of quality/cost
+# - Resolution: 8MP (3280x2464)
+# - Good for daylight and IR photography
+# - dtoverlay=imx219
+
+# OV5647: Original Pi camera sensor
+# - Resolution: 5MP (2592x1944)  
+# - Basic performance, widely supported
+# - dtoverlay=ov5647
+
+# IMX290/IMX327: Specialized for low-light
+# - Resolution: 2MP (1920x1080)
+# - Excellent night vision capabilities
+# - Requires clock frequency setting
+# - dtoverlay=imx290,clock-frequency=37125000
+
+# IMX477: High-quality camera sensor
+# - Resolution: 12MP (4056x3040)
+# - Professional image quality
+# - dtoverlay=imx477
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+
+# If camera is not detected:
+# 1. Ensure camera cable is properly connected
+# 2. Check cable orientation (contacts facing HDMI on most Pi models)
+# 3. Verify camera_auto_detect=0 is set
+# 4. Confirm correct dtoverlay for your sensor
+# 5. Reboot after configuration changes
+
+# To identify your sensor:
+# - Run: rpicam-hello -t 1000 --info-text "%frame"
+# - Or: dmesg | grep -i camera
+# - Or: vcgencmd get_camera
+
+# Common issues:
+# - "No cameras available": Wrong dtoverlay or cable issue
+# - "Camera not detected": camera_auto_detect=1 still enabled
+# - Poor image quality: Missing sensor-specific tuning files
+
+# ============================================================================
+# VALIDATION COMMANDS
+# ============================================================================
+
+# Test camera detection:
+# rpicam-hello -t 5000
+# libcamera-hello -t 5000 (older OS versions)
+
+# List available cameras:
+# rpicam-hello --list-cameras
+# libcamera-hello --list-cameras
+
+# Test image capture:
+# rpicam-still -o test.jpg
+# libcamera-still -o test.jpg
+
+# Python test:
+# python3 -c "from picamera2 import Picamera2; print('Camera available')"
+
+# ============================================================================
+# END OF CONFIGURATION
+# ============================================================================

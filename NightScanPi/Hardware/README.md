@@ -31,4 +31,31 @@ Battery -> TPL5110 -> Raspberry Pi
 - Typical total consumption is under **3 W** during captures.
 - Use a **64 GB microSD** card (ext4 recommended) to store audio and image files.
 
-For further details about each component, refer to the individual files in this directory.
+## Camera Configuration
+
+**⚠️ CRITICAL**: IR-CUT cameras require specific boot configuration to function properly.
+
+### Automatic Setup (Recommended)
+```bash
+# Run the complete setup (includes camera configuration)
+./setup_pi.sh
+
+# Or configure camera separately
+./Hardware/configure_camera_boot.sh
+```
+
+### Manual Setup
+1. **Connect camera** with CSI cable (metal contacts **downward** for Pi Zero)
+2. **Configure boot** by setting `camera_auto_detect=0` in `/boot/firmware/config.txt`
+3. **Add sensor overlay** like `dtoverlay=imx219` (most common)
+4. **Reboot** system for changes to take effect
+
+**📖 Complete guide**: See `Hardware/CAMERA_CONFIGURATION_GUIDE.md` for detailed instructions.
+
+## Component Details
+
+For detailed information about each component:
+- **Camera Setup**: `CAMERA_CONFIGURATION_GUIDE.md`
+- **Camera Hardware**: `RPI IR-CUT Camera` (detailed specs)
+- **Pi Zero Details**: `Raspberry pi zero 2w`
+- **Microphone Info**: `Respeaker Lite`
