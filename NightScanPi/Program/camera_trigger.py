@@ -63,40 +63,46 @@ class CameraManager:
         return self.api_type is not None
     
     def capture_image_modern(self, output_path: Path, resolution: Tuple[int, int] = (1920, 1080)) -> bool:
-        """Capture image using modern picamera2 API."""
+        """Capture image using modern picamera2 API with memory optimization."""
         if self.api_type != "picamera2" or Picamera2 is None:
             return False
         
         try:
-            # Prepare night vision system for capture
-            self._prepare_night_vision()
+            # Use memory-optimized context for Pi Zero
+            from .utils.pi_zero_optimizer import memory_optimized_operation
             
-            # Get sensor-specific settings
-            sensor_settings = self._get_sensor_optimized_settings(resolution)
-            
-            # Create camera instance for this capture
-            with Picamera2() as camera:
-                # Configure camera for still capture
-                config = camera.create_still_configuration(
-                    main={"size": resolution, "format": "RGB888"},
-                    lores={"size": (640, 480), "format": "YUV420"},
-                    display="lores"
-                )
-                camera.configure(config)
+            with memory_optimized_operation():
+                # Prepare night vision system for capture
+                self._prepare_night_vision()
                 
-                # Apply sensor-optimized camera controls
-                camera.set_controls(sensor_settings["controls"])
+                # Get sensor-specific settings
+                sensor_settings = self._get_sensor_optimized_settings(resolution)
                 
-                # Start camera and allow time to adjust
-                camera.start()
-                time.sleep(sensor_settings["settling_time"])
-                
-                # Capture the image
-                camera.capture_file(str(output_path))
-                camera.stop()
-                
-                logger.info(f"Image captured successfully: {output_path}")
-                return True
+                # Create camera instance for this capture
+                with Picamera2() as camera:
+                    # Configure camera for still capture with Pi Zero optimizations
+                    lores_size = (320, 240) if self._is_pi_zero() else (640, 480)
+                    
+                    config = camera.create_still_configuration(
+                        main={"size": resolution, "format": "RGB888"},
+                        lores={"size": lores_size, "format": "YUV420"},
+                        display="lores"
+                    )
+                    camera.configure(config)
+                    
+                    # Apply sensor-optimized camera controls
+                    camera.set_controls(sensor_settings["controls"])
+                    
+                    # Start camera and allow time to adjust
+                    camera.start()
+                    time.sleep(sensor_settings["settling_time"])
+                    
+                    # Capture the image
+                    camera.capture_file(str(output_path))
+                    camera.stop()
+                    
+                    logger.info(f"Image captured successfully: {output_path}")
+                    return True
                 
         except Exception as e:
             logger.error(f"Modern camera capture failed: {e}")
@@ -186,6 +192,14 @@ class CameraManager:
             logger.error(f"Legacy camera capture failed: {e}")
             return False
     
+    def _is_pi_zero(self) -> bool:
+        """Check if running on Pi Zero."""
+        try:
+            from .utils.pi_zero_optimizer import is_pi_zero
+            return is_pi_zero()
+        except:
+            return False
+    
     def _prepare_night_vision(self) -> None:
         """Prepare night vision system for capture."""
         try:
@@ -254,23 +268,38 @@ def capture_image(out_dir: Path, resolution: Optional[Tuple[int, int]] = None) -
 
 
 def get_optimal_resolution() -> Tuple[int, int]:
-    """Get optimal resolution for detected camera sensor."""
+    """Get optimal resolution for detected camera sensor and Pi model."""
     try:
         from .camera_sensor_detector import detect_camera_sensor, get_sensor_detector
+        from .utils.pi_zero_optimizer import optimize_camera_resolution
         
         detector = get_sensor_detector()
         sensor_type = detect_camera_sensor()
         
+        # Get sensor-recommended resolution
         if sensor_type:
             recommended_res = detector.get_recommended_resolution(sensor_type)
-            logger.info(f"Using sensor-recommended resolution: {recommended_res}")
-            return recommended_res
+            logger.info(f"Sensor-recommended resolution: {recommended_res}")
+        else:
+            recommended_res = (1920, 1080)
+        
+        # Optimize for Pi Zero 2W if needed
+        optimal_res = optimize_camera_resolution(recommended_res)
+        
+        if optimal_res != recommended_res:
+            logger.info(f"Resolution optimized for Pi Zero: {recommended_res} → {optimal_res}")
+        
+        return optimal_res
         
     except Exception as e:
         logger.warning(f"Failed to get optimal resolution: {e}")
     
-    # Default fallback resolution
-    return (1920, 1080)
+    # Default fallback resolution (optimized for Pi Zero if applicable)
+    try:
+        from .utils.pi_zero_optimizer import optimize_camera_resolution
+        return optimize_camera_resolution((1920, 1080))
+    except:
+        return (1920, 1080)
 
 
 def test_camera() -> bool:

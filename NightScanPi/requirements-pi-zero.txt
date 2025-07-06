@@ -1,0 +1,43 @@
+# Pi Zero 2W Optimized Requirements
+# Lightweight versions of dependencies for 512MB RAM constraint
+
+# Core Python packages (lightweight versions)
+numpy==1.24.3                    # Specific version for Pi Zero compatibility
+Pillow==9.5.0                    # Image processing - optimized version
+requests==2.31.0                 # HTTP requests
+
+# Audio processing (lightweight)
+soundfile==0.12.1               # Audio file I/O
+sounddevice==0.4.6              # Audio device interface
+pyaudio==0.2.11                 # Audio capture
+pydub==0.25.1                   # Audio manipulation
+
+# Scientific computing (minimal)
+scipy==1.10.1                   # Scientific computing - Pi Zero compatible
+
+# Web framework (lightweight)
+flask==2.3.2                    # Web server
+flask-limiter==3.3.1            # Rate limiting
+flask-socketio==5.3.4           # WebSocket support
+
+# Computer vision (headless version for Pi Zero)
+opencv-python-headless==4.7.1.72  # OpenCV without GUI dependencies
+
+# Camera support (modern)
+picamera2==0.3.12               # Modern camera API for Pi
+# picamera==1.13                # Legacy fallback (commented out - use only if needed)
+
+# GPIO and hardware
+RPi.GPIO==0.7.1                 # GPIO control for Pi Zero
+
+# System monitoring
+psutil==5.9.5                   # System and process monitoring
+
+# Optional: Lightweight replacements for heavy ML dependencies
+# Instead of torch/torchaudio (which are very heavy):
+# librosa==0.10.0                # Audio analysis (much lighter than torch)
+# matplotlib==3.7.1              # Plotting (if needed for spectrograms)
+
+# Development and testing (only install in dev environment)
+# pytest==7.4.0
+# pytest-cov==4.1.0

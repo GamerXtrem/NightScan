@@ -150,6 +150,12 @@ get_package_list() {
                 "libraspberrypi-bin"
                 "libraspberrypi-dev"
             )
+            
+            # Additional Pi Zero optimizations
+            base_packages+=(
+                "zram-tools"      # Compressed memory for Pi Zero
+                "dphys-swapfile"  # Swap management
+            )
         fi
     else
         log_warning "Not on Raspberry Pi - skipping camera packages"
@@ -221,6 +227,24 @@ configure_system_services() {
             $SUDO raspi-config nonint do_camera 0 >/dev/null 2>&1 || true
             log_success "Camera interface enabled"
         fi
+        
+        # Pi Zero specific optimizations
+        if [ "$IS_PI_ZERO" = true ]; then
+            log "🔧 Applying Pi Zero 2W memory optimizations..."
+            
+            # Configure zRAM for compressed memory
+            if command -v zramctl >/dev/null 2>&1; then
+                $SUDO systemctl enable zramswap >/dev/null 2>&1 || true
+                log_success "zRAM compressed memory enabled"
+            fi
+            
+            # Configure swap file for Pi Zero
+            if [ -f /etc/dphys-swapfile ]; then
+                $SUDO sed -i 's/#CONF_SWAPSIZE=/CONF_SWAPSIZE=256/' /etc/dphys-swapfile 2>/dev/null || true
+                $SUDO systemctl restart dphys-swapfile >/dev/null 2>&1 || true
+                log_success "256MB swap file configured"
+            fi
+        fi
     fi
 }
 
@@ -288,6 +312,9 @@ setup_python_environment() {
         if [ "$IS_PI_ZERO" = true ]; then
             log "Installing lightweight OpenCV for Pi Zero..."
             camera_python_packages+=("opencv-python-headless")
+            
+            # Pi Zero specific optimizations
+            camera_python_packages+=("psutil")  # Memory monitoring
         else
             camera_python_packages+=("opencv-python")
         fi

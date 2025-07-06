@@ -64,6 +64,9 @@ def print_camera_status():
     # Display night vision status
     print_night_vision_status()
     
+    # Display Pi Zero optimization status
+    print_pi_zero_status()
+    
     print()
 
 
@@ -224,6 +227,87 @@ def print_night_vision_status():
         print(f"\n🌙 Night Vision System: ⚠️ Error - {e}")
 
 
+def print_pi_zero_status():
+    """Print Pi Zero optimization status."""
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.pi_zero_optimizer import get_memory_status
+        
+        status = get_memory_status()
+        
+        print(f"\n🔧 Pi Zero 2W Optimizations:")
+        print(f"  • Pi Zero Detected: {'✅' if status['is_pi_zero'] else '❌'}")
+        print(f"  • Optimizations Active: {'✅' if status['optimizations_active'] else '❌'}")
+        
+        memory = status['memory']
+        print(f"  • Memory Total: {memory['total_mb']:.0f}MB")
+        print(f"  • Memory Used: {memory['used_mb']:.0f}MB ({memory['percent_used']:.1f}%)")
+        print(f"  • Memory Available: {memory['available_mb']:.0f}MB")
+        print(f"  • Swap Usage: {memory['swap_mb']:.0f}MB")
+        
+        if status['optimizations_active']:
+            settings = status['settings']
+            print(f"  • Max Camera Res: {settings['max_camera_resolution']}")
+            print(f"  • GPU Memory: {settings['gpu_memory_mb']}MB")
+            print(f"  • Max Audio Buffer: {settings['max_audio_buffer']}")
+            print(f"  • Memory Monitoring: {'✅' if settings['monitoring_active'] else '❌'}")
+        
+    except ImportError:
+        print(f"\n🔧 Pi Zero 2W Optimizations: ❌ Not available")
+    except Exception as e:
+        print(f"\n🔧 Pi Zero 2W Optimizations: ⚠️ Error - {e}")
+
+
+def test_pi_zero_optimizations():
+    """Test Pi Zero memory optimization functionality."""
+    print("🔧 Testing Pi Zero 2W Optimizations...")
+    
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from utils.pi_zero_optimizer import get_optimizer, optimize_camera_resolution, optimize_audio_buffer_size, cleanup_memory
+        
+        optimizer = get_optimizer()
+        
+        if not optimizer.is_pi_zero:
+            print("ℹ️ Not running on Pi Zero - optimization tests limited")
+        
+        print("📋 Testing optimization functions:")
+        
+        # Test resolution optimization
+        test_resolutions = [(1920, 1080), (1280, 720), (640, 480)]
+        print("  • Camera resolution optimization:")
+        for res in test_resolutions:
+            optimized = optimize_camera_resolution(res)
+            status = "→" if optimized != res else "="
+            print(f"    {res} {status} {optimized}")
+        
+        # Test audio buffer optimization
+        test_buffers = [1024, 2048, 4096]
+        print("  • Audio buffer optimization:")
+        for buffer in test_buffers:
+            optimized = optimize_audio_buffer_size(buffer)
+            status = "→" if optimized != buffer else "="
+            print(f"    {buffer} {status} {optimized}")
+        
+        # Test memory cleanup
+        print("  • Memory cleanup test...")
+        initial_memory = optimizer.get_memory_info()
+        cleanup_memory(force=True)
+        final_memory = optimizer.get_memory_info()
+        freed = initial_memory.used_mb - final_memory.used_mb
+        print(f"    Freed {freed:.1f}MB of memory")
+        
+        print("✅ Pi Zero optimization test PASSED")
+        return True
+        
+    except ImportError:
+        print("❌ Pi Zero optimizer module not available")
+        return False
+    except Exception as e:
+        print(f"❌ Pi Zero optimization test FAILED: {e}")
+        return False
+
+
 def test_night_vision_control():
     """Test night vision control functionality."""
     print("🌙 Testing Night Vision Control...")
@@ -299,6 +383,7 @@ Examples:
   python camera_test.py --capture             # Capture test image
   python camera_test.py --detect-sensor       # Test sensor detection
   python camera_test.py --test-night-vision   # Test IR-CUT and LED control
+  python camera_test.py --test-pi-zero        # Test Pi Zero 2W optimizations
   python camera_test.py --all                 # Run all diagnostics
   python camera_test.py --json                # Output in JSON format
         """
@@ -314,6 +399,8 @@ Examples:
                        help="Test sensor detection specifically")
     parser.add_argument("--test-night-vision", action="store_true",
                        help="Test night vision control functionality")
+    parser.add_argument("--test-pi-zero", action="store_true",
+                       help="Test Pi Zero 2W memory optimizations")
     parser.add_argument("--all", action="store_true",
                        help="Run all diagnostics")
     parser.add_argument("--json", action="store_true",
@@ -324,7 +411,7 @@ Examples:
     args = parser.parse_args()
     
     # If no specific action, show status by default
-    if not any([args.status, args.test, args.capture, args.detect_sensor, args.test_night_vision, args.all]):
+    if not any([args.status, args.test, args.capture, args.detect_sensor, args.test_night_vision, args.test_pi_zero, args.all]):
         args.status = True
     
     results = {}
@@ -358,6 +445,9 @@ Examples:
         if args.test_night_vision or args.all:
             results["night_vision_test"] = test_night_vision_control()
         
+        if args.test_pi_zero or args.all:
+            results["pi_zero_test"] = test_pi_zero_optimizations()
+        
         print(json.dumps(results, indent=2))
         
     else:
@@ -379,6 +469,10 @@ Examples:
         
         if args.test_night_vision or args.all:
             test_night_vision_control()
+            print()
+        
+        if args.test_pi_zero or args.all:
+            test_pi_zero_optimizations()
             print()
         
         if args.all:
