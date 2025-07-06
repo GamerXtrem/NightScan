@@ -1,0 +1,782 @@
+{
+  "security_score": 0,
+  "total_vulnerabilities": 124,
+  "severity_breakdown": {
+    "critical": 25,
+    "high": 42,
+    "medium": 57
+  },
+  "vulnerabilities": {
+    "hardcoded_secrets": [
+      {
+        "type": "CRITICAL",
+        "description": "Database URL with credentials",
+        "file": "security_audit.py",
+        "match": "postgres://[^:]+:[^@...",
+        "line": 63
+      },
+      {
+        "type": "CRITICAL",
+        "description": "MySQL URL with credentials",
+        "file": "security_audit.py",
+        "match": "mysql://[^:]+:[^@...",
+        "line": 64
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Secret Key",
+        "file": "README.md",
+        "match": "SECRET_KEY=\"$SECRET_KEY\"...",
+        "line": 63
+      },
+      {
+        "type": "CRITICAL",
+        "description": "MySQL URL with credentials",
+        "file": "export_predictions.py",
+        "match": "mysql://user:pass@...",
+        "line": 12
+      },
+      {
+        "type": "CRITICAL",
+        "description": "MySQL URL with credentials",
+        "file": "export_predictions.py",
+        "match": "mysql://user:pass@...",
+        "line": 12
+      },
+      {
+        "type": "CRITICAL",
+        "description": "MySQL URL with credentials",
+        "file": "export_predictions.py",
+        "match": "mysql://user:pass@...",
+        "line": 12
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Password",
+        "file": "SECURITY.md",
+        "match": "password=\"$NEW_PASSWORD\"...",
+        "line": 214
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Token",
+        "file": "SECURITY.md",
+        "match": "TOKEN=\"your-vault-token\"...",
+        "line": 90
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Token",
+        "file": "SECURITY.md",
+        "match": "TOKEN=\"dev-token\"...",
+        "line": 114
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Token",
+        "file": "SECURITY.md",
+        "match": "TOKEN=\"$(cat /etc/vault/token)\"...",
+        "line": 122
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Password",
+        "file": "tests/test_config.py",
+        "match": "password='key-123'...",
+        "line": 204
+      },
+      {
+        "type": "CRITICAL",
+        "description": "MySQL URL with credentials",
+        "file": "tests/test_config.py",
+        "match": "mysql://user:pass@...",
+        "line": 93
+      },
+      {
+        "type": "CRITICAL",
+        "description": "MySQL URL with credentials",
+        "file": "tests/test_config.py",
+        "match": "mysql://user:pass@...",
+        "line": 93
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Password",
+        "file": "scripts/setup-secrets.sh",
+        "match": "password=\"$db_password\"...",
+        "line": 90
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Password",
+        "file": "scripts/setup-secrets.sh",
+        "match": "password=\"$redis_password\"...",
+        "line": 95
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Password",
+        "file": "scripts/setup-secrets.sh",
+        "match": "password=\"CHANGE_ME\"...",
+        "line": 117
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Password",
+        "file": "scripts/setup-secrets.sh",
+        "match": "password=\"...\"...",
+        "line": 141
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Secret Key",
+        "file": "scripts/setup-secrets.sh",
+        "match": "secret_key=\"$secret_key\"...",
+        "line": 99
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Secret Key",
+        "file": "scripts/setup-secrets.sh",
+        "match": "secret_key=\"$csrf_secret\"...",
+        "line": 100
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded API Key",
+        "file": "scripts/setup-secrets.sh",
+        "match": "api_key=\"CHANGE_ME\"...",
+        "line": 110
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded API Key",
+        "file": "scripts/setup-secrets.sh",
+        "match": "api_key=\"...\"...",
+        "line": 139
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Token",
+        "file": "scripts/setup-secrets.sh",
+        "match": "TOKEN=\"${VAULT_TOKEN:-}\"...",
+        "line": 17
+      },
+      {
+        "type": "CRITICAL",
+        "description": "Hardcoded Token",
+        "file": "scripts/setup-secrets.sh",
+        "match": "TOKEN=\"$VAULT_TOKEN\"...",
+        "line": 74
+      },
+      {
+        "type": "CRITICAL",
+        "description": "MySQL URL with credentials",
+        "file": "docs/en/wordpress_plugin.md",
+        "match": "mysql://appuser:secret@...",
+        "line": 44
+      },
+      {
+        "type": "CRITICAL",
+        "description": "MySQL URL with credentials",
+        "file": "docs/en/wordpress_plugin.md",
+        "match": "mysql://wpuser:secret@...",
+        "line": 45
+      }
+    ],
+    "xss": [
+      {
+        "type": "HIGH",
+        "description": "Jinja2 safe filter usage",
+        "file": "analytics_dashboard.py",
+        "pattern": "|safe }}",
+        "line": 578
+      },
+      {
+        "type": "HIGH",
+        "description": "Jinja2 safe filter usage",
+        "file": "analytics_dashboard.py",
+        "pattern": "|safe }}",
+        "line": 578
+      },
+      {
+        "type": "HIGH",
+        "description": "Jinja2 safe filter usage",
+        "file": "analytics_dashboard.py",
+        "pattern": "|safe }}",
+        "line": 578
+      },
+      {
+        "type": "HIGH",
+        "description": "Jinja2 safe filter usage",
+        "file": "analytics_dashboard.py",
+        "pattern": "|safe }}",
+        "line": 578
+      }
+    ],
+    "csrf": [
+      {
+        "type": "MEDIUM",
+        "description": "CSRF protection exemption found",
+        "file": "security_audit.py",
+        "line": 174,
+        "context": "                    lines = content.split('\\n')"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "CSRF protection exemption found",
+        "file": "security_audit.py",
+        "line": 177,
+        "context": "                            csrf_exclusions.append({"
+      }
+    ],
+    "authentication": [
+      {
+        "type": "HIGH",
+        "description": "Weak password hashing algorithm",
+        "file": "security_audit.py",
+        "recommendation": "Use bcrypt, scrypt, or Argon2"
+      },
+      {
+        "type": "HIGH",
+        "description": "Weak password hashing algorithm",
+        "file": "analyze_conflicts.py",
+        "recommendation": "Use bcrypt, scrypt, or Argon2"
+      },
+      {
+        "type": "HIGH",
+        "description": "Weak password hashing algorithm",
+        "file": "model_versioning.py",
+        "recommendation": "Use bcrypt, scrypt, or Argon2"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential session fixation vulnerability",
+        "file": "web/app.py",
+        "recommendation": "Regenerate session ID after login"
+      }
+    ],
+    "authorization": [
+      {
+        "type": "HIGH",
+        "description": "Potential privilege escalation",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "demo_optimized_serving.py",
+        "route": "@app.route(\"/\")",
+        "function": "index"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "openapi_spec.py",
+        "route": "@app.route(\"/api/v1/openapi.json\")",
+        "function": "openapi_spec"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "openapi_spec.py",
+        "route": "@app.route(\"/api/v1/docs\")",
+        "function": "api_docs"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "optimized_api_integration.py",
+        "route": "@app.route(\"/api/optimized/stats\")",
+        "function": "optimized_stats"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "optimized_api_integration.py",
+        "route": "@app.route(\"/api/optimized/health\")",
+        "function": "optimized_health"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "optimized_api_integration.py",
+        "route": "@app.route(\"/api/optimized/predict\", methods=['POST'])",
+        "function": "optimized_predict_endpoint"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "optimized_api_integration.py",
+        "route": "@app.route(\"/test\")",
+        "function": "test_endpoint"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "web/app.py",
+        "route": "@app.route(\"/metrics\")",
+        "function": "metrics_endpoint"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "web/app.py",
+        "route": "@app.route(\"/health\")",
+        "function": "health_check"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "web/app.py",
+        "route": "@app.route(\"/ready\")",
+        "function": "readiness_check"
+      },
+      {
+        "type": "HIGH",
+        "description": "Potential privilege escalation",
+        "file": "tests/test_time_config.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Potential privilege escalation",
+        "file": "tests/test_energy_manager.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "Audio_Training/scripts/api_server.py",
+        "route": "@app.route(\"/metrics\")",
+        "function": "metrics_endpoint"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "Audio_Training/scripts/api_server.py",
+        "route": "@app.route(\"/health\")",
+        "function": "health_check"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Route without authorization check",
+        "file": "Audio_Training/scripts/api_server.py",
+        "route": "@app.route(\"/ready\")",
+        "function": "readiness_check"
+      },
+      {
+        "type": "HIGH",
+        "description": "Potential privilege escalation",
+        "file": "NightScanPi/Program/time_config.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Potential privilege escalation",
+        "file": "NightScanPi/Program/wifi_wakeup.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Potential privilege escalation",
+        "file": "NightScanPi/Program/utils/energy_manager.py"
+      }
+    ],
+    "input_validation": [
+      {
+        "type": "HIGH",
+        "description": "Direct request parameter in SQL",
+        "file": "web/app.py",
+        "pattern": "request.args.get('page', 1, type=int)\n    per_page = min(request.args.get('per_page', 50, type=int),..."
+      },
+      {
+        "type": "HIGH",
+        "description": "Direct form input in SQL",
+        "file": "web/app.py",
+        "pattern": "request.form.get(\"username\", \"\"), 30)\n        password = request.form.get(\"password\", \"\")\n        \n ..."
+      }
+    ],
+    "file_upload": [
+      {
+        "type": "HIGH",
+        "description": "File upload without proper validation",
+        "file": "optimized_api_integration.py",
+        "recommendation": "Implement file type and size validation"
+      },
+      {
+        "type": "HIGH",
+        "description": "File upload without proper validation",
+        "file": "api_v1.py",
+        "recommendation": "Implement file type and size validation"
+      },
+      {
+        "type": "HIGH",
+        "description": "File upload vulnerable to path traversal",
+        "file": "api_v1.py",
+        "recommendation": "Use secure_filename() and validate paths"
+      },
+      {
+        "type": "HIGH",
+        "description": "File upload without proper validation",
+        "file": "Audio_Training/scripts/api_server.py",
+        "recommendation": "Implement file type and size validation"
+      },
+      {
+        "type": "HIGH",
+        "description": "File upload vulnerable to path traversal",
+        "file": "Audio_Training/scripts/api_server.py",
+        "recommendation": "Use secure_filename() and validate paths"
+      }
+    ],
+    "dependencies": [
+      {
+        "type": "HIGH",
+        "description": "Vulnerable pillow version",
+        "version": "11.2.1",
+        "recommendation": "Update pillow to latest version"
+      }
+    ],
+    "docker": [],
+    "kubernetes": [
+      {
+        "type": "MEDIUM",
+        "description": "Missing security context",
+        "file": "k8s/postgres.yaml"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing security context",
+        "file": "k8s/prediction-api.yaml"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing security context",
+        "file": "k8s/web-app.yaml"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing security context",
+        "file": "k8s/redis.yaml"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing security context",
+        "file": "k8s/monitoring.yaml"
+      }
+    ],
+    "logging": [
+      {
+        "type": "MEDIUM",
+        "description": "Secret in logs",
+        "file": "config.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Key in logs",
+        "file": "config.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Key in logs",
+        "file": "log_utils.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Password in logs",
+        "file": "notification_service.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Password in logs",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Password in print statements",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Secret in logs",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Token in logs",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Key in logs",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Key in logs",
+        "file": "cache_utils.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Key in logs",
+        "file": "backup_system.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Key in logs",
+        "file": "model_versioning.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Token in logs",
+        "file": "push_notifications.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Key in logs",
+        "file": "tests/test_wifi_wakeup.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Key in logs",
+        "file": "tests/test_flask_app.py"
+      }
+    ],
+    "encryption": [
+      {
+        "type": "HIGH",
+        "description": "MD5 hashing (weak)",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "SHA1 hashing (weak)",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "MD5 hashing (weak)",
+        "file": "analyze_conflicts.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "MD5 hashing (weak)",
+        "file": "model_versioning.py"
+      }
+    ],
+    "session_management": [
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "websocket_service.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "analytics_dashboard.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Insecure session cookies",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "openapi_spec.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "web/tasks.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "web/app.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "tests/test_flask_app.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "tests/test_analytics_dashboard.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "tests/test_websocket_service.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "tests/test_web_tasks.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Missing HttpOnly flag on cookies",
+        "file": "tests/test_notification_service.py"
+      }
+    ],
+    "cors": [
+      {
+        "type": "HIGH",
+        "description": "CORS wildcard origin",
+        "file": "security_audit.py"
+      }
+    ],
+    "ssl_tls": [],
+    "environment": [
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "config.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "fix_critical_conflicts.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "cache_utils.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "backup_system.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "push_notifications.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "web/tasks.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "web/app.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "tests/test_api_server.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "tests/test_config.py"
+      },
+      {
+        "type": "MEDIUM",
+        "description": "Potential environment variable exposure",
+        "file": "Audio_Training/scripts/api_server.py"
+      }
+    ],
+    "privilege_escalation": [
+      {
+        "type": "HIGH",
+        "description": "OS command execution",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code execution",
+        "file": "security_audit.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "fix_critical_conflicts.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "demo_optimized_serving.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "model_deployment.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "optimized_api_integration.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code execution",
+        "file": "tests/test_api_server.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code execution",
+        "file": "tests/test_flask_app.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "shared/training_framework.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "Picture_Training/scripts/predict.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "Picture_Training/scripts/train.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "Audio_Training/scripts/predict.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "Audio_Training/scripts/api_server.py"
+      },
+      {
+        "type": "HIGH",
+        "description": "Code evaluation",
+        "file": "Audio_Training/scripts/train.py"
+      }
+    ]
+  },
+  "compliance": {
+    "OWASP Top 10": {
+      "score": 20,
+      "framework": "OWASP Top 10 2021"
+    },
+    "CIS Controls": {
+      "score": 40,
+      "framework": "CIS Controls v8"
+    },
+    "NIST Framework": {
+      "score": 50,
+      "framework": "NIST Cybersecurity Framework"
+    },
+    "GDPR": {
+      "score": 55,
+      "framework": "GDPR"
+    }
+  },
+  "timestamp": "2025-07-06T08:12:20.625642"
+}
