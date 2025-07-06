@@ -1,0 +1,659 @@
+{
+  "summary": {
+    "total_issues": 42,
+    "priority_breakdown": {
+      "HIGH": 7,
+      "MEDIUM": 21,
+      "LOW": 14
+    },
+    "categories": [
+      "duplicate_functions",
+      "port_conflicts",
+      "api_conflicts",
+      "dependency_conflicts",
+      "naming_conflicts"
+    ]
+  },
+  "issues": {
+    "duplicate_functions": [
+      {
+        "type": "Duplicate Training Functions",
+        "priority": "HIGH",
+        "function": "train_epoch",
+        "files": [
+          "fix_critical_conflicts.py",
+          "shared/training_framework.py",
+          "Picture_Training/scripts/train.py",
+          "Audio_Training/scripts/train.py"
+        ],
+        "description": "Training function \"train_epoch\" found in multiple files"
+      },
+      {
+        "type": "Duplicate Prediction Functions",
+        "priority": "HIGH",
+        "function": "notify_prediction_complete",
+        "files": [
+          "websocket_service.py",
+          "notification_service.py",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "shared/notification_utils.py",
+          "shared/notification_utils.py"
+        ],
+        "description": "Prediction function \"notify_prediction_complete\" found in multiple files"
+      },
+      {
+        "type": "Duplicate Prediction Functions",
+        "priority": "HIGH",
+        "function": "send_prediction_complete_notification",
+        "files": [
+          "notification_service.py",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "push_notifications.py",
+          "shared/notification_utils.py",
+          "shared/notification_utils.py"
+        ],
+        "description": "Prediction function \"send_prediction_complete_notification\" found in multiple files"
+      },
+      {
+        "type": "Duplicate Prediction Functions",
+        "priority": "HIGH",
+        "function": "predict_audio",
+        "files": [
+          "api_v1.py",
+          "tests/test_load.py"
+        ],
+        "description": "Prediction function \"predict_audio\" found in multiple files"
+      }
+    ],
+    "port_conflicts": [
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "6379",
+        "files": [
+          "config.py",
+          "config.py",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "disaster_recovery.py",
+          "cache_utils.py",
+          "docker-compose.yml",
+          "docker-compose.yml",
+          "web/tasks.py",
+          "web/tasks.py",
+          "k8s/prediction-api.yaml",
+          "k8s/web-app.yaml",
+          "k8s/redis.yaml",
+          "k8s/redis.yaml",
+          "k8s/redis.yaml",
+          "k8s/redis.yaml",
+          "k8s/redis.yaml",
+          "k8s/redis.yaml",
+          "k8s/monitoring.yaml"
+        ],
+        "description": "Port 6379 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "8001",
+        "files": [
+          "config.py",
+          "Manual_en.md",
+          "Manual_en.md",
+          "Manual_en.md",
+          "Dockerfile",
+          "setup_nginx.sh",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "openapi_spec.py",
+          "README.md",
+          "README.md",
+          "disaster_recovery.py",
+          "disaster_recovery.py",
+          "setup_nginx_tls.sh",
+          "docker-compose.yml",
+          "docker-compose.yml",
+          "docker-compose.yml",
+          "web/app.py",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/prediction-api.yaml",
+          "k8s/web-app.yaml",
+          "k8s/monitoring.yaml",
+          "tests/test_load.py",
+          "docs/ML_SERVING_OPTIMIZATION.md",
+          "docs/ML_SERVING_OPTIMIZATION.md",
+          "docs/ML_SERVING_OPTIMIZATION.md",
+          "docs/ML_SERVING_OPTIMIZATION.md",
+          "docs/ML_SERVING_OPTIMIZATION.md",
+          "scripts/backup-cron.sh",
+          "docs/en/api_server.md",
+          "docs/en/api_server.md",
+          "docs/en/flask_app.md",
+          "docs/en/nginx_setup.md",
+          "ios-app/services/api.js"
+        ],
+        "description": "Port 8001 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "1000",
+        "files": [
+          "notification_service.py",
+          "optimized_api_integration.py"
+        ],
+        "description": "Port 1000 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "8000",
+        "files": [
+          "notification_service.py",
+          "Dockerfile",
+          "Dockerfile",
+          "Dockerfile",
+          "Dockerfile",
+          "setup_nginx.sh",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "openapi_spec.py",
+          "README.md",
+          "README.md",
+          "disaster_recovery.py",
+          "disaster_recovery.py",
+          "setup_nginx_tls.sh",
+          "docker-compose.yml",
+          "docker-compose.yml",
+          "docker-compose.yml",
+          "README-Docker.md",
+          "README-Docker.md",
+          "web/app.py",
+          "web/app.py",
+          "web/app.py",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/web-app.yaml",
+          "k8s/monitoring.yaml",
+          "tests/test_load.py",
+          "tests/test_load.py",
+          "tests/test_load.py",
+          "scripts/backup-cron.sh",
+          "scripts/deploy.sh",
+          "scripts/deploy.sh",
+          "docs/en/flask_app.md",
+          "docs/en/nginx_setup.md",
+          "NightScanPi/Program/manual_transfer.py",
+          "NightScanPi/Program/manual_transfer.py",
+          "NightScanPi/Program/manual_transfer.py",
+          "ios-app/services/websocket.js",
+          "ios-app/services/api.js",
+          "ios-app/services/api.js"
+        ],
+        "description": "Port 8000 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "8002",
+        "files": [
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "demo_optimized_serving.py",
+          "demo_optimized_serving.py",
+          "demo_optimized_serving.py",
+          "demo_optimized_serving.py",
+          "demo_optimized_serving.py",
+          "disaster_recovery.py",
+          "optimized_api_integration.py",
+          "optimized_api_integration.py",
+          "optimized_api_integration.py"
+        ],
+        "description": "Port 8002 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "8003",
+        "files": [
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py"
+        ],
+        "description": "Port 8003 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "9090",
+        "files": [
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "docker-compose.yml",
+          "README-Docker.md",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "scripts/deploy.sh",
+          "scripts/deploy.sh"
+        ],
+        "description": "Port 9090 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "8080",
+        "files": [
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "disaster_recovery.py",
+          "scripts/deploy-enhanced.sh",
+          "scripts/deploy-enhanced.sh"
+        ],
+        "description": "Port 8080 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "5432",
+        "files": [
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "README-Backup-DR.md",
+          "disaster_recovery.py",
+          "disaster_recovery.py",
+          "docker-compose.yml",
+          "docker-compose.yml",
+          "k8s/postgres.yaml",
+          "k8s/postgres.yaml",
+          "k8s/postgres.yaml",
+          "k8s/postgres.yaml",
+          "k8s/postgres.yaml",
+          "k8s/postgres.yaml",
+          "k8s/web-app.yaml",
+          "k8s/monitoring.yaml"
+        ],
+        "description": "Port 5432 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "3000",
+        "files": [
+          "fix_critical_conflicts.py",
+          "fix_critical_conflicts.py",
+          "docker-compose.yml",
+          "README-Docker.md",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "k8s/monitoring.yaml",
+          "scripts/deploy.sh",
+          "scripts/deploy.sh"
+        ],
+        "description": "Port 3000 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "8200",
+        "files": [
+          "SECURITY.md",
+          "SECURITY.md",
+          "SECURITY.md",
+          "scripts/setup-secrets.sh",
+          "scripts/setup-secrets.sh"
+        ],
+        "description": "Port 8200 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "5000",
+        "files": [
+          "scripts/deploy.sh",
+          "scripts/deploy.sh",
+          "NightScanPi/Program/wifi_service.py",
+          "NightScanPi/Program/wifi_service.py",
+          "NightScanPi/Program/wifi_service.py"
+        ],
+        "description": "Port 5000 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "8554",
+        "files": [
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera"
+        ],
+        "description": "Port 8554 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "3040",
+        "files": [
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera"
+        ],
+        "description": "Port 3040 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "1224",
+        "files": [
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera"
+        ],
+        "description": "Port 1224 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "1944",
+        "files": [
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera"
+        ],
+        "description": "Port 1944 used in multiple files"
+      },
+      {
+        "type": "Port Conflict",
+        "priority": "MEDIUM",
+        "port": "2448",
+        "files": [
+          "NightScanPi/Hardware/RPI IR-CUT Camera",
+          "NightScanPi/Hardware/RPI IR-CUT Camera"
+        ],
+        "description": "Port 2448 used in multiple files"
+      }
+    ],
+    "api_conflicts": [
+      {
+        "type": "API Endpoint Conflict",
+        "priority": "MEDIUM",
+        "endpoint": "/",
+        "files": [
+          "demo_optimized_serving.py",
+          "web/app.py"
+        ],
+        "description": "Endpoint \"/\" defined in multiple files"
+      },
+      {
+        "type": "API Endpoint Conflict",
+        "priority": "MEDIUM",
+        "endpoint": "/health",
+        "files": [
+          "api_v1.py",
+          "web/app.py",
+          "Audio_Training/scripts/api_server.py"
+        ],
+        "description": "Endpoint \"/health\" defined in multiple files"
+      },
+      {
+        "type": "API Endpoint Conflict",
+        "priority": "MEDIUM",
+        "endpoint": "/ready",
+        "files": [
+          "api_v1.py",
+          "web/app.py",
+          "Audio_Training/scripts/api_server.py"
+        ],
+        "description": "Endpoint \"/ready\" defined in multiple files"
+      },
+      {
+        "type": "API Endpoint Conflict",
+        "priority": "MEDIUM",
+        "endpoint": "/metrics",
+        "files": [
+          "web/app.py",
+          "Audio_Training/scripts/api_server.py"
+        ],
+        "description": "Endpoint \"/metrics\" defined in multiple files"
+      }
+    ],
+    "dependency_conflicts": [
+      {
+        "type": "Dependency Version Conflict",
+        "priority": "HIGH",
+        "package": "torch",
+        "versions": {
+          "requirements.txt": "==2.7.1",
+          "pyproject.toml": "==2.1.1"
+        },
+        "description": "Package \"torch\" has conflicting versions"
+      },
+      {
+        "type": "Dependency Version Conflict",
+        "priority": "HIGH",
+        "package": "torchvision",
+        "versions": {
+          "requirements.txt": "==0.22.1",
+          "pyproject.toml": "==0.16.1"
+        },
+        "description": "Package \"torchvision\" has conflicting versions"
+      },
+      {
+        "type": "Dependency Version Conflict",
+        "priority": "HIGH",
+        "package": "numpy",
+        "versions": {
+          "requirements.txt": "==2.3.0",
+          "pyproject.toml": "==1.24.3"
+        },
+        "description": "Package \"numpy\" has conflicting versions"
+      }
+    ],
+    "naming_conflicts": [
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "class",
+        "files": [
+          "websocket_service.py",
+          "analytics_dashboard.py",
+          "config.py",
+          "config.py",
+          "config.py",
+          "config.py",
+          "config.py",
+          "config.py",
+          "config.py",
+          "config.py",
+          "config.py",
+          "config.py",
+          "notification_service.py",
+          "notification_service.py",
+          "model_deployment.py",
+          "model_deployment.py",
+          "disaster_recovery.py",
+          "disaster_recovery.py",
+          "backup_system.py",
+          "model_serving_optimization.py",
+          "model_serving_optimization.py",
+          "model_versioning.py",
+          "model_versioning.py",
+          "model_versioning.py",
+          "push_notifications.py"
+        ],
+        "description": "Class \"class\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "NightScanConfig",
+        "files": [
+          "config.py",
+          "config.py"
+        ],
+        "description": "Class \"NightScanConfig\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "BaseTrainer",
+        "files": [
+          "fix_critical_conflicts.py",
+          "shared/training_framework.py"
+        ],
+        "description": "Class \"BaseTrainer\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "for",
+        "files": [
+          "fix_critical_conflicts.py",
+          "demo_optimized_serving.py",
+          "shared/training_framework.py"
+        ],
+        "description": "Class \"for\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "AudioTrainer",
+        "files": [
+          "fix_critical_conflicts.py",
+          "shared/training_framework.py"
+        ],
+        "description": "Class \"AudioTrainer\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "ImageTrainer",
+        "files": [
+          "fix_critical_conflicts.py",
+          "shared/training_framework.py"
+        ],
+        "description": "Class \"ImageTrainer\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "NotificationCoordinator",
+        "files": [
+          "fix_critical_conflicts.py",
+          "shared/notification_utils.py"
+        ],
+        "description": "Class \"NotificationCoordinator\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "names",
+        "files": [
+          "analyze_conflicts.py",
+          "Audio_Training/scripts/predict.py"
+        ],
+        "description": "Class \"names\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "Dummy",
+        "files": [
+          "tests/test_flask_app.py",
+          "tests/test_manual_transfer.py"
+        ],
+        "description": "Class \"Dummy\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "MockDB",
+        "files": [
+          "tests/test_analytics_dashboard.py",
+          "tests/test_web_tasks.py",
+          "tests/test_notification_service.py"
+        ],
+        "description": "Class \"MockDB\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "MockPrediction",
+        "files": [
+          "tests/test_analytics_dashboard.py",
+          "tests/test_web_tasks.py"
+        ],
+        "description": "Class \"MockPrediction\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "DummySun",
+        "files": [
+          "tests/test_sun_times.py",
+          "tests/test_sun_times.py",
+          "tests/test_sun_times.py"
+        ],
+        "description": "Class \"DummySun\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "folders",
+        "files": [
+          "Picture_Training/scripts/prepare_csv.py",
+          "Audio_Training/scripts/preprocess.py"
+        ],
+        "description": "Class \"folders\" defined in multiple files"
+      },
+      {
+        "type": "Class Name Conflict",
+        "priority": "LOW",
+        "class_name": "labels",
+        "files": [
+          "Audio_Training/scripts/preprocess.py",
+          "Audio_Training/scripts/predict.py",
+          "Audio_Training/scripts/api_server.py"
+        ],
+        "description": "Class \"labels\" defined in multiple files"
+      }
+    ]
+  }
+}

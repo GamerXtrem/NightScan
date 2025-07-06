@@ -1,0 +1,41 @@
+{
+  "fixes_applied": [
+    {
+      "type": "Dependency Standardization",
+      "file": "pyproject.toml",
+      "description": "Standardized dependency versions to match requirements.txt"
+    },
+    {
+      "type": "Lock File Creation",
+      "file": "requirements-lock.txt",
+      "description": "Created locked dependency versions file"
+    },
+    {
+      "type": "Code Deduplication",
+      "file": "shared/training_framework.py",
+      "description": "Created shared training framework to eliminate duplicate train_epoch functions"
+    },
+    {
+      "type": "Notification Deduplication",
+      "file": "shared/notification_utils.py",
+      "description": "Created shared notification coordinator to eliminate duplicate functions"
+    },
+    {
+      "type": "API Conflict Resolution",
+      "file": "api_routing_config.py",
+      "description": "Created API routing configuration to resolve endpoint conflicts"
+    },
+    {
+      "type": "Port Standardization",
+      "file": "port_config.py",
+      "description": "Created centralized port configuration to prevent conflicts"
+    },
+    {
+      "type": "Environment Template",
+      "file": ".env.example",
+      "description": "Created environment template with configurable ports"
+    }
+  ],
+  "timestamp": "1751781932.2978568",
+  "total_fixes": 7
+}

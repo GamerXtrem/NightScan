@@ -1,0 +1,46 @@
+{
+  "validation_results": {
+    "dependency_conflicts": {
+      "pyproject_updated": true,
+      "lock_file_created": true,
+      "versions_consistent": false
+    },
+    "code_deduplication": {
+      "shared_framework_created": true,
+      "notification_utils_created": true,
+      "training_modules_exist": true
+    },
+    "api_conflicts": {
+      "routing_config_created": true,
+      "endpoint_mapping_defined": true,
+      "service_blueprints_available": true
+    },
+    "port_conflicts": {
+      "port_config_created": true,
+      "env_template_created": true,
+      "port_functions_available": true
+    },
+    "new_files_created": {
+      "requirements-lock.txt": true,
+      "shared/training_framework.py": true,
+      "shared/notification_utils.py": true,
+      "shared/__init__.py": true,
+      "api_routing_config.py": true,
+      "port_config.py": true,
+      ".env.example": true
+    }
+  },
+  "post_analysis": {
+    "remaining_issues": 42,
+    "critical_issues": 7,
+    "issues_by_category": {
+      "duplicate_functions": 4,
+      "port_conflicts": 17,
+      "api_conflicts": 4,
+      "dependency_conflicts": 3,
+      "naming_conflicts": 14
+    }
+  },
+  "all_critical_fixed": false,
+  "integration_required": true
+}

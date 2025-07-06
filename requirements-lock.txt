@@ -1,0 +1,11 @@
+# Locked dependency versions for NightScan
+# Generated automatically to resolve version conflicts
+
+torch==2.1.1
+torchvision==0.16.1
+numpy==1.24.3
+redis==4.6.0
+celery==5.3.6
+pydantic==2.3.0
+flask==2.3.3
+sqlalchemy==1.4.52

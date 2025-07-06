@@ -24,7 +24,7 @@ mypy==1.15.0
 mypy_extensions==1.1.0
 networkx==3.5
 nodeenv==1.9.1
-numpy==2.3.0
+numpy==1.24.3
 nvidia-cublas-cu12==12.6.4.1
 nvidia-cuda-cupti-cu12==12.6.80
 nvidia-cuda-nvrtc-cu12==12.6.77
@@ -56,9 +56,9 @@ ruff==0.11.10
 setuptools==80.9.0
 SQLAlchemy==2.0.41
 sympy==1.14.0
-torch==2.7.1
-torchaudio==2.7.1
-torchvision==0.22.1
+torch==2.1.1
+torchaudio==2.1.1
+torchvision==0.16.1
 tqdm==4.67.1
 triton==3.3.1
 typing_extensions==4.13.2
