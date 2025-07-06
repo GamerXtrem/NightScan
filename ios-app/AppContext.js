@@ -5,6 +5,7 @@ import {
   checkForNewDetections,
 } from './services/notifications';
 import { fetchDetections } from './services/api';
+import authService from './services/auth';
 
 const PREFS_KEY = 'settings';
 
@@ -12,15 +13,20 @@ export const AppContext = createContext({
   darkMode: false,
   notifications: false,
   zoneFilter: '',
+  isAuthenticated: false,
+  authState: null,
   setDarkMode: () => {},
   setNotifications: () => {},
   setZoneFilter: () => {},
+  setAuthState: () => {},
 });
 
 export function AppProvider({ children }) {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(false);
   const [zoneFilter, setZoneFilter] = useState('');
+  const [authState, setAuthState] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -37,6 +43,25 @@ export function AppProvider({ children }) {
       }
     }
     load();
+  }, []);
+
+  // Initialize auth service and monitor auth state
+  useEffect(() => {
+    const updateAuthState = () => {
+      const currentAuthState = authService.getAuthState();
+      setAuthState(currentAuthState);
+      setIsAuthenticated(authService.isAuthenticated());
+    };
+
+    // Initial auth state
+    updateAuthState();
+
+    // Set up a periodic check for auth state changes
+    const authCheckInterval = setInterval(updateAuthState, 5000);
+
+    return () => {
+      clearInterval(authCheckInterval);
+    };
   }, []);
 
   useEffect(() => {
@@ -70,9 +95,12 @@ export function AppProvider({ children }) {
         darkMode,
         notifications,
         zoneFilter,
+        isAuthenticated,
+        authState,
         setDarkMode,
         setNotifications,
         setZoneFilter,
+        setAuthState,
       }}
     >
       {children}

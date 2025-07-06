@@ -4,16 +4,17 @@ import { StatusBar } from 'expo-status-bar';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import HomeScreen from './screens/HomeScreen';
+import { registerRootComponent } from 'expo';
+
 import ModernHomeScreen from './screens/ModernHomeScreen';
-import ScanScreen from './screens/ScanScreen';
 import MapScreen from './screens/MapScreen';
-import DetectionListScreen from './screens/DetectionListScreen';
+import ModernDetectionListScreen from './screens/ModernDetectionListScreen';
 import DetectionDetailScreen from './screens/DetectionDetailScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
-import SettingsScreen from './screens/SettingsScreen';
 import ModernSettingsScreen from './screens/ModernSettingsScreen';
+import PinSetupScreen from './screens/PinSetupScreen';
+import PinEntryScreen from './screens/PinEntryScreen';
 import CameraPreviewScreen from './screens/CameraPreviewScreen';
 import PiInstallationScreen from './screens/PiInstallationScreen';
 import AudioThresholdScreen from './screens/AudioThresholdScreen';
@@ -21,6 +22,7 @@ import EnergyManagementScreen from './screens/EnergyManagementScreen';
 import { AppProvider, AppContext } from './AppContext';
 import { initializeNotificationService, setupNotificationActionHandlers, removeNotificationListeners, handleWebSocketNotification } from './services/notifications';
 import websocketService from './services/websocket';
+import AuthWrapper from './components/AuthWrapper';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -36,8 +38,6 @@ function MainTabs() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Détections') {
             iconName = focused ? 'list' : 'list-outline';
-          } else if (route.name === 'Scanner') {
-            iconName = focused ? 'scan' : 'scan-outline';
           } else if (route.name === 'Paramètres') {
             iconName = focused ? 'settings' : 'settings-outline';
           }
@@ -74,17 +74,9 @@ function MainTabs() {
       />
       <Tab.Screen 
         name="Détections" 
-        component={DetectionListScreen}
+        component={ModernDetectionListScreen}
         options={{
           title: 'Détections',
-          headerShown: false,
-        }}
-      />
-      <Tab.Screen 
-        name="Scanner" 
-        component={ScanScreen}
-        options={{
-          title: 'Scanner',
           headerShown: false,
         }}
       />
@@ -101,7 +93,7 @@ function MainTabs() {
 }
 
 function RootNavigator() {
-  const { darkMode, isAuthenticated } = useContext(AppContext);
+  const { darkMode, isAuthenticated, authState } = useContext(AppContext);
   const navigationRef = useRef();
   const notificationListeners = useRef(null);
 
@@ -160,6 +152,7 @@ function RootNavigator() {
       theme={darkMode ? DarkTheme : DefaultTheme}
     >
       <Stack.Navigator
+        initialRouteName="Main"
         screenOptions={{
           headerStyle: {
             backgroundColor: darkMode ? '#1a1a1a' : '#4CAF50',
@@ -170,14 +163,19 @@ function RootNavigator() {
           },
         }}
       >
-        <Stack.Screen 
-          name="Home" 
-          component={ModernHomeScreen}
-          options={{
-            title: 'NightScan',
+        <Stack.Screen
+          name="Main"
+          options={{ 
             headerShown: false,
+            gestureEnabled: false,
           }}
-        />
+        >
+          {(props) => (
+            <AuthWrapper {...props}>
+              <MainTabs />
+            </AuthWrapper>
+          )}
+        </Stack.Screen>
         <Stack.Screen 
           name="Login" 
           component={LoginScreen}
@@ -194,10 +192,20 @@ function RootNavigator() {
             presentation: 'modal',
           }}
         />
-        <Stack.Screen
-          name="Main"
-          component={MainTabs}
-          options={{ 
+        <Stack.Screen 
+          name="PinSetup" 
+          component={PinSetupScreen}
+          options={{
+            title: 'Configuration PIN',
+            headerShown: false,
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen 
+          name="PinEntry" 
+          component={PinEntryScreen}
+          options={{
+            title: 'Authentification',
             headerShown: false,
             gestureEnabled: false,
           }}
@@ -259,3 +267,6 @@ export default function App() {
     </AppProvider>
   );
 }
+
+// Register the main component for Expo
+registerRootComponent(App);

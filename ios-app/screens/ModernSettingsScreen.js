@@ -13,6 +13,7 @@ import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import Typography, { Heading, Body, Label } from '../components/ui/Typography';
 import Theme from '../theme/DesignSystem';
+import authService from '../services/auth';
 
 export default function ModernSettingsScreen({ navigation }) {
   const [userInfo, setUserInfo] = useState(null);
@@ -43,6 +44,85 @@ export default function ModernSettingsScreen({ navigation }) {
         }},
       ]
     );
+  };
+
+  const handleAddUser = () => {
+    Alert.prompt(
+      'Ajouter Utilisateur',
+      'Entrez l\'adresse MAC de l\'appareil à autoriser (format: XX:XX:XX:XX:XX:XX)',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Ajouter', 
+          onPress: async (macAddress) => {
+            if (!macAddress || !isValidMAC(macAddress)) {
+              Alert.alert('Erreur', 'Format d\'adresse MAC invalide');
+              return;
+            }
+            
+            const result = await authService.addUserByMAC(macAddress.trim());
+            Alert.alert(
+              result.success ? 'Succès' : 'Erreur',
+              result.message
+            );
+          }
+        },
+      ],
+      'plain-text',
+      '',
+      'default'
+    );
+  };
+
+  const handleResetPi = () => {
+    Alert.prompt(
+      'Réinitialiser Pi',
+      'Cette action supprimera tous les utilisateurs autorisés. Entrez votre PIN pour confirmer :',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Réinitialiser', 
+          style: 'destructive',
+          onPress: async (pin) => {
+            if (!pin) {
+              Alert.alert('Erreur', 'PIN requis');
+              return;
+            }
+            
+            const result = await authService.resetPi(pin);
+            if (result.success) {
+              Alert.alert(
+                'Pi Réinitialisé',
+                'Le Pi a été réinitialisé avec succès. L\'application va se fermer.',
+                [
+                  { 
+                    text: 'OK', 
+                    onPress: () => {
+                      // Clear auth and restart app
+                      authService.clearAuthState();
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Main' }],
+                      });
+                    }
+                  }
+                ]
+              );
+            } else {
+              Alert.alert('Erreur', result.message);
+            }
+          }
+        },
+      ],
+      'secure-text',
+      '',
+      'default'
+    );
+  };
+
+  const isValidMAC = (mac) => {
+    const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+    return macRegex.test(mac);
   };
 
   const renderHeader = () => (
@@ -147,6 +227,46 @@ export default function ModernSettingsScreen({ navigation }) {
           variant="glass"
           size="medium"
           onPress={() => navigation.navigate('EnergyManagement')}
+          style={styles.settingButton}
+        />
+      </View>
+    </GlassCard>
+  );
+
+  const renderSecuritySection = () => (
+    <GlassCard variant="medium" style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Ionicons name="shield-checkmark" size={24} color={Theme.colors.warning} />
+        <Heading level={5} style={styles.sectionTitle}>
+          Sécurité et Accès
+        </Heading>
+      </View>
+
+      <View style={styles.settingsList}>
+        <GlassButton
+          title="Ajouter Utilisateur"
+          icon="person-add"
+          variant="glass"
+          size="medium"
+          onPress={() => handleAddUser()}
+          style={styles.settingButton}
+        />
+        
+        <GlassButton
+          title="Gérer Utilisateurs"
+          icon="people"
+          variant="glass"
+          size="medium"
+          onPress={() => navigation.navigate('UserManagement')}
+          style={styles.settingButton}
+        />
+        
+        <GlassButton
+          title="Réinitialiser Pi"
+          icon="refresh-circle"
+          variant="glass"
+          size="medium"
+          onPress={() => handleResetPi()}
           style={styles.settingButton}
         />
       </View>
@@ -270,6 +390,7 @@ export default function ModernSettingsScreen({ navigation }) {
           {renderHeader()}
           {renderUserSection()}
           {renderHardwareSection()}
+          {renderSecuritySection()}
           {renderDataSection()}
           {renderAppSection()}
         </ScrollView>

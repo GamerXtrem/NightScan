@@ -15,6 +15,7 @@ import { Audio } from 'expo-av';
 import GlassCard from '../components/ui/GlassCard';
 import GlassButton from '../components/ui/GlassButton';
 import Typography, { Heading, Body, Label } from '../components/ui/Typography';
+import NightScanLogo from '../components/ui/NightScanLogo';
 import Theme from '../theme/DesignSystem';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -22,9 +23,7 @@ const { width: screenWidth } = Dimensions.get('window');
 export default function ModernHomeScreen({ navigation }) {
   const [sound, setSound] = useState();
   const [refreshing, setRefreshing] = useState(false);
-  const [systemStatus, setSystemStatus] = useState(null);
   const [recentDetections, setRecentDetections] = useState([]);
-  const [energyStatus, setEnergyStatus] = useState(null);
   
   const statusInterval = useRef(null);
   const appState = useRef(AppState.currentState);
@@ -126,99 +125,22 @@ export default function ModernHomeScreen({ navigation }) {
     }
   };
 
-  const getStatusColor = (isActive) => {
-    return isActive ? Theme.colors.success : Theme.colors.neutral[400];
-  };
 
-  const getEnergyModeText = (mode) => {
-    switch (mode) {
-      case 'camera_active': return 'Caméra Active';
-      case 'audio_only': return 'Audio Seulement';
-      case 'sleep': return 'En Veille';
-      default: return 'Inconnu';
-    }
-  };
-
-  const getEnergyModeIcon = (mode) => {
-    switch (mode) {
-      case 'camera_active': return 'camera';
-      case 'audio_only': return 'mic';
-      case 'sleep': return 'moon';
-      default: return 'help';
-    }
-  };
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <View>
-        <Heading level={1} color={Theme.colors.neutral[0]} weight="bold">
-          NightScan
-        </Heading>
-        <Body color={Theme.colors.neutral[200]} style={styles.subtitle}>
-          Surveillance Nocturne Intelligente
-        </Body>
+      <View style={styles.logoContainer}>
+        <View style={styles.logoRow}>
+          <Ionicons name="eye" size={32} color="#FF6B35" style={styles.leftIcon} />
+          <Heading level={1} color="#FF6B35" weight="bold" style={styles.logoText}>
+            NIGHTSCAN
+          </Heading>
+          <Ionicons name="radio" size={32} color="#FF6B35" style={styles.rightIcon} />
+        </View>
       </View>
-      
-      <GlassButton
-        icon="notifications"
-        variant="glass"
-        size="medium"
-        onPress={() => navigation.navigate('Detections')}
-        style={styles.notificationButton}
-      />
     </View>
   );
 
-  const renderSystemStatus = () => {
-    if (!systemStatus) return null;
-
-    return (
-      <GlassCard variant="medium" style={styles.statusCard}>
-        <View style={styles.statusHeader}>
-          <View style={styles.statusTitleRow}>
-            <Ionicons name="hardware-chip" size={24} color={Theme.colors.primary[500]} />
-            <Heading level={5} style={styles.cardTitle}>
-              État du Système
-            </Heading>
-          </View>
-          <View style={[
-            styles.statusIndicator,
-            { backgroundColor: systemStatus.isOnline ? Theme.colors.success : Theme.colors.error }
-          ]} />
-        </View>
-
-        <View style={styles.statusGrid}>
-          <View style={styles.statusItem}>
-            <Ionicons name="camera" size={20} color={getStatusColor(systemStatus.cameraActive)} />
-            <Label size="small" color={Theme.colors.neutral[600]}>
-              Caméra
-            </Label>
-          </View>
-          
-          <View style={styles.statusItem}>
-            <Ionicons name="mic" size={20} color={getStatusColor(systemStatus.audioActive)} />
-            <Label size="small" color={Theme.colors.neutral[600]}>
-              Audio
-            </Label>
-          </View>
-          
-          <View style={styles.statusItem}>
-            <Ionicons name="wifi" size={20} color={getStatusColor(systemStatus.wifiActive)} />
-            <Label size="small" color={Theme.colors.neutral[600]}>
-              WiFi
-            </Label>
-          </View>
-          
-          <View style={styles.statusItem}>
-            <Ionicons name="battery-half" size={20} color={getStatusColor(systemStatus.batteryLevel > 20)} />
-            <Label size="small" color={Theme.colors.neutral[600]}>
-              {systemStatus.batteryLevel}%
-            </Label>
-          </View>
-        </View>
-      </GlassCard>
-    );
-  };
 
   const renderQuickActions = () => (
     <GlassCard variant="medium" style={styles.quickActionsCard}>
@@ -227,15 +149,6 @@ export default function ModernHomeScreen({ navigation }) {
       </Heading>
       
       <View style={styles.quickActionsGrid}>
-        <GlassButton
-          title="Scanner Audio"
-          icon="scan"
-          variant="glass"
-          size="medium"
-          onPress={() => navigation.navigate('Scan')}
-          style={styles.quickActionButton}
-        />
-        
         <GlassButton
           title="Réveiller Pi"
           icon="power"
@@ -246,82 +159,17 @@ export default function ModernHomeScreen({ navigation }) {
         />
         
         <GlassButton
-          title="Carte Live"
-          icon="map"
+          title="Installer Pi"
+          icon="construct"
           variant="glass"
           size="medium"
-          onPress={() => navigation.navigate('Map')}
-          style={styles.quickActionButton}
-        />
-        
-        <GlassButton
-          title="Paramètres"
-          icon="settings"
-          variant="glass"
-          size="medium"
-          onPress={() => navigation.navigate('Settings')}
+          onPress={() => navigation.navigate('PiInstallation')}
           style={styles.quickActionButton}
         />
       </View>
     </GlassCard>
   );
 
-  const renderEnergyStatus = () => {
-    if (!energyStatus) return null;
-
-    return (
-      <GlassCard variant="medium" style={styles.energyCard}>
-        <View style={styles.energyHeader}>
-          <View style={styles.energyTitleRow}>
-            <Ionicons 
-              name={getEnergyModeIcon(energyStatus.mode)} 
-              size={24} 
-              color={Theme.colors.secondary[500]} 
-            />
-            <Heading level={5} style={styles.cardTitle}>
-              Gestion Énergétique
-            </Heading>
-          </View>
-          
-          <GlassButton
-            icon="settings"
-            variant="ghost"
-            size="small"
-            onPress={() => navigation.navigate('EnergyManagement')}
-          />
-        </View>
-
-        <View style={styles.energyContent}>
-          <View style={styles.energyModeRow}>
-            <Label color={Theme.colors.neutral[600]}>Mode Actuel:</Label>
-            <Body weight="medium" color={Theme.colors.secondary[600]}>
-              {getEnergyModeText(energyStatus.mode)}
-            </Body>
-          </View>
-          
-          <View style={styles.energyStatsRow}>
-            <View style={styles.energyStat}>
-              <Body weight="bold" color={Theme.colors.primary[500]}>
-                {energyStatus.batteryLevel}%
-              </Body>
-              <Label size="small" color={Theme.colors.neutral[600]}>
-                Batterie
-              </Label>
-            </View>
-            
-            <View style={styles.energyStat}>
-              <Body weight="bold" color={Theme.colors.primary[500]}>
-                {energyStatus.estimatedHours}h
-              </Body>
-              <Label size="small" color={Theme.colors.neutral[600]}>
-                Autonomie
-              </Label>
-            </View>
-          </View>
-        </View>
-      </GlassCard>
-    );
-  };
 
   const renderRecentDetections = () => (
     <GlassCard variant="medium" style={styles.detectionsCard}>
@@ -386,9 +234,7 @@ export default function ModernHomeScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         >
           {renderHeader()}
-          {renderSystemStatus()}
           {renderQuickActions()}
-          {renderEnergyStatus()}
           {renderRecentDetections()}
         </ScrollView>
       </LinearGradient>
@@ -412,46 +258,32 @@ const styles = StyleSheet.create({
     paddingBottom: Theme.spacing[8],
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: Theme.spacing[6],
+    alignItems: 'center',
   },
-  subtitle: {
-    marginTop: Theme.spacing[1],
+  logoContainer: {
+    alignItems: 'center',
   },
-  notificationButton: {
-    width: 44,
-    height: 44,
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: 24,
+    letterSpacing: 2,
+    textShadowColor: 'rgba(255, 107, 53, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  leftIcon: {
+    marginRight: Theme.spacing[3],
+    transform: [{ rotate: '-15deg' }],
+  },
+  rightIcon: {
+    marginLeft: Theme.spacing[3],
+    transform: [{ rotate: '15deg' }],
   },
   
-  // Status Card
-  statusCard: {
-    marginBottom: Theme.spacing[4],
-  },
-  statusHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Theme.spacing[4],
-  },
-  statusTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  statusGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statusItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
   
   // Quick Actions
   quickActionsCard: {
@@ -466,36 +298,10 @@ const styles = StyleSheet.create({
   quickActionButton: {
     width: (screenWidth - Theme.spacing[4] * 2 - Theme.spacing[4] * 2 - Theme.spacing[2]) / 2,
   },
+  singleActionButton: {
+    width: '100%',
+  },
   
-  // Energy Card
-  energyCard: {
-    marginBottom: Theme.spacing[4],
-  },
-  energyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Theme.spacing[3],
-  },
-  energyTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  energyContent: {
-    gap: Theme.spacing[3],
-  },
-  energyModeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  energyStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  energyStat: {
-    alignItems: 'center',
-  },
   
   // Detections Card
   detectionsCard: {
