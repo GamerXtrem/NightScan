@@ -1,0 +1,49 @@
+{
+  "classes": [
+    "bird_song",
+    "mammal_call", 
+    "insect_sound",
+    "amphibian_call",
+    "environmental_sound",
+    "unknown_species"
+  ],
+  "class_to_idx": {
+    "bird_song": 0,
+    "mammal_call": 1,
+    "insect_sound": 2,
+    "amphibian_call": 3,
+    "environmental_sound": 4,
+    "unknown_species": 5
+  },
+  "idx_to_class": {
+    "0": "bird_song",
+    "1": "mammal_call",
+    "2": "insect_sound", 
+    "3": "amphibian_call",
+    "4": "environmental_sound",
+    "5": "unknown_species"
+  },
+  "class_descriptions": {
+    "bird_song": "General bird vocalizations and songs",
+    "mammal_call": "Mammal vocalizations including calls and communication",
+    "insect_sound": "Insect-produced sounds including chirping and buzzing",
+    "amphibian_call": "Amphibian calls including frogs and toads",
+    "environmental_sound": "Non-animal environmental sounds like wind, water",
+    "unknown_species": "Unidentified or unclear species sounds"
+  },
+  "confidence_thresholds": {
+    "bird_song": 0.7,
+    "mammal_call": 0.75,
+    "insect_sound": 0.65,
+    "amphibian_call": 0.7,
+    "environmental_sound": 0.8,
+    "unknown_species": 0.5
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "created_date": "2024-07-06",
+    "num_classes": 6,
+    "model_type": "wildlife_audio_classifier",
+    "description": "Wildlife audio classification labels for NightScan ML model"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "model_info": {
+    "name": "wildlife_audio_classifier_mock",
+    "version": "1.0.0-mock",
+    "architecture": "ResNet18-simplified",
+    "framework": "PyTorch",
+    "creation_date": "2024-07-06",
+    "is_mock": true
+  },
+  "training_info": {
+    "dataset_size": "simulated",
+    "training_epochs": 100,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "optimizer": "Adam",
+    "loss_function": "CrossEntropyLoss",
+    "final_accuracy": 0.892,
+    "validation_accuracy": 0.856
+  },
+  "input_specs": {
+    "input_shape": [
+      3,
+      224,
+      224
+    ],
+    "input_type": "spectrogram_image",
+    "preprocessing": "normalize_imagenet",
+    "sample_rate": 22050,
+    "n_fft": 2048,
+    "hop_length": 512
+  },
+  "output_specs": {
+    "num_classes": 6,
+    "output_type": "logits",
+    "confidence_threshold": 0.7
+  },
+  "performance": {
+    "inference_time_ms": 45,
+    "memory_usage_mb": 150,
+    "cpu_optimized": true,
+    "gpu_compatible": true
+  },
+  "warning": "⚠️ This is a MOCK model for testing infrastructure only. Do NOT use in production!"
+}
