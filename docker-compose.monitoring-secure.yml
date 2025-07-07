@@ -1,0 +1,356 @@
+version: '3.8'
+
+services:
+  # Loki - Log aggregation (sécurisé)
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: nightscan-loki
+    restart: always
+    networks:
+      - nightscan-monitoring  # Réseau isolé
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    mem_limit: 250m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    user: "10001:10001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Pas de ports exposés - accès via reverse proxy uniquement
+
+  # Promtail - Log collector (sécurisé)
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: nightscan-promtail
+    restart: always
+    networks:
+      - nightscan-monitoring
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail/config-secure.yml:/etc/promtail/config.yml:ro
+      # Docker socket via proxy sécurisé au lieu d'accès direct
+      - docker-proxy-socket:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    mem_limit: 80m
+    cpus: 0.2
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_READ_SEARCH  # Pour lire les logs uniquement
+    user: "10002:10002"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Docker Socket Proxy - Accès sécurisé au Docker daemon
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.1
+    container_name: nightscan-docker-proxy
+    restart: always
+    networks:
+      - nightscan-monitoring
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: 1
+      INFO: 1
+      NETWORKS: 0
+      VOLUMES: 0
+      EXEC: 0
+      IMAGES: 0
+      BUILD: 0
+      COMMIT: 0
+      SWARM: 0
+      SYSTEM: 0
+      PLUGINS: 0
+      NODES: 0
+      TASKS: 0
+      SECRETS: 0
+    mem_limit: 64m
+    cpus: 0.1
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prometheus - Metrics collection (sécurisé)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nightscan-prometheus
+    restart: always
+    networks:
+      - nightscan-monitoring
+    volumes:
+      - ./monitoring/prometheus/prometheus-secure.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts-enhanced.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=2GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api=false'  # Désactiver API admin
+      - '--web.external-url=https://monitoring.${DOMAIN_NAME}/prometheus/'
+    mem_limit: 200m
+    cpus: 0.3
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    user: "65534:65534"
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana - Visualization (sécurisé)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nightscan-grafana
+    restart: always
+    networks:
+      - nightscan-monitoring
+      - nightscan-net  # Pour accès via reverse proxy
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_USERS_DEFAULT_THEME=dark
+      - GF_AUTH_DISABLE_SIGNOUT_MENU=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=strict
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=true
+      - GF_SECURITY_CONTENT_SECURITY_POLICY=true
+      - GF_INSTALL_PLUGINS=redis-datasource,grafana-piechart-panel
+      - GF_SERVER_ROOT_URL=https://monitoring.${DOMAIN_NAME}
+      - GF_SERVER_DOMAIN=monitoring.${DOMAIN_NAME}
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=${SMTP_HOST}
+      - GF_SMTP_USER=${SMTP_USER}
+      - GF_SMTP_PASSWORD=${SMTP_PASSWORD}
+      - GF_SMTP_FROM_ADDRESS=alerts@${DOMAIN_NAME}
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - VIRTUAL_HOST=monitoring.${DOMAIN_NAME}
+      - VIRTUAL_PORT=3000
+      - LETSENCRYPT_HOST=monitoring.${DOMAIN_NAME}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/notifiers:/etc/grafana/provisioning/notifiers:ro
+      - ./monitoring/grafana/plugins:/var/lib/grafana/plugins:ro
+    depends_on:
+      - prometheus
+      - loki
+    mem_limit: 150m
+    cpus: 0.3
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    user: "472:472"
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Node Exporter - Host metrics (sécurisé)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: nightscan-node-exporter
+    restart: always
+    networks:
+      - nightscan-monitoring
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--no-collector.ipvs'  # Désactiver collecteurs non nécessaires
+      - '--no-collector.nfs'
+      - '--no-collector.nfsd'
+      - '--no-collector.infiniband'
+    mem_limit: 50m
+    cpus: 0.1
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_TIME  # Pour les métriques de temps
+    user: "65534:65534"
+    read_only: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # cAdvisor Alternative - Google Cloud Monitoring Agent (plus sécurisé)
+  # Remplace cAdvisor qui nécessite mode privileged
+  gcp-monitoring:
+    image: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+    container_name: nightscan-monitoring-agent
+    restart: always
+    networks:
+      - nightscan-monitoring
+    volumes:
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - ./monitoring/gcp/config.yml:/etc/google-cloud-ops-agent/config.yaml:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/credentials.json
+    mem_limit: 100m
+    cpus: 0.2
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_ADMIN  # Minimal pour métriques cgroup
+      - SYS_PTRACE  # Pour processus monitoring
+    user: "1000:1000"
+    read_only: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Jaeger - Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: nightscan-jaeger
+    restart: always
+    networks:
+      - nightscan-monitoring
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - MEMORY_MAX_TRACES=10000
+      - SPAN_STORAGE_TYPE=badger
+      - BADGER_EPHEMERAL=false
+      - BADGER_DIRECTORY_VALUE=/badger/data
+      - BADGER_DIRECTORY_KEY=/badger/key
+    volumes:
+      - jaeger_data:/badger
+    mem_limit: 256m
+    cpus: 0.3
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    user: "10003:10003"
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:14269/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Falco - Runtime Security Monitoring
+  falco:
+    image: falcosecurity/falco-no-driver:latest
+    container_name: nightscan-falco
+    restart: always
+    networks:
+      - nightscan-monitoring
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock:ro
+      - /dev:/host/dev:ro
+      - /proc:/host/proc:ro
+      - /boot:/host/boot:ro
+      - /lib/modules:/host/lib/modules:ro
+      - /usr:/host/usr:ro
+      - /etc:/host/etc:ro
+      - ./monitoring/falco/rules.yaml:/etc/falco/rules.d/custom-rules.yaml:ro
+      - falco_data:/var/log/falco
+    environment:
+      - FALCO_BPF_PROBE=""
+    mem_limit: 256m
+    cpus: 0.3
+    security_opt:
+      - apparmor:unconfined  # Falco nécessite accès kernel
+    cap_add:
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - SYS_PTRACE
+    pid: host
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  loki_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  jaeger_data:
+    driver: local
+  falco_data:
+    driver: local
+  docker-proxy-socket:
+    driver: local
+
+networks:
+  nightscan-monitoring:
+    driver: bridge
+    internal: true  # Réseau interne uniquement
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  nightscan-net:
+    external: true

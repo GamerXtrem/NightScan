@@ -1,0 +1,275 @@
+version: '3.8'
+
+services:
+  # pgBouncer - Connection Pooling pour PostgreSQL
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: nightscan-pgbouncer
+    restart: always
+    environment:
+      - DATABASES_HOST=postgres
+      - DATABASES_PORT=5432
+      - DATABASES_USER=nightscan
+      - DATABASES_PASSWORD=${DB_PASSWORD}
+      - DATABASES_DBNAME=nightscan
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=1000
+      - DEFAULT_POOL_SIZE=25
+      - MIN_POOL_SIZE=5
+      - RESERVE_POOL_SIZE=5
+      - RESERVE_POOL_TIMEOUT=3
+      - SERVER_LIFETIME=3600
+      - SERVER_IDLE_TIMEOUT=600
+      - LOG_CONNECTIONS=0
+      - LOG_DISCONNECTIONS=0
+      - LOG_POOLER_ERRORS=1
+      - STATS_PERIOD=60
+      - AUTH_TYPE=scram-sha-256
+    networks:
+      - nightscan-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 64m
+    cpus: 0.2
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "6432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # PostgreSQL Optimized with TimescaleDB for time-series data
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: nightscan-db
+    restart: always
+    env_file:
+      - ./secrets/production/.env
+    environment:
+      POSTGRES_DB: nightscan
+      POSTGRES_USER: nightscan
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C --data-checksums"
+      # TimescaleDB tuning
+      TIMESCALEDB_TELEMETRY: "off"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db-secure.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./scripts/postgres-backup.sh:/usr/local/bin/backup.sh:ro
+      - postgres_wal:/var/lib/postgresql/wal
+      - postgres_archive:/var/lib/postgresql/archive
+    networks:
+      - nightscan-net
+    shm_size: 256m  # Shared memory for performance
+    mem_limit: 350m
+    cpus: 0.4
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c effective_cache_size=384MB
+      -c maintenance_work_mem=32MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=8MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=4
+      -c max_parallel_workers_per_gather=2
+      -c max_parallel_workers=4
+      -c max_parallel_maintenance_workers=2
+      -c wal_level=replica
+      -c max_wal_senders=3
+      -c max_replication_slots=3
+      -c hot_standby=on
+      -c wal_log_hints=on
+      -c archive_mode=on
+      -c archive_command='test ! -f /var/lib/postgresql/archive/%f && cp %p /var/lib/postgresql/archive/%f'
+      -c shared_preload_libraries='timescaledb,pg_stat_statements'
+      -c timescaledb.max_background_workers=4
+      -c jit=off
+      -c log_destination='stderr'
+      -c logging_collector=on
+      -c log_directory='pg_log'
+      -c log_filename='postgresql-%Y-%m-%d_%H%M%S.log'
+      -c log_rotation_age=1d
+      -c log_rotation_size=100MB
+      -c log_min_duration_statement=200
+      -c log_checkpoints=on
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
+      -c log_temp_files=0
+      -c log_autovacuum_min_duration=0
+      -c log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nightscan && psql -U nightscan -d nightscan -c 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # PostgreSQL Replica for High Availability (Optional)
+  postgres-replica:
+    image: timescale/timescaledb:latest-pg15
+    container_name: nightscan-db-replica
+    restart: always
+    profiles: ["ha"]  # Only start with --profile ha
+    env_file:
+      - ./secrets/production/.env
+    environment:
+      POSTGRES_USER: nightscan
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_MASTER_SERVICE: postgres
+      POSTGRES_REPLICATION_MODE: slave
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: ${REPLICATION_PASSWORD}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+    networks:
+      - nightscan-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 350m
+    cpus: 0.4
+    security_opt:
+      - no-new-privileges:true
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c effective_cache_size=384MB
+      -c hot_standby=on
+      -c max_standby_archive_delay=30s
+      -c max_standby_streaming_delay=30s
+      -c wal_receiver_status_interval=10s
+      -c hot_standby_feedback=on
+
+  # Redis Optimized with Persistence
+  redis:
+    image: redis:7-alpine
+    container_name: nightscan-cache
+    restart: always
+    env_file:
+      - ./secrets/production/.env
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - nightscan-net
+    mem_limit: 150m
+    cpus: 0.3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+    user: "999:999"
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 150mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+      --no-appendfsync-on-rewrite no
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
+      --tcp-backlog 511
+      --timeout 0
+      --tcp-keepalive 300
+      --databases 16
+      --slowlog-log-slower-than 10000
+      --slowlog-max-len 128
+      --latency-monitor-threshold 0
+      --notify-keyspace-events ""
+      --list-max-ziplist-size -2
+      --list-compress-depth 0
+      --set-max-intset-entries 512
+      --zset-max-ziplist-entries 128
+      --zset-max-ziplist-value 64
+      --hll-sparse-max-bytes 3000
+      --activerehashing yes
+      --client-output-buffer-limit normal 0 0 0
+      --client-output-buffer-limit slave 256mb 64mb 60
+      --client-output-buffer-limit pubsub 32mb 8mb 60
+      --hz 10
+      --aof-rewrite-incremental-fsync yes
+      --rdb-compression yes
+      --rdb-checksum yes
+      --repl-diskless-sync no
+      --repl-diskless-sync-delay 5
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Sentinel for High Availability (Optional)
+  redis-sentinel:
+    image: redis:7-alpine
+    container_name: nightscan-sentinel
+    restart: always
+    profiles: ["ha"]
+    networks:
+      - nightscan-net
+    depends_on:
+      - redis
+    mem_limit: 64m
+    cpus: 0.1
+    command: >
+      redis-sentinel /etc/redis/sentinel.conf
+      --sentinel announce-ip redis-sentinel
+      --sentinel announce-port 26379
+
+volumes:
+  postgres_data:
+    driver: local
+  postgres_wal:
+    driver: local
+  postgres_archive:
+    driver: local
+  postgres_replica_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  nightscan-net:
+    external: true

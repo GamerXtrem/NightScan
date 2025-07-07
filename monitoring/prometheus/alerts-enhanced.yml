@@ -1,0 +1,295 @@
+groups:
+  # SLO-based Alerts (Service Level Objectives)
+  - name: nightscan_slo_alerts
+    interval: 30s
+    rules:
+      # API Availability SLO (99.9% uptime)
+      - alert: APIAvailabilitySLOBreach
+        expr: |
+          (
+            sum(rate(http_requests_total{job="nightscan-web",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="nightscan-web"}[5m]))
+          ) > 0.001
+        for: 5m
+        labels:
+          severity: critical
+          slo: availability
+          service: api
+        annotations:
+          summary: "API availability SLO breach (current error rate: {{ $value | humanizePercentage }})"
+          description: "API error rate is above 0.1% SLO threshold for 5 minutes"
+          runbook_url: "https://wiki.nightscan.local/runbooks/api-availability"
+
+      # API Latency SLO (95th percentile < 500ms)
+      - alert: APILatencySLOBreach
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="nightscan-web"}[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+          service: api
+        annotations:
+          summary: "API latency SLO breach (p95: {{ $value | humanizeDuration }})"
+          description: "95th percentile latency is above 500ms SLO threshold"
+          dashboard_url: "https://monitoring.nightscan.local/d/api-performance"
+
+      # Prediction Accuracy SLO (>85% accuracy)
+      - alert: PredictionAccuracySLOBreach
+        expr: |
+          avg_over_time(ml_model_accuracy_percent{model="wildlife_classifier"}[1h]) < 85
+        for: 30m
+        labels:
+          severity: warning
+          slo: accuracy
+          service: ml
+        annotations:
+          summary: "ML model accuracy below SLO (current: {{ $value }}%)"
+          description: "Wildlife classifier accuracy is below 85% threshold"
+          action: "Review recent predictions and consider model retraining"
+
+  # Security Alerts
+  - name: nightscan_security_alerts
+    interval: 15s
+    rules:
+      # Suspicious Authentication Activity
+      - alert: SuspiciousAuthenticationPattern
+        expr: |
+          sum(rate(auth_failed_attempts_total[5m])) by (ip_address) > 10
+        for: 2m
+        labels:
+          severity: critical
+          category: security
+          action: auto_block
+        annotations:
+          summary: "Suspicious authentication pattern from {{ $labels.ip_address }}"
+          description: "More than 10 failed auth attempts in 5 minutes"
+          auto_action: "IP will be auto-blocked by fail2ban"
+
+      # Privilege Escalation Attempt
+      - alert: PrivilegeEscalationAttempt
+        expr: |
+          sum(increase(audit_privilege_escalation_attempts_total[1m])) > 0
+        labels:
+          severity: critical
+          category: security
+          page: true
+        annotations:
+          summary: "Privilege escalation attempt detected"
+          description: "User {{ $labels.user }} attempted unauthorized privilege escalation"
+          action: "Investigate immediately and review audit logs"
+
+      # Anomalous Data Access Pattern
+      - alert: AnomalousDataAccess
+        expr: |
+          (
+            abs(
+              rate(database_queries_total[5m]) - 
+              avg_over_time(rate(database_queries_total[5m])[1h:5m] offset 1d)
+            ) 
+            / 
+            stddev_over_time(rate(database_queries_total[5m])[1h:5m] offset 1d)
+          ) > 3
+        for: 10m
+        labels:
+          severity: warning
+          category: security
+          ml_detected: true
+        annotations:
+          summary: "Anomalous database access pattern detected"
+          description: "Database query rate deviates significantly from normal pattern"
+          z_score: "{{ $value }}"
+
+  # Database Performance Alerts
+  - name: nightscan_database_alerts
+    interval: 30s
+    rules:
+      # Connection Pool Exhaustion
+      - alert: DatabaseConnectionPoolExhaustion
+        expr: |
+          (pgbouncer_pools_client_active / pgbouncer_pools_client_maxwait) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database connection pool near exhaustion ({{ $value | humanizePercentage }} used)"
+          description: "pgBouncer connection pool is >80% utilized"
+          action: "Consider increasing pool size or optimizing connections"
+
+      # Replication Lag
+      - alert: DatabaseReplicationLag
+        expr: |
+          pg_replication_lag_seconds > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+          ha: true
+        annotations:
+          summary: "Database replication lag high ({{ $value }}s)"
+          description: "PostgreSQL replica is lagging behind master"
+          impact: "Read queries may return stale data"
+
+      # Table Bloat
+      - alert: DatabaseTableBloat
+        expr: |
+          (pg_table_bloat_ratio > 2) and (pg_table_size_bytes > 1073741824)
+        for: 1h
+        labels:
+          severity: warning
+          component: database
+          maintenance: true
+        annotations:
+          summary: "Table {{ $labels.table_name }} is bloated ({{ $value }}x)"
+          description: "Table bloat ratio exceeds 2x for tables >1GB"
+          action: "Schedule VACUUM FULL during maintenance window"
+
+  # Resource Utilization Alerts
+  - name: nightscan_resource_alerts
+    interval: 30s
+    rules:
+      # Predictive Disk Space Alert
+      - alert: DiskSpaceWillFillIn24Hours
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 24*3600) < 0
+        for: 1h
+        labels:
+          severity: warning
+          predictive: true
+        annotations:
+          summary: "Disk space will be exhausted within 24 hours"
+          description: "Based on 6h trend, disk {{ $labels.device }} will be full"
+          current_available: "{{ $value | humanize1024 }}B"
+
+      # Memory Pressure with OOM Risk
+      - alert: HighMemoryPressureWithOOMRisk
+        expr: |
+          (
+            (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.1
+            and
+            rate(node_vmstat_oom_kill[5m]) > 0
+          )
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "High memory pressure with OOM kills occurring"
+          description: "System has <10% memory available and OOM killer is active"
+          action: "Reduce memory usage immediately or add more RAM"
+
+  # ML Model Performance Alerts
+  - name: nightscan_ml_alerts
+    interval: 1m
+    rules:
+      # Model Drift Detection
+      - alert: MLModelDriftDetected
+        expr: |
+          abs(
+            ml_model_prediction_distribution_kl_divergence{quantile="0.5"} - 
+            ml_model_baseline_distribution{quantile="0.5"}
+          ) > 0.1
+        for: 30m
+        labels:
+          severity: warning
+          component: ml
+          requires_retraining: maybe
+        annotations:
+          summary: "ML model drift detected (KL divergence: {{ $value }})"
+          description: "Prediction distribution deviates from training baseline"
+          action: "Monitor closely and consider retraining if drift persists"
+
+      # Inference Latency Degradation
+      - alert: MLInferenceLatencyHigh
+        expr: |
+          histogram_quantile(0.99,
+            rate(ml_inference_duration_seconds_bucket[5m])
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: ml
+        annotations:
+          summary: "ML inference latency high (p99: {{ $value }}s)"
+          description: "99th percentile inference time exceeds 5 seconds"
+          possible_causes: "Model complexity, resource constraints, or data issues"
+
+  # Business Metrics Alerts
+  - name: nightscan_business_alerts
+    interval: 5m
+    rules:
+      # Prediction Volume Anomaly
+      - alert: PredictionVolumeAnomaly
+        expr: |
+          (
+            abs(sum(rate(predictions_total[1h])) - sum(rate(predictions_total[1h] offset 1d))) 
+            / 
+            sum(rate(predictions_total[1h] offset 1d))
+          ) > 0.5
+        for: 30m
+        labels:
+          severity: info
+          category: business
+        annotations:
+          summary: "Unusual prediction volume ({{ $value | humanizePercentage }} change)"
+          description: "Prediction volume differs >50% from same time yesterday"
+          current_rate: "{{ with query \"sum(rate(predictions_total[1h]))\" }}{{ . | first | value | humanize }}{{ end }}/hour"
+
+      # Species Detection Spike
+      - alert: RareSpeciesDetectionSpike
+        expr: |
+          sum(increase(detections_total{species=~"endangered_.*"}[1h])) > 10
+        labels:
+          severity: info
+          category: conservation
+          notify: researchers
+        annotations:
+          summary: "Spike in {{ $labels.species }} detections"
+          description: "{{ $value }} detections of endangered species in last hour"
+          action: "Notify conservation team for investigation"
+
+  # Composite Health Alerts
+  - name: nightscan_health_composite
+    interval: 1m
+    rules:
+      # Overall System Health Score
+      - alert: SystemHealthDegraded
+        expr: |
+          (
+            (up{job="nightscan-web"} == 1) * 25 +
+            (up{job="prediction-api"} == 1) * 25 +
+            (up{job="postgres"} == 1) * 25 +
+            (up{job="redis"} == 1) * 15 +
+            (up{job="prometheus"} == 1) * 5 +
+            (up{job="grafana"} == 1) * 5
+          ) < 90
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "Overall system health degraded (score: {{ $value }}/100)"
+          description: "One or more critical components are unhealthy"
+          dashboard: "https://monitoring.nightscan.local/d/system-health"
+
+      # Cascade Failure Detection
+      - alert: CascadeFailureRisk
+        expr: |
+          (
+            count(up{job=~"nightscan-.*"} == 0) >= 2
+            and
+            rate(http_requests_total[5m]) < 0.1
+          )
+        for: 2m
+        labels:
+          severity: critical
+          category: availability
+          page: true
+        annotations:
+          summary: "Cascade failure detected - multiple services down"
+          description: "{{ $value }} services are down and traffic has stopped"
+          action: "Execute emergency recovery procedure immediately"
