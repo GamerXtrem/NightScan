@@ -407,5 +407,263 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Quota Management Tables
+CREATE OR REPLACE FUNCTION create_quota_management_tables()
+RETURNS void AS $$
+BEGIN
+    -- Plan Features table - defines what each plan offers
+    CREATE TABLE IF NOT EXISTS plan_features (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        plan_type VARCHAR(50) NOT NULL UNIQUE,
+        plan_name VARCHAR(100) NOT NULL,
+        monthly_quota INTEGER NOT NULL DEFAULT 100,
+        max_file_size_mb INTEGER NOT NULL DEFAULT 50,
+        max_concurrent_uploads INTEGER NOT NULL DEFAULT 1,
+        priority_queue BOOLEAN NOT NULL DEFAULT false,
+        advanced_analytics BOOLEAN NOT NULL DEFAULT false,
+        api_access BOOLEAN NOT NULL DEFAULT false,
+        email_support BOOLEAN NOT NULL DEFAULT false,
+        phone_support BOOLEAN NOT NULL DEFAULT false,
+        features_json JSONB DEFAULT '{}',
+        price_monthly_cents INTEGER NOT NULL DEFAULT 0,
+        price_yearly_cents INTEGER DEFAULT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- User Plans table - assigns plans to users
+    CREATE TABLE IF NOT EXISTS user_plans (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+        plan_type VARCHAR(50) NOT NULL REFERENCES plan_features(plan_type),
+        subscription_start TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        subscription_end TIMESTAMP WITH TIME ZONE,
+        auto_renew BOOLEAN NOT NULL DEFAULT false,
+        payment_method VARCHAR(50),
+        subscription_id VARCHAR(200), -- For payment provider
+        trial_end TIMESTAMP WITH TIME ZONE,
+        is_trial BOOLEAN NOT NULL DEFAULT false,
+        status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'suspended', 'expired')),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        
+        UNIQUE(user_id) -- One active plan per user
+    );
+
+    -- Quota Usage table - tracks monthly usage per user
+    CREATE TABLE IF NOT EXISTS quota_usage (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+        month INTEGER NOT NULL CHECK (month >= 1 AND month <= 12),
+        year INTEGER NOT NULL CHECK (year >= 2024),
+        prediction_count INTEGER NOT NULL DEFAULT 0,
+        total_file_size_bytes BIGINT NOT NULL DEFAULT 0,
+        successful_predictions INTEGER NOT NULL DEFAULT 0,
+        failed_predictions INTEGER NOT NULL DEFAULT 0,
+        premium_features_used JSONB DEFAULT '{}',
+        reset_date TIMESTAMP WITH TIME ZONE DEFAULT date_trunc('month', CURRENT_TIMESTAMP + interval '1 month'),
+        last_prediction_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        
+        UNIQUE(user_id, month, year)
+    );
+
+    -- Daily Usage Details table - for detailed analytics
+    CREATE TABLE IF NOT EXISTS daily_usage_details (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+        usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        prediction_count INTEGER NOT NULL DEFAULT 0,
+        total_file_size_bytes BIGINT NOT NULL DEFAULT 0,
+        average_processing_time_ms INTEGER,
+        peak_hour INTEGER, -- 0-23
+        device_type VARCHAR(50),
+        app_version VARCHAR(20),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        
+        UNIQUE(user_id, usage_date)
+    );
+
+    -- Quota Transactions table - for audit trail of quota changes
+    CREATE TABLE IF NOT EXISTS quota_transactions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+        transaction_type VARCHAR(50) NOT NULL, -- 'usage', 'bonus', 'reset', 'adjustment'
+        amount INTEGER NOT NULL, -- Can be negative for usage
+        reason VARCHAR(200),
+        metadata JSONB DEFAULT '{}',
+        prediction_id INTEGER, -- Link to specific prediction if applicable
+        admin_user_id INTEGER, -- If manually adjusted by admin
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Subscription Events table - for billing and lifecycle tracking
+    CREATE TABLE IF NOT EXISTS subscription_events (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+        event_type VARCHAR(50) NOT NULL, -- 'created', 'upgraded', 'downgraded', 'cancelled', 'renewed', 'expired'
+        old_plan_type VARCHAR(50),
+        new_plan_type VARCHAR(50),
+        effective_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        metadata JSONB DEFAULT '{}',
+        created_by INTEGER, -- Admin or system
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Create indexes for performance
+    CREATE INDEX IF NOT EXISTS idx_user_plans_user_id ON user_plans(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_plans_status ON user_plans(status);
+    CREATE INDEX IF NOT EXISTS idx_user_plans_expiry ON user_plans(subscription_end);
+    
+    CREATE INDEX IF NOT EXISTS idx_quota_usage_user_month ON quota_usage(user_id, year, month);
+    CREATE INDEX IF NOT EXISTS idx_quota_usage_reset_date ON quota_usage(reset_date);
+    
+    CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON daily_usage_details(user_id, usage_date DESC);
+    CREATE INDEX IF NOT EXISTS idx_daily_usage_date ON daily_usage_details(usage_date DESC);
+    
+    CREATE INDEX IF NOT EXISTS idx_quota_transactions_user ON quota_transactions(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_quota_transactions_type ON quota_transactions(transaction_type, created_at DESC);
+    
+    CREATE INDEX IF NOT EXISTS idx_subscription_events_user ON subscription_events(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_subscription_events_type ON subscription_events(event_type, created_at DESC);
+
+    RAISE NOTICE 'Quota management tables created successfully';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Default plan configurations
+CREATE OR REPLACE FUNCTION setup_default_plans()
+RETURNS void AS $$
+BEGIN
+    -- Insert default plans
+    INSERT INTO plan_features (plan_type, plan_name, monthly_quota, max_file_size_mb, 
+                              max_concurrent_uploads, priority_queue, advanced_analytics, 
+                              api_access, email_support, phone_support, price_monthly_cents)
+    VALUES 
+        ('free', 'Plan Gratuit', 600, 50, 1, false, false, false, false, false, 0),
+        ('premium', 'Plan Premium', 3000, 50, 1, false, false, false, false, false, 1990),
+        ('enterprise', 'Plan Entreprise', 100000, 50, 1, false, false, false, false, false, 9990)
+    ON CONFLICT (plan_type) DO UPDATE SET
+        updated_at = CURRENT_TIMESTAMP;
+
+    RAISE NOTICE 'Default plans configured';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to initialize user with free plan
+CREATE OR REPLACE FUNCTION assign_free_plan_to_user(p_user_id INTEGER)
+RETURNS void AS $$
+BEGIN
+    -- Assign free plan to new user
+    INSERT INTO user_plans (user_id, plan_type, status)
+    VALUES (p_user_id, 'free', 'active')
+    ON CONFLICT (user_id) DO NOTHING;
+    
+    -- Initialize current month quota usage
+    INSERT INTO quota_usage (user_id, month, year)
+    VALUES (p_user_id, EXTRACT(month FROM CURRENT_TIMESTAMP)::INTEGER, 
+            EXTRACT(year FROM CURRENT_TIMESTAMP)::INTEGER)
+    ON CONFLICT (user_id, month, year) DO NOTHING;
+    
+    RAISE NOTICE 'Free plan assigned to user %', p_user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check and update quota
+CREATE OR REPLACE FUNCTION check_and_update_quota(
+    p_user_id INTEGER,
+    p_prediction_count INTEGER DEFAULT 1,
+    p_file_size_bytes BIGINT DEFAULT 0
+) RETURNS JSONB AS $$
+DECLARE
+    v_current_month INTEGER := EXTRACT(month FROM CURRENT_TIMESTAMP);
+    v_current_year INTEGER := EXTRACT(year FROM CURRENT_TIMESTAMP);
+    v_plan plan_features%ROWTYPE;
+    v_usage quota_usage%ROWTYPE;
+    v_result JSONB;
+BEGIN
+    -- Get user's current plan
+    SELECT pf.* INTO v_plan
+    FROM plan_features pf
+    JOIN user_plans up ON pf.plan_type = up.plan_type
+    WHERE up.user_id = p_user_id AND up.status = 'active';
+    
+    IF NOT FOUND THEN
+        -- No plan found, assign free plan
+        PERFORM assign_free_plan_to_user(p_user_id);
+        SELECT * INTO v_plan FROM plan_features WHERE plan_type = 'free';
+    END IF;
+    
+    -- Get or create current month usage
+    INSERT INTO quota_usage (user_id, month, year)
+    VALUES (p_user_id, v_current_month, v_current_year)
+    ON CONFLICT (user_id, month, year) DO NOTHING;
+    
+    SELECT * INTO v_usage FROM quota_usage 
+    WHERE user_id = p_user_id AND month = v_current_month AND year = v_current_year;
+    
+    -- Check if quota would be exceeded
+    IF v_usage.prediction_count + p_prediction_count > v_plan.monthly_quota THEN
+        v_result := jsonb_build_object(
+            'allowed', false,
+            'reason', 'quota_exceeded',
+            'current_usage', v_usage.prediction_count,
+            'monthly_quota', v_plan.monthly_quota,
+            'plan_type', v_plan.plan_type,
+            'remaining', v_plan.monthly_quota - v_usage.prediction_count
+        );
+    ELSE
+        -- Update usage
+        UPDATE quota_usage 
+        SET prediction_count = prediction_count + p_prediction_count,
+            total_file_size_bytes = total_file_size_bytes + p_file_size_bytes,
+            last_prediction_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = p_user_id AND month = v_current_month AND year = v_current_year;
+        
+        -- Record transaction
+        INSERT INTO quota_transactions (user_id, transaction_type, amount, reason)
+        VALUES (p_user_id, 'usage', p_prediction_count, 'prediction_processed');
+        
+        v_result := jsonb_build_object(
+            'allowed', true,
+            'current_usage', v_usage.prediction_count + p_prediction_count,
+            'monthly_quota', v_plan.monthly_quota,
+            'plan_type', v_plan.plan_type,
+            'remaining', v_plan.monthly_quota - (v_usage.prediction_count + p_prediction_count)
+        );
+    END IF;
+    
+    RETURN v_result;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to automatically assign free plan to new users
+CREATE OR REPLACE FUNCTION trigger_assign_free_plan()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM assign_free_plan_to_user(NEW.id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Only create trigger if user table exists
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user') THEN
+        DROP TRIGGER IF EXISTS after_user_insert_assign_plan ON "user";
+        CREATE TRIGGER after_user_insert_assign_plan
+            AFTER INSERT ON "user"
+            FOR EACH ROW
+            EXECUTE FUNCTION trigger_assign_free_plan();
+    END IF;
+END $$;
+
+-- Execute quota system setup
+SELECT create_quota_management_tables();
+SELECT setup_default_plans();
+
 -- Execute secure initialization
 SELECT * FROM initialize_secure_nightscan_db();

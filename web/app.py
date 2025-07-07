@@ -7,6 +7,7 @@ import logging
 import random
 import requests
 import json
+import uuid
 from datetime import datetime, timedelta
 import psutil
 
@@ -335,6 +336,216 @@ class NotificationPreference(db.Model):
             "quiet_hours_end": self.quiet_hours_end,
             "slack_webhook": self.slack_webhook,
             "discord_webhook": self.discord_webhook,
+        }
+
+
+# ===== QUOTA MANAGEMENT MODELS =====
+
+class PlanFeatures(db.Model):
+    """Plan features and pricing configuration"""
+    __tablename__ = 'plan_features'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    plan_type = db.Column(db.String(50), nullable=False, unique=True)
+    plan_name = db.Column(db.String(100), nullable=False)
+    monthly_quota = db.Column(db.Integer, nullable=False, default=100)
+    max_file_size_mb = db.Column(db.Integer, nullable=False, default=50)
+    max_concurrent_uploads = db.Column(db.Integer, nullable=False, default=1)
+    priority_queue = db.Column(db.Boolean, nullable=False, default=False)
+    advanced_analytics = db.Column(db.Boolean, nullable=False, default=False)
+    api_access = db.Column(db.Boolean, nullable=False, default=False)
+    email_support = db.Column(db.Boolean, nullable=False, default=False)
+    phone_support = db.Column(db.Boolean, nullable=False, default=False)
+    features_json = db.Column(db.Text)  # JSON string for additional features
+    price_monthly_cents = db.Column(db.Integer, nullable=False, default=0)
+    price_yearly_cents = db.Column(db.Integer)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self) -> dict:
+        return {
+            "plan_type": self.plan_type,
+            "plan_name": self.plan_name,
+            "monthly_quota": self.monthly_quota,
+            "price_monthly": self.price_monthly_cents / 100 if self.price_monthly_cents else 0,
+            "is_active": self.is_active
+        }
+
+
+class UserPlan(db.Model):
+    """User subscription plan assignment"""
+    __tablename__ = 'user_plans'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, unique=True)
+    plan_type = db.Column(db.String(50), db.ForeignKey("plan_features.plan_type"), nullable=False)
+    subscription_start = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    subscription_end = db.Column(db.DateTime)
+    auto_renew = db.Column(db.Boolean, nullable=False, default=False)
+    payment_method = db.Column(db.String(50))
+    subscription_id = db.Column(db.String(200))  # For payment provider
+    trial_end = db.Column(db.DateTime)
+    is_trial = db.Column(db.Boolean, nullable=False, default=False)
+    status = db.Column(db.String(20), nullable=False, default='active')  # active, cancelled, suspended, expired
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship("User", backref=db.backref("user_plan", uselist=False))
+    plan_features = db.relationship("PlanFeatures", backref="subscriptions")
+
+    def to_dict(self) -> dict:
+        return {
+            "user_id": self.user_id,
+            "plan_type": self.plan_type,
+            "subscription_start": self.subscription_start.isoformat() if self.subscription_start else None,
+            "subscription_end": self.subscription_end.isoformat() if self.subscription_end else None,
+            "auto_renew": self.auto_renew,
+            "is_trial": self.is_trial,
+            "trial_end": self.trial_end.isoformat() if self.trial_end else None,
+            "status": self.status
+        }
+
+
+class QuotaUsage(db.Model):
+    """Monthly quota usage tracking"""
+    __tablename__ = 'quota_usage'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    month = db.Column(db.Integer, nullable=False)  # 1-12
+    year = db.Column(db.Integer, nullable=False)
+    prediction_count = db.Column(db.Integer, nullable=False, default=0)
+    total_file_size_bytes = db.Column(db.BigInteger, nullable=False, default=0)
+    successful_predictions = db.Column(db.Integer, nullable=False, default=0)
+    failed_predictions = db.Column(db.Integer, nullable=False, default=0)
+    premium_features_used = db.Column(db.Text)  # JSON string
+    reset_date = db.Column(db.DateTime, nullable=False)
+    last_prediction_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship("User", backref="quota_usage_records")
+    
+    # Unique constraint
+    __table_args__ = (db.UniqueConstraint('user_id', 'month', 'year', name='unique_user_month_year'),)
+
+    def to_dict(self) -> dict:
+        import json
+        return {
+            "user_id": self.user_id,
+            "month": self.month,
+            "year": self.year,
+            "prediction_count": self.prediction_count,
+            "total_file_size_mb": round(self.total_file_size_bytes / (1024 * 1024), 2),
+            "successful_predictions": self.successful_predictions,
+            "failed_predictions": self.failed_predictions,
+            "premium_features_used": json.loads(self.premium_features_used) if self.premium_features_used else {},
+            "reset_date": self.reset_date.isoformat() if self.reset_date else None,
+            "last_prediction_at": self.last_prediction_at.isoformat() if self.last_prediction_at else None
+        }
+
+
+class DailyUsageDetails(db.Model):
+    """Daily usage details for analytics"""
+    __tablename__ = 'daily_usage_details'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    usage_date = db.Column(db.Date, nullable=False, default=datetime.utcnow().date)
+    prediction_count = db.Column(db.Integer, nullable=False, default=0)
+    total_file_size_bytes = db.Column(db.BigInteger, nullable=False, default=0)
+    average_processing_time_ms = db.Column(db.Integer)
+    peak_hour = db.Column(db.Integer)  # 0-23
+    device_type = db.Column(db.String(50))
+    app_version = db.Column(db.String(20))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship("User", backref="daily_usage_details")
+    
+    # Unique constraint
+    __table_args__ = (db.UniqueConstraint('user_id', 'usage_date', name='unique_user_date'),)
+
+    def to_dict(self) -> dict:
+        return {
+            "user_id": self.user_id,
+            "usage_date": self.usage_date.isoformat() if self.usage_date else None,
+            "prediction_count": self.prediction_count,
+            "total_file_size_mb": round(self.total_file_size_bytes / (1024 * 1024), 2),
+            "average_processing_time_ms": self.average_processing_time_ms,
+            "peak_hour": self.peak_hour,
+            "device_type": self.device_type,
+            "app_version": self.app_version
+        }
+
+
+class QuotaTransaction(db.Model):
+    """Audit trail for quota changes"""
+    __tablename__ = 'quota_transactions'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    transaction_type = db.Column(db.String(50), nullable=False)  # usage, bonus, reset, adjustment
+    amount = db.Column(db.Integer, nullable=False)  # Can be negative for usage
+    reason = db.Column(db.String(200))
+    metadata = db.Column(db.Text)  # JSON string
+    prediction_id = db.Column(db.Integer, db.ForeignKey("prediction.id"))
+    admin_user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship("User", foreign_keys=[user_id], backref="quota_transactions")
+    admin_user = db.relationship("User", foreign_keys=[admin_user_id])
+    prediction = db.relationship("Prediction", backref="quota_transactions")
+
+    def to_dict(self) -> dict:
+        import json
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "transaction_type": self.transaction_type,
+            "amount": self.amount,
+            "reason": self.reason,
+            "metadata": json.loads(self.metadata) if self.metadata else {},
+            "prediction_id": self.prediction_id,
+            "admin_user_id": self.admin_user_id,
+            "created_at": self.created_at.isoformat()
+        }
+
+
+class SubscriptionEvent(db.Model):
+    """Subscription lifecycle events"""
+    __tablename__ = 'subscription_events'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    event_type = db.Column(db.String(50), nullable=False)  # created, upgraded, downgraded, cancelled, renewed, expired
+    old_plan_type = db.Column(db.String(50))
+    new_plan_type = db.Column(db.String(50))
+    effective_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    metadata = db.Column(db.Text)  # JSON string
+    created_by = db.Column(db.Integer, db.ForeignKey("user.id"))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship("User", foreign_keys=[user_id], backref="subscription_events")
+    created_by_user = db.relationship("User", foreign_keys=[created_by])
+
+    def to_dict(self) -> dict:
+        import json
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "event_type": self.event_type,
+            "old_plan_type": self.old_plan_type,
+            "new_plan_type": self.new_plan_type,
+            "effective_date": self.effective_date.isoformat(),
+            "metadata": json.loads(self.metadata) if self.metadata else {},
+            "created_by": self.created_by,
+            "created_at": self.created_at.isoformat()
         }
 
 

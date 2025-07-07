@@ -191,6 +191,7 @@ def readiness_check():
 
 @api_v1.route('/predict', methods=['POST'])
 @track_request_metrics
+@login_required
 def predict_audio():
     """
     Audio Prediction Endpoint
@@ -255,6 +256,31 @@ def predict_audio():
     if request.content_length is not None and request.content_length > MAX_FILE_SIZE:
         return jsonify({"error": "File exceeds 100 MB limit", "code": "FILE_TOO_LARGE"}), 400
     
+    # Check user quota before processing
+    from quota_manager import get_quota_manager
+    quota_manager = get_quota_manager()
+    
+    file_size_bytes = request.content_length or 0
+    quota_check = quota_manager.check_quota_before_prediction(current_user.id, file_size_bytes)
+    
+    if not quota_check['allowed']:
+        error_response = {
+            "error": quota_check['message'], 
+            "code": quota_check['reason'].upper(),
+            "quota_status": {
+                "current_usage": quota_check.get('current_usage', 0),
+                "monthly_quota": quota_check.get('monthly_quota', 0),
+                "plan_type": quota_check.get('plan_type', 'unknown')
+            }
+        }
+        
+        # Add upgrade information for quota exceeded
+        if quota_check['reason'] == 'quota_exceeded':
+            error_response["upgrade_required"] = True
+            error_response["recommended_plan"] = quota_check.get('recommended_plan')
+        
+        return jsonify(error_response), 429  # Too Many Requests
+    
     with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
         total = 0
         chunk_size = 64 * 1024
@@ -287,6 +313,19 @@ def predict_audio():
                     "cached": True
                 }
             }
+            
+            # Consume quota even for cached results
+            try:
+                quota_result = quota_manager.consume_quota(current_user.id, total)
+                if quota_result.get('allowed'):
+                    response_data["quota_status"] = {
+                        "current_usage": quota_result.get('current_usage'),
+                        "monthly_quota": quota_result.get('monthly_quota'),
+                        "remaining": quota_result.get('remaining'),
+                        "plan_type": quota_result.get('plan_type')
+                    }
+            except Exception as e:
+                logger.error(f"Error consuming quota for cached result: {e}")
             
             # Validate response
             schema = PredictionResponseSchema()
@@ -380,6 +419,23 @@ def predict_audio():
                 }
             }
             
+            # Consume quota after successful prediction
+            try:
+                quota_result = quota_manager.consume_quota(current_user.id, total)
+                if quota_result.get('allowed'):
+                    logger.info(f"Quota consumed for user {current_user.id}: {quota_result}")
+                    # Add quota info to response
+                    response_data["quota_status"] = {
+                        "current_usage": quota_result.get('current_usage'),
+                        "monthly_quota": quota_result.get('monthly_quota'),
+                        "remaining": quota_result.get('remaining'),
+                        "plan_type": quota_result.get('plan_type')
+                    }
+                else:
+                    logger.warning(f"Quota consumption failed for user {current_user.id}: {quota_result}")
+            except Exception as e:
+                logger.error(f"Error consuming quota: {e}")
+            
             # Validate response
             schema = PredictionResponseSchema()
             try:
@@ -392,6 +448,333 @@ def predict_audio():
             processing_time = time.time() - start_time
             record_prediction_metrics(duration=processing_time, success=False)
             return jsonify({"error": "Prediction failed", "code": "PREDICTION_ERROR"}), 500
+
+
+# ===== QUOTA MANAGEMENT ENDPOINTS =====
+
+@api_v1.route('/quota/status', methods=['GET'])
+@login_required
+@track_request_metrics
+def get_quota_status():
+    """
+    Get User Quota Status
+    ---
+    tags:
+      - Quota
+    summary: Get current quota usage and limits
+    description: Returns detailed quota information for the authenticated user
+    security:
+      - cookieAuth: []
+    responses:
+      200:
+        description: Quota status retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                plan_type:
+                  type: string
+                current_usage:
+                  type: integer
+                monthly_quota:
+                  type: integer
+                remaining:
+                  type: integer
+                usage_percentage:
+                  type: number
+                reset_date:
+                  type: string
+                  format: date-time
+                days_until_reset:
+                  type: integer
+      401:
+        description: User not authenticated
+    """
+    try:
+        from quota_manager import get_quota_manager
+        quota_manager = get_quota_manager()
+        
+        status = quota_manager.get_user_quota_status(current_user.id)
+        
+        response_data = {
+            "user_id": status.user_id,
+            "plan_type": status.plan_type,
+            "current_usage": status.current_usage,
+            "monthly_quota": status.monthly_quota,
+            "remaining": status.remaining,
+            "usage_percentage": round(status.usage_percentage, 2),
+            "reset_date": status.reset_date.isoformat() if status.reset_date else None,
+            "days_until_reset": status.days_until_reset,
+            "last_prediction_at": status.last_prediction_at.isoformat() if status.last_prediction_at else None
+        }
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting quota status for user {current_user.id}: {e}")
+        return jsonify({"error": "Failed to retrieve quota status"}), 500
+
+
+@api_v1.route('/quota/plans', methods=['GET'])
+@track_request_metrics
+def get_available_plans():
+    """
+    Get Available Plans
+    ---
+    tags:
+      - Quota
+    summary: Get all available subscription plans
+    description: Returns list of all available plans with features and pricing
+    responses:
+      200:
+        description: Plans retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plans:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      plan_type:
+                        type: string
+                      plan_name:
+                        type: string
+                      monthly_quota:
+                        type: integer
+                      max_file_size_mb:
+                        type: integer
+                      price_monthly:
+                        type: number
+                      features:
+                        type: object
+    """
+    try:
+        from quota_manager import get_quota_manager
+        quota_manager = get_quota_manager()
+        
+        plans = quota_manager.get_available_plans()
+        
+        return jsonify({"plans": plans}), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting available plans: {e}")
+        return jsonify({"error": "Failed to retrieve plans"}), 500
+
+
+@api_v1.route('/quota/upgrade', methods=['POST'])
+@login_required
+@track_request_metrics
+def upgrade_plan():
+    """
+    Upgrade User Plan
+    ---
+    tags:
+      - Quota
+    summary: Upgrade user to a new plan
+    description: Upgrade the authenticated user to a new subscription plan
+    security:
+      - cookieAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              plan_type:
+                type: string
+                description: Target plan type
+                enum: [premium, enterprise]
+            required:
+              - plan_type
+    responses:
+      200:
+        description: Plan upgraded successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                message:
+                  type: string
+                new_quota:
+                  type: integer
+                old_quota:
+                  type: integer
+      400:
+        description: Invalid plan or upgrade request
+      401:
+        description: User not authenticated
+    """
+    try:
+        data = request.get_json()
+        if not data or 'plan_type' not in data:
+            return jsonify({"error": "plan_type is required"}), 400
+        
+        plan_type = data['plan_type']
+        
+        from quota_manager import get_quota_manager, PlanType
+        quota_manager = get_quota_manager()
+        
+        # Validate plan type
+        valid_plans = [p.value for p in PlanType]
+        if plan_type not in valid_plans:
+            return jsonify({"error": f"Invalid plan type. Must be one of: {valid_plans}"}), 400
+        
+        result = quota_manager.upgrade_user_plan(current_user.id, plan_type)
+        
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        logger.error(f"Error upgrading plan for user {current_user.id}: {e}")
+        return jsonify({"error": "Failed to upgrade plan"}), 500
+
+
+@api_v1.route('/quota/analytics', methods=['GET'])
+@login_required
+@track_request_metrics
+def get_usage_analytics():
+    """
+    Get Usage Analytics
+    ---
+    tags:
+      - Quota
+    summary: Get detailed usage analytics
+    description: Returns detailed usage analytics for the authenticated user
+    security:
+      - cookieAuth: []
+    parameters:
+      - in: query
+        name: days
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 90
+          default: 30
+        description: Number of days to include in analytics
+    responses:
+      200:
+        description: Analytics retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                period_days:
+                  type: integer
+                total_predictions:
+                  type: integer
+                total_file_size_mb:
+                  type: number
+                average_processing_time_ms:
+                  type: number
+                daily_breakdown:
+                  type: array
+                  items:
+                    type: object
+      401:
+        description: User not authenticated
+    """
+    try:
+        days = request.args.get('days', default=30, type=int)
+        
+        # Validate days parameter
+        if days < 1 or days > 90:
+            return jsonify({"error": "days must be between 1 and 90"}), 400
+        
+        from quota_manager import get_quota_manager
+        quota_manager = get_quota_manager()
+        
+        analytics = quota_manager.get_usage_analytics(current_user.id, days)
+        
+        return jsonify(analytics), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting usage analytics for user {current_user.id}: {e}")
+        return jsonify({"error": "Failed to retrieve analytics"}), 500
+
+
+@api_v1.route('/quota/check', methods=['POST'])
+@login_required
+@track_request_metrics
+def check_quota():
+    """
+    Check Quota Before Upload
+    ---
+    tags:
+      - Quota
+    summary: Check if user can make a prediction
+    description: Check quota limits before uploading a file for prediction
+    security:
+      - cookieAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              file_size_bytes:
+                type: integer
+                description: Size of the file to be uploaded
+            required:
+              - file_size_bytes
+    responses:
+      200:
+        description: Quota check completed
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                allowed:
+                  type: boolean
+                reason:
+                  type: string
+                message:
+                  type: string
+                current_usage:
+                  type: integer
+                monthly_quota:
+                  type: integer
+                remaining:
+                  type: integer
+      400:
+        description: Invalid request
+      401:
+        description: User not authenticated
+    """
+    try:
+        data = request.get_json()
+        if not data or 'file_size_bytes' not in data:
+            return jsonify({"error": "file_size_bytes is required"}), 400
+        
+        file_size_bytes = data['file_size_bytes']
+        
+        if not isinstance(file_size_bytes, int) or file_size_bytes < 0:
+            return jsonify({"error": "file_size_bytes must be a non-negative integer"}), 400
+        
+        from quota_manager import get_quota_manager
+        quota_manager = get_quota_manager()
+        
+        quota_check = quota_manager.check_quota_before_prediction(current_user.id, file_size_bytes)
+        
+        return jsonify(quota_check), 200
+        
+    except Exception as e:
+        logger.error(f"Error checking quota for user {current_user.id}: {e}")
+        return jsonify({"error": "Failed to check quota"}), 500
 
 
 @api_v1.route('/detections', methods=['GET'])
