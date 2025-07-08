@@ -13,7 +13,8 @@ from flask_cors import CORS
 from . import wifi_config
 from . import camera_trigger
 from . import audio_threshold
-from .utils.smart_scheduler import get_wifi_manager, get_process_manager
+from .utils.smart_scheduler import get_process_manager
+from .wifi_manager import get_wifi_manager as get_advanced_wifi_manager, NetworkSecurity
 
 
 class CameraPreviewService:
@@ -139,13 +140,34 @@ def create_app(config_path: Path | None = None) -> Flask:
 
     @app.post("/wifi")
     def set_wifi():
+        """Legacy endpoint - adds network and connects to it."""
         data = request.get_json() or {}
         ssid = data.get("ssid")
         password = data.get("password")
         if not ssid or not password:
             return jsonify({"error": "ssid and password required"}), 400
-        wifi_config.write_wifi_config(ssid, password, config_path)
-        return jsonify({"status": "ok"})
+        
+        # Use new WiFi manager
+        wifi_manager = get_advanced_wifi_manager()
+        
+        # Add network with high priority (legacy behavior)
+        success = wifi_manager.add_network(
+            ssid=ssid,
+            password=password,
+            priority=100,  # High priority for manually configured networks
+            auto_connect=True
+        )
+        
+        if success:
+            # Try to connect immediately
+            connect_success = wifi_manager.connect_to_network(ssid)
+            return jsonify({
+                "status": "ok",
+                "added": True,
+                "connected": connect_success
+            })
+        else:
+            return jsonify({"error": "Failed to add network"}), 500
 
     @app.get("/camera/status")
     def camera_status():
@@ -498,6 +520,227 @@ def create_app(config_path: Path | None = None) -> Flask:
                 "wifi_active": is_active,
                 "timestamp": time.time()
             })
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # Advanced WiFi Management Endpoints
+    @app.get("/wifi/networks")
+    def get_wifi_networks():
+        """Get all configured WiFi networks."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            networks = wifi_manager.get_networks()
+            return jsonify({"networks": networks})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.post("/wifi/networks")
+    def add_wifi_network():
+        """Add a new WiFi network."""
+        try:
+            data = request.get_json() or {}
+            ssid = data.get("ssid")
+            password = data.get("password", "")
+            priority = data.get("priority", 50)
+            auto_connect = data.get("auto_connect", True)
+            hidden = data.get("hidden", False)
+            notes = data.get("notes", "")
+            
+            if not ssid:
+                return jsonify({"error": "SSID required"}), 400
+            
+            # Determine security type
+            security = NetworkSecurity.OPEN if not password else NetworkSecurity.WPA2_PSK
+            
+            wifi_manager = get_advanced_wifi_manager()
+            success = wifi_manager.add_network(
+                ssid=ssid,
+                password=password,
+                security=security,
+                priority=priority,
+                auto_connect=auto_connect,
+                hidden=hidden,
+                notes=notes
+            )
+            
+            if success:
+                return jsonify({"status": "added", "ssid": ssid})
+            else:
+                return jsonify({"error": "Failed to add network"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.delete("/wifi/networks/<ssid>")
+    def remove_wifi_network(ssid):
+        """Remove a WiFi network."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            success = wifi_manager.remove_network(ssid)
+            
+            if success:
+                return jsonify({"status": "removed", "ssid": ssid})
+            else:
+                return jsonify({"error": "Network not found"}), 404
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.put("/wifi/networks/<ssid>")
+    def update_wifi_network(ssid):
+        """Update WiFi network configuration."""
+        try:
+            data = request.get_json() or {}
+            wifi_manager = get_advanced_wifi_manager()
+            
+            # Filter valid update fields
+            valid_fields = ['password', 'priority', 'auto_connect', 'hidden', 'notes']
+            updates = {k: v for k, v in data.items() if k in valid_fields}
+            
+            if not updates:
+                return jsonify({"error": "No valid fields to update"}), 400
+            
+            success = wifi_manager.update_network(ssid, **updates)
+            
+            if success:
+                return jsonify({"status": "updated", "ssid": ssid})
+            else:
+                return jsonify({"error": "Network not found"}), 404
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.get("/wifi/scan")
+    def scan_wifi_networks():
+        """Scan for available WiFi networks."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            networks = wifi_manager.scan_networks()
+            return jsonify({"networks": networks})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.post("/wifi/connect/<ssid>")
+    def connect_to_wifi_network(ssid):
+        """Connect to a specific WiFi network."""
+        try:
+            data = request.get_json() or {}
+            force = data.get("force", False)
+            
+            wifi_manager = get_advanced_wifi_manager()
+            success = wifi_manager.connect_to_network(ssid, force=force)
+            
+            if success:
+                return jsonify({"status": "connected", "ssid": ssid})
+            else:
+                return jsonify({"error": "Connection failed"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.post("/wifi/connect/best")
+    def connect_to_best_network():
+        """Connect to the best available network."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            success = wifi_manager.connect_to_best_network()
+            
+            if success:
+                status = wifi_manager.get_status()
+                return jsonify({
+                    "status": "connected",
+                    "network": status.get("connected_network")
+                })
+            else:
+                return jsonify({"error": "No suitable network found"}), 404
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.post("/wifi/disconnect")
+    def disconnect_wifi():
+        """Disconnect from current network."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            success = wifi_manager.disconnect()
+            
+            if success:
+                return jsonify({"status": "disconnected"})
+            else:
+                return jsonify({"error": "Disconnection failed"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.get("/wifi/status")
+    def get_wifi_detailed_status():
+        """Get detailed WiFi status."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            status = wifi_manager.get_status()
+            return jsonify(status)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+
+    @app.post("/wifi/hotspot/start")
+    def start_wifi_hotspot():
+        """Start WiFi hotspot mode."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            success = wifi_manager.start_hotspot()
+            
+            if success:
+                return jsonify({"status": "hotspot_started"})
+            else:
+                return jsonify({"error": "Failed to start hotspot"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.post("/wifi/hotspot/stop")
+    def stop_wifi_hotspot():
+        """Stop WiFi hotspot mode."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            success = wifi_manager.stop_hotspot()
+            
+            if success:
+                return jsonify({"status": "hotspot_stopped"})
+            else:
+                return jsonify({"error": "Failed to stop hotspot"}), 500
+                
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.get("/wifi/hotspot/config")
+    def get_hotspot_config():
+        """Get current hotspot configuration."""
+        try:
+            wifi_manager = get_advanced_wifi_manager()
+            config = wifi_manager.hotspot_config.to_dict()
+            return jsonify(config)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.put("/wifi/hotspot/config")
+    def update_hotspot_config():
+        """Update hotspot configuration."""
+        try:
+            data = request.get_json() or {}
+            wifi_manager = get_advanced_wifi_manager()
+            
+            # Update hotspot config
+            valid_fields = ['ssid', 'password', 'channel', 'hidden', 'max_clients']
+            for field in valid_fields:
+                if field in data:
+                    setattr(wifi_manager.hotspot_config, field, data[field])
+            
+            # Save configuration
+            wifi_manager._save_configuration()
+            
+            return jsonify({"status": "updated"})
             
         except Exception as e:
             return jsonify({"error": str(e)}), 500
