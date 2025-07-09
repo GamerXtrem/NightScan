@@ -1,0 +1,97 @@
+{
+  "minimal_augmentation": {
+    "use_augmentation": true,
+    "rotation_degrees": 5,
+    "color_jitter_strength": 0.1,
+    "horizontal_flip_prob": 0.5,
+    "vertical_flip_prob": 0.0,
+    "cutmix_prob": 0.0,
+    "mixup_alpha": 0.0,
+    "use_cutmix": false,
+    "use_mixup": false,
+    "use_night_vision": false,
+    "night_vision_prob": 0.0,
+    "infrared_prob": 0.0,
+    "description": "Minimal augmentation for stable training. Only basic flipping and slight rotation."
+  },
+  
+  "standard_augmentation": {
+    "use_augmentation": true,
+    "rotation_degrees": 15,
+    "color_jitter_strength": 0.3,
+    "horizontal_flip_prob": 0.5,
+    "vertical_flip_prob": 0.2,
+    "cutmix_prob": 0.3,
+    "mixup_alpha": 0.2,
+    "use_cutmix": true,
+    "use_mixup": true,
+    "use_night_vision": false,
+    "night_vision_prob": 0.0,
+    "infrared_prob": 0.0,
+    "description": "Standard augmentation package. Good balance of data diversity and training stability."
+  },
+  
+  "aggressive_augmentation": {
+    "use_augmentation": true,
+    "rotation_degrees": 30,
+    "color_jitter_strength": 0.5,
+    "horizontal_flip_prob": 0.5,
+    "vertical_flip_prob": 0.3,
+    "cutmix_prob": 0.6,
+    "mixup_alpha": 0.4,
+    "use_cutmix": true,
+    "use_mixup": true,
+    "use_night_vision": true,
+    "night_vision_prob": 0.2,
+    "infrared_prob": 0.1,
+    "description": "Aggressive augmentation for challenging datasets. Maximum data diversity but may slow convergence."
+  },
+  
+  "nocturnal_specialized": {
+    "use_augmentation": true,
+    "rotation_degrees": 20,
+    "color_jitter_strength": 0.4,
+    "horizontal_flip_prob": 0.5,
+    "vertical_flip_prob": 0.3,
+    "cutmix_prob": 0.4,
+    "mixup_alpha": 0.3,
+    "use_cutmix": true,
+    "use_mixup": true,
+    "use_night_vision": true,
+    "night_vision_prob": 0.4,
+    "infrared_prob": 0.3,
+    "description": "Specialized augmentation for nocturnal wildlife. Includes night vision and infrared simulation."
+  },
+  
+  "production_augmentation": {
+    "use_augmentation": true,
+    "rotation_degrees": 10,
+    "color_jitter_strength": 0.2,
+    "horizontal_flip_prob": 0.5,
+    "vertical_flip_prob": 0.1,
+    "cutmix_prob": 0.2,
+    "mixup_alpha": 0.1,
+    "use_cutmix": true,
+    "use_mixup": true,
+    "use_night_vision": true,
+    "night_vision_prob": 0.1,
+    "infrared_prob": 0.05,
+    "description": "Conservative augmentation for production models. Maintains model reliability while adding some diversity."
+  },
+  
+  "no_augmentation": {
+    "use_augmentation": false,
+    "rotation_degrees": 0,
+    "color_jitter_strength": 0.0,
+    "horizontal_flip_prob": 0.0,
+    "vertical_flip_prob": 0.0,
+    "cutmix_prob": 0.0,
+    "mixup_alpha": 0.0,
+    "use_cutmix": false,
+    "use_mixup": false,
+    "use_night_vision": false,
+    "night_vision_prob": 0.0,
+    "infrared_prob": 0.0,
+    "description": "No augmentation. Use only for testing or when you have very high-quality, diverse data."
+  }
+}

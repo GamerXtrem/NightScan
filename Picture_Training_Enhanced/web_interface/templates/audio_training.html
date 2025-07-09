@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NightScan - Entraînement Audio</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .audio-theme {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .feature-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        .config-badge {
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark audio-theme">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-arrow-left"></i> Retour au Dashboard
+            </a>
+            <h4 class="text-white mb-0">
+                <i class="fas fa-volume-up"></i> Entraînement Audio - EfficientNet
+            </h4>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card feature-card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-brain"></i> Modèles EfficientNet</h5>
+                        <p>Entraînement de modèles EfficientNet optimisés pour la classification audio sur spectrogrammes.</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Configurations Rapides</h6>
+                                <div class="mb-2">
+                                    <span class="config-badge">efficientnet_b0_fast</span>
+                                    <small class="text-muted ms-2">30 epochs, batch 64</small>
+                                </div>
+                                <div class="mb-2">
+                                    <span class="config-badge">efficientnet_b1_balanced</span>
+                                    <small class="text-muted ms-2">50 epochs, batch 32</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Configurations Qualité</h6>
+                                <div class="mb-2">
+                                    <span class="config-badge">efficientnet_b2_quality</span>
+                                    <small class="text-muted ms-2">100 epochs, batch 16</small>
+                                </div>
+                                <div class="mb-2">
+                                    <span class="config-badge">efficientnet_b3_best</span>
+                                    <small class="text-muted ms-2">150 epochs, batch 8</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card feature-card mt-4">
+                    <div class="card-body">
+                        <h5><i class="fas fa-cogs"></i> Fonctionnalités Audio</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6><i class="fas fa-chart-line"></i> Spectrogrammes</h6>
+                                <p>Conversion des fichiers audio en spectrogrammes mel pour l'entraînement.</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h6><i class="fas fa-magic"></i> SpecAugment</h6>
+                                <p>Augmentation spécialisée pour données audio avec masquage fréquentiel.</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h6><i class="fas fa-balance-scale"></i> Équilibrage</h6>
+                                <p>Poids de classes optimisés pour la faune nocturne.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card feature-card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-list"></i> Classes Audio</h5>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-dove text-primary"></i> Chant d'oiseau</li>
+                            <li><i class="fas fa-paw text-warning"></i> Cri de mammifère</li>
+                            <li><i class="fas fa-bug text-success"></i> Son d'insecte</li>
+                            <li><i class="fas fa-frog text-info"></i> Cri d'amphibien</li>
+                            <li><i class="fas fa-wind text-secondary"></i> Son environnemental</li>
+                            <li><i class="fas fa-question text-muted"></i> Espèce inconnue</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card feature-card mt-4">
+                    <div class="card-body text-center">
+                        <h5><i class="fas fa-play"></i> Démarrer l'Entraînement</h5>
+                        <p>Commencez l'entraînement audio avec vos spectrogrammes</p>
+                        <button class="btn btn-primary" onclick="startAudioTraining()">
+                            <i class="fas fa-volume-up"></i> Configurer Audio
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function startAudioTraining() {
+            // Redirect to main dashboard with audio pre-selected
+            window.location.href = '/?modality=audio';
+        }
+    </script>
+</body>
+</html>

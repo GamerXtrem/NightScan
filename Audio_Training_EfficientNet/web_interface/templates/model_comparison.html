@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparaison de Modèles - NightScan</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-color: #1f2937;
+            --light-bg: #f8fafc;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .comparison-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .comparison-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .model-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: center;
+        }
+
+        .model-header.efficientnet {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .model-header.resnet {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .metric-row {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #f3f4f6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .metric-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .metric-winner {
+            color: var(--success-color);
+        }
+
+        .metric-loser {
+            color: #6b7280;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            height: 400px;
+            margin-bottom: 2rem;
+        }
+
+        .winner-badge {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .model-comparison-section {
+            position: relative;
+            margin-bottom: 2rem;
+        }
+
+        .evaluation-controls {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .btn-custom {
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            z-index: 10;
+        }
+
+        .comparison-summary {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .summary-stat {
+            margin: 0 1rem;
+        }
+
+        .summary-stat .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .summary-stat .stat-label {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .confusion-matrix {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .model-specs {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .spec-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .spec-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .performance-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .performance-excellent { background-color: var(--success-color); }
+        .performance-good { background-color: var(--warning-color); }
+        .performance-poor { background-color: var(--danger-color); }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-balance-scale me-3"></i>Comparaison de Modèles</h1>
+                    <p class="mb-0">Analyse comparative EfficientNet vs ResNet18 pour NightScan</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="/" class="btn btn-light btn-custom">
+                        <i class="fas fa-arrow-left me-2"></i>Retour au Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Evaluation Controls -->
+        <div class="evaluation-controls">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5><i class="fas fa-chart-bar me-2"></i>Évaluation des Modèles</h5>
+                    <p class="mb-0 text-muted">Comparez les performances des modèles EfficientNet et ResNet18</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-primary btn-custom me-2" onclick="runEvaluation()">
+                        <i class="fas fa-play me-2"></i>Lancer l'Évaluation
+                    </button>
+                    <button class="btn btn-outline-primary btn-custom" onclick="loadSampleResults()">
+                        <i class="fas fa-eye me-2"></i>Voir Exemple
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Summary -->
+        <div class="comparison-summary" id="comparisonSummary" style="display: none;">
+            <h4><i class="fas fa-trophy me-2 text-warning"></i>Résumé de la Comparaison</h4>
+            <div class="row justify-content-center mt-4">
+                <div class="col-auto">
+                    <div class="summary-stat">
+                        <div class="stat-value" id="winnerModel">-</div>
+                        <div class="stat-label">Modèle Gagnant</div>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <div class="summary-stat">
+                        <div class="stat-value" id="accuracyImprovement">-</div>
+                        <div class="stat-label">Amélioration Accuracy</div>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <div class="summary-stat">
+                        <div class="stat-value" id="f1Improvement">-</div>
+                        <div class="stat-label">Amélioration F1-Score</div>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <div class="summary-stat">
+                        <div class="stat-value" id="speedComparison">-</div>
+                        <div class="stat-label">Vitesse Relative</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Comparison -->
+        <div class="model-comparison-section" id="modelComparison" style="display: none;">
+            <div class="row">
+                <!-- EfficientNet Card -->
+                <div class="col-lg-6">
+                    <div class="comparison-card position-relative">
+                        <div class="winner-badge" id="efficientnetBadge" style="display: none;">
+                            <i class="fas fa-crown me-1"></i>Gagnant
+                        </div>
+                        <div class="model-header efficientnet">
+                            <h4><i class="fas fa-brain me-2"></i>EfficientNet</h4>
+                            <p class="mb-0">Architecture moderne optimisée</p>
+                        </div>
+                        
+                        <div class="model-specs">
+                            <div class="spec-item">
+                                <span>Modèle:</span>
+                                <span id="efficientnetModel">EfficientNet-B1</span>
+                            </div>
+                            <div class="spec-item">
+                                <span>Paramètres:</span>
+                                <span id="efficientnetParams">7.8M</span>
+                            </div>
+                            <div class="spec-item">
+                                <span>Taille:</span>
+                                <span id="efficientnetSize">31.2 MB</span>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-row">
+                            <span class="metric-label">Accuracy</span>
+                            <span class="metric-value" id="efficientnetAccuracy">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">F1-Score (Macro)</span>
+                            <span class="metric-value" id="efficientnetF1Macro">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">F1-Score (Weighted)</span>
+                            <span class="metric-value" id="efficientnetF1Weighted">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Precision (Macro)</span>
+                            <span class="metric-value" id="efficientnetPrecision">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Recall (Macro)</span>
+                            <span class="metric-value" id="efficientnetRecall">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Temps d'Inférence</span>
+                            <span class="metric-value" id="efficientnetInferenceTime">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ResNet18 Card -->
+                <div class="col-lg-6">
+                    <div class="comparison-card position-relative">
+                        <div class="winner-badge" id="resnetBadge" style="display: none;">
+                            <i class="fas fa-crown me-1"></i>Gagnant
+                        </div>
+                        <div class="model-header resnet">
+                            <h4><i class="fas fa-layer-group me-2"></i>ResNet18</h4>
+                            <p class="mb-0">Architecture classique éprouvée</p>
+                        </div>
+                        
+                        <div class="model-specs">
+                            <div class="spec-item">
+                                <span>Modèle:</span>
+                                <span id="resnetModel">ResNet18</span>
+                            </div>
+                            <div class="spec-item">
+                                <span>Paramètres:</span>
+                                <span id="resnetParams">11.7M</span>
+                            </div>
+                            <div class="spec-item">
+                                <span>Taille:</span>
+                                <span id="resnetSize">46.8 MB</span>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-row">
+                            <span class="metric-label">Accuracy</span>
+                            <span class="metric-value" id="resnetAccuracy">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">F1-Score (Macro)</span>
+                            <span class="metric-value" id="resnetF1Macro">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">F1-Score (Weighted)</span>
+                            <span class="metric-value" id="resnetF1Weighted">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Precision (Macro)</span>
+                            <span class="metric-value" id="resnetPrecision">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Recall (Macro)</span>
+                            <span class="metric-value" id="resnetRecall">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Temps d'Inférence</span>
+                            <span class="metric-value" id="resnetInferenceTime">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Charts -->
+        <div class="row" id="chartsSection" style="display: none;">
+            <div class="col-lg-6">
+                <div class="chart-container">
+                    <h6><i class="fas fa-chart-bar me-2"></i>Comparaison des Métriques</h6>
+                    <canvas id="metricsComparisonChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="chart-container">
+                    <h6><i class="fas fa-clock me-2"></i>Performance Temporelle</h6>
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Per-Class Performance -->
+        <div class="row" id="classPerformanceSection" style="display: none;">
+            <div class="col-12">
+                <div class="chart-container">
+                    <h6><i class="fas fa-list me-2"></i>Performance par Classe</h6>
+                    <canvas id="classPerformanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confusion Matrices -->
+        <div class="row" id="confusionMatricesSection" style="display: none;">
+            <div class="col-lg-6">
+                <div class="comparison-card">
+                    <div class="model-header efficientnet">
+                        <h6><i class="fas fa-table me-2"></i>Matrice de Confusion - EfficientNet</h6>
+                    </div>
+                    <div class="p-3 text-center">
+                        <canvas id="efficientnetConfusionMatrix" class="confusion-matrix"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="comparison-card">
+                    <div class="model-header resnet">
+                        <h6><i class="fas fa-table me-2"></i>Matrice de Confusion - ResNet18</h6>
+                    </div>
+                    <div class="p-3 text-center">
+                        <canvas id="resnetConfusionMatrix" class="confusion-matrix"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <div>
+                    <h5>Évaluation en cours...</h5>
+                    <p class="text-muted">Comparaison des modèles EfficientNet et ResNet18</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global variables
+        let metricsChart = null;
+        let performanceChart = null;
+        let classPerformanceChart = null;
+        let efficientnetCMChart = null;
+        let resnetCMChart = null;
+
+        // Class names for wildlife audio classification
+        const classNames = [
+            'bird_song', 'mammal_call', 'insect_sound', 
+            'amphibian_call', 'environmental_sound', 'unknown_species'
+        ];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎯 Interface de comparaison initialisée');
+        });
+
+        async function runEvaluation() {
+            try {
+                showLoading(true);
+                
+                // Simulate API call to run evaluation
+                console.log('🚀 Lancement de l\'évaluation comparative...');
+                
+                // In a real implementation, this would call the actual evaluation API
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate processing time
+                
+                // Load sample results for demonstration
+                loadSampleResults();
+                
+            } catch (error) {
+                console.error('❌ Erreur lors de l\'évaluation:', error);
+                alert('Erreur lors de l\'évaluation des modèles');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function loadSampleResults() {
+            // Sample comparison data for demonstration
+            const sampleData = {
+                efficientnet: {
+                    model: 'EfficientNet-B1',
+                    parameters: '7.8M',
+                    size: '31.2 MB',
+                    accuracy: 0.8745,
+                    f1_macro: 0.8523,
+                    f1_weighted: 0.8699,
+                    precision_macro: 0.8634,
+                    recall_macro: 0.8523,
+                    inference_time: 42.3
+                },
+                resnet18: {
+                    model: 'ResNet18',
+                    parameters: '11.7M',
+                    size: '46.8 MB',
+                    accuracy: 0.8234,
+                    f1_macro: 0.8012,
+                    f1_weighted: 0.8187,
+                    precision_macro: 0.8156,
+                    recall_macro: 0.8012,
+                    inference_time: 38.7
+                },
+                class_performance: {
+                    efficientnet: [0.89, 0.86, 0.82, 0.84, 0.91, 0.79],
+                    resnet18: [0.83, 0.81, 0.77, 0.79, 0.86, 0.74]
+                }
+            };
+
+            displayResults(sampleData);
+        }
+
+        function displayResults(data) {
+            // Show sections
+            document.getElementById('comparisonSummary').style.display = 'block';
+            document.getElementById('modelComparison').style.display = 'block';
+            document.getElementById('chartsSection').style.display = 'flex';
+            document.getElementById('classPerformanceSection').style.display = 'block';
+            document.getElementById('confusionMatricesSection').style.display = 'flex';
+
+            // Update summary
+            updateComparisonSummary(data);
+            
+            // Update model cards
+            updateModelCards(data);
+            
+            // Create charts
+            createMetricsComparisonChart(data);
+            createPerformanceChart(data);
+            createClassPerformanceChart(data);
+            createConfusionMatrices(data);
+        }
+
+        function updateComparisonSummary(data) {
+            const effAcc = data.efficientnet.accuracy;
+            const resAcc = data.resnet18.accuracy;
+            const effF1 = data.efficientnet.f1_macro;
+            const resF1 = data.resnet18.f1_macro;
+            const effTime = data.efficientnet.inference_time;
+            const resTime = data.resnet18.inference_time;
+
+            const winner = effAcc > resAcc ? 'EfficientNet' : 'ResNet18';
+            const accuracyImprovement = ((effAcc - resAcc) / resAcc * 100).toFixed(1);
+            const f1Improvement = ((effF1 - resF1) / resF1 * 100).toFixed(1);
+            const speedRatio = (resTime / effTime).toFixed(1);
+
+            document.getElementById('winnerModel').textContent = winner;
+            document.getElementById('accuracyImprovement').textContent = `+${accuracyImprovement}%`;
+            document.getElementById('f1Improvement').textContent = `+${f1Improvement}%`;
+            document.getElementById('speedComparison').textContent = `${speedRatio}x`;
+        }
+
+        function updateModelCards(data) {
+            // EfficientNet
+            document.getElementById('efficientnetAccuracy').textContent = `${(data.efficientnet.accuracy * 100).toFixed(2)}%`;
+            document.getElementById('efficientnetF1Macro').textContent = data.efficientnet.f1_macro.toFixed(4);
+            document.getElementById('efficientnetF1Weighted').textContent = data.efficientnet.f1_weighted.toFixed(4);
+            document.getElementById('efficientnetPrecision').textContent = data.efficientnet.precision_macro.toFixed(4);
+            document.getElementById('efficientnetRecall').textContent = data.efficientnet.recall_macro.toFixed(4);
+            document.getElementById('efficientnetInferenceTime').textContent = `${data.efficientnet.inference_time.toFixed(1)}ms`;
+
+            // ResNet18
+            document.getElementById('resnetAccuracy').textContent = `${(data.resnet18.accuracy * 100).toFixed(2)}%`;
+            document.getElementById('resnetF1Macro').textContent = data.resnet18.f1_macro.toFixed(4);
+            document.getElementById('resnetF1Weighted').textContent = data.resnet18.f1_weighted.toFixed(4);
+            document.getElementById('resnetPrecision').textContent = data.resnet18.precision_macro.toFixed(4);
+            document.getElementById('resnetRecall').textContent = data.resnet18.recall_macro.toFixed(4);
+            document.getElementById('resnetInferenceTime').textContent = `${data.resnet18.inference_time.toFixed(1)}ms`;
+
+            // Highlight winners
+            const metrics = ['Accuracy', 'F1Macro', 'F1Weighted', 'Precision', 'Recall'];
+            const effMetrics = [data.efficientnet.accuracy, data.efficientnet.f1_macro, data.efficientnet.f1_weighted, data.efficientnet.precision_macro, data.efficientnet.recall_macro];
+            const resMetrics = [data.resnet18.accuracy, data.resnet18.f1_macro, data.resnet18.f1_weighted, data.resnet18.precision_macro, data.resnet18.recall_macro];
+
+            let effWins = 0;
+            metrics.forEach((metric, i) => {
+                const effEl = document.getElementById(`efficientnet${metric}`);
+                const resEl = document.getElementById(`resnet${metric}`);
+                
+                if (effMetrics[i] > resMetrics[i]) {
+                    effEl.classList.add('metric-winner');
+                    resEl.classList.add('metric-loser');
+                    effWins++;
+                } else {
+                    resEl.classList.add('metric-winner');
+                    effEl.classList.add('metric-loser');
+                }
+            });
+
+            // Speed comparison (lower is better)
+            const effTimeEl = document.getElementById('efficientnetInferenceTime');
+            const resTimeEl = document.getElementById('resnetInferenceTime');
+            if (data.efficientnet.inference_time < data.resnet18.inference_time) {
+                effTimeEl.classList.add('metric-winner');
+                resTimeEl.classList.add('metric-loser');
+                effWins++;
+            } else {
+                resTimeEl.classList.add('metric-winner');
+                effTimeEl.classList.add('metric-loser');
+            }
+
+            // Show overall winner badge
+            if (effWins > 3) {
+                document.getElementById('efficientnetBadge').style.display = 'block';
+            } else {
+                document.getElementById('resnetBadge').style.display = 'block';
+            }
+        }
+
+        function createMetricsComparisonChart(data) {
+            const ctx = document.getElementById('metricsComparisonChart').getContext('2d');
+            
+            if (metricsChart) {
+                metricsChart.destroy();
+            }
+
+            metricsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Accuracy', 'F1-Macro', 'F1-Weighted', 'Precision', 'Recall'],
+                    datasets: [
+                        {
+                            label: 'EfficientNet',
+                            data: [
+                                data.efficientnet.accuracy * 100,
+                                data.efficientnet.f1_macro * 100,
+                                data.efficientnet.f1_weighted * 100,
+                                data.efficientnet.precision_macro * 100,
+                                data.efficientnet.recall_macro * 100
+                            ],
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: '#3b82f6',
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'ResNet18',
+                            data: [
+                                data.resnet18.accuracy * 100,
+                                data.resnet18.f1_macro * 100,
+                                data.resnet18.f1_weighted * 100,
+                                data.resnet18.precision_macro * 100,
+                                data.resnet18.recall_macro * 100
+                            ],
+                            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                            borderColor: '#f59e0b',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Performance (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createPerformanceChart(data) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            if (performanceChart) {
+                performanceChart.destroy();
+            }
+
+            performanceChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['EfficientNet', 'ResNet18'],
+                    datasets: [{
+                        label: 'Temps d\'Inférence (ms)',
+                        data: [data.efficientnet.inference_time, data.resnet18.inference_time],
+                        backgroundColor: ['#3b82f6', '#f59e0b'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createClassPerformanceChart(data) {
+            const ctx = document.getElementById('classPerformanceChart').getContext('2d');
+            
+            if (classPerformanceChart) {
+                classPerformanceChart.destroy();
+            }
+
+            classPerformanceChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: classNames.map(name => name.replace('_', ' ')),
+                    datasets: [
+                        {
+                            label: 'EfficientNet',
+                            data: data.class_performance.efficientnet.map(x => x * 100),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            pointBackgroundColor: '#3b82f6',
+                            pointBorderColor: '#ffffff',
+                            pointHoverBackgroundColor: '#ffffff',
+                            pointHoverBorderColor: '#3b82f6'
+                        },
+                        {
+                            label: 'ResNet18',
+                            data: data.class_performance.resnet18.map(x => x * 100),
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                            pointBackgroundColor: '#f59e0b',
+                            pointBorderColor: '#ffffff',
+                            pointHoverBackgroundColor: '#ffffff',
+                            pointHoverBorderColor: '#f59e0b'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                stepSize: 20
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createConfusionMatrices(data) {
+            // Sample confusion matrices for demonstration
+            const efficientnetMatrix = [
+                [85, 2, 1, 0, 1, 1],
+                [3, 82, 2, 1, 1, 1],
+                [2, 3, 78, 2, 3, 2],
+                [1, 2, 3, 81, 2, 1],
+                [0, 1, 2, 1, 88, 3],
+                [2, 2, 4, 2, 3, 77]
+            ];
+
+            const resnetMatrix = [
+                [79, 4, 2, 1, 2, 2],
+                [5, 77, 3, 2, 2, 1],
+                [3, 5, 72, 3, 4, 3],
+                [2, 3, 4, 76, 3, 2],
+                [1, 2, 3, 2, 82, 5],
+                [3, 3, 6, 3, 4, 71]
+            ];
+
+            // Create heatmaps for confusion matrices
+            // Note: This is a simplified representation. In a real implementation,
+            // you would use a proper heatmap library like Chart.js with matrix plugin
+            // or a dedicated visualization library
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+        }
+
+        // Utility functions
+        function formatMetric(value, type = 'decimal') {
+            if (type === 'percentage') {
+                return `${(value * 100).toFixed(2)}%`;
+            }
+            return value.toFixed(4);
+        }
+
+        function formatTime(milliseconds) {
+            return `${milliseconds.toFixed(1)}ms`;
+        }
+
+        // Debug
+        console.log('🎯 Interface de comparaison prête');
+    </script>
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EfficientNet Training Dashboard - NightScan</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.min.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-color: #1f2937;
+            --light-bg: #f8fafc;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #3b82f6 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: none;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .metric-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .progress-bar-custom {
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--success-color) 100%);
+        }
+
+        .control-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-custom {
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
+            border: none;
+            color: white;
+        }
+
+        .btn-start:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #dc2626 100%);
+            border: none;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+            color: white;
+        }
+
+        .log-container {
+            background: var(--dark-color);
+            color: #e5e7eb;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #374151;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-timestamp {
+            color: #9ca3af;
+            margin-right: 0.5rem;
+        }
+
+        .log-info { color: #60a5fa; }
+        .log-success { color: #34d399; }
+        .log-warning { color: #fbbf24; }
+        .log-error { color: #f87171; }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .status-active {
+            background-color: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        .status-inactive {
+            background-color: #6b7280;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            height: 400px;
+        }
+
+        .system-info {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .system-metric {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .system-metric:last-child {
+            border-bottom: none;
+        }
+
+        .config-display {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem;
+            border-left: 4px solid var(--primary-color);
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-brain me-3"></i>EfficientNet Training Dashboard</h1>
+                    <p class="mb-0">Système d'entraînement avancé pour la classification audio NightScan</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <span class="status-indicator" id="connectionStatus"></span>
+                    <span id="connectionText">Connexion...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Control Panel -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="control-panel">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-play-circle me-2"></i>Contrôle d'Entraînement</h5>
+                            <div class="d-flex gap-3 mt-3">
+                                <button class="btn btn-start btn-custom" id="startBtn" onclick="showConfigModal()">
+                                    <i class="fas fa-play me-2"></i>Démarrer l'Entraînement
+                                </button>
+                                <button class="btn btn-stop btn-custom" id="stopBtn" onclick="stopTraining()" disabled>
+                                    <i class="fas fa-stop me-2"></i>Arrêter l'Entraînement
+                                </button>
+                                <a href="/config" class="btn btn-outline-primary btn-custom">
+                                    <i class="fas fa-cog me-2"></i>Configuration
+                                </a>
+                                <a href="/comparison" class="btn btn-outline-info btn-custom">
+                                    <i class="fas fa-chart-line me-2"></i>Comparaison
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div id="currentConfig" class="config-display" style="display: none;">
+                                <h6><i class="fas fa-microchip me-2"></i>Configuration Actuelle</h6>
+                                <div id="configDetails"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div class="row mb-4" id="progressSection" style="display: none;">
+            <div class="col-12">
+                <div class="progress-container">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5><i class="fas fa-chart-line me-2"></i>Progression de l'Entraînement</h5>
+                        <span id="eta" class="badge bg-primary">ETA: --:--:--</span>
+                    </div>
+                    
+                    <div class="row align-items-center mb-3">
+                        <div class="col-md-8">
+                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                <span>Époque <span id="currentEpoch">0</span> sur <span id="totalEpochs">0</span></span>
+                                <span id="progressPercent">0%</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar progress-bar-custom" id="epochProgress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <span class="badge bg-success fs-6" id="trainingStatus">En cours...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Cards -->
+        <div class="row mb-4" id="metricsSection" style="display: none;">
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <div class="metric-label">Train Loss</div>
+                        <div class="metric-value text-primary" id="trainLoss">0.000</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <div class="metric-label">Val Loss</div>
+                        <div class="metric-value text-info" id="valLoss">0.000</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <div class="metric-label">Train Accuracy</div>
+                        <div class="metric-value text-success" id="trainAccuracy">0.0%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <div class="metric-label">Val Accuracy</div>
+                        <div class="metric-value text-warning" id="valAccuracy">0.0%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts and Logs -->
+        <div class="row mb-4">
+            <div class="col-lg-8">
+                <div class="chart-container">
+                    <h6><i class="fas fa-chart-area me-2"></i>Métriques en Temps Réel</h6>
+                    <canvas id="metricsChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="system-info">
+                    <h6><i class="fas fa-server me-2"></i>Informations Système</h6>
+                    <div id="systemInfo">
+                        <div class="text-center py-3">
+                            <i class="fas fa-spinner fa-spin"></i> Chargement...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="control-panel">
+                    <h6><i class="fas fa-terminal me-2"></i>Logs d'Entraînement</h6>
+                    <div class="log-container p-3" id="logContainer">
+                        <div class="log-entry">
+                            <span class="log-timestamp">[--:--:--]</span>
+                            <span class="log-info">En attente de démarrage de l'entraînement...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Start Modal -->
+    <div class="modal fade" id="quickStartModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-rocket me-2"></i>Démarrage Rapide</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="quickStartForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Configuration du Modèle</label>
+                                    <select class="form-select" id="configSelect" required>
+                                        <option value="">Sélectionner une configuration...</option>
+                                        <option value="efficientnet_b0_fast">EfficientNet-B0 (Rapide)</option>
+                                        <option value="efficientnet_b1_balanced">EfficientNet-B1 (Équilibré)</option>
+                                        <option value="efficientnet_b2_quality">EfficientNet-B2 (Qualité)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Nombre d'Époques</label>
+                                    <input type="number" class="form-control" id="epochsInput" value="50" min="1" max="200">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Taille de Batch</label>
+                                    <select class="form-select" id="batchSizeSelect">
+                                        <option value="16">16 (Mémoire limitée)</option>
+                                        <option value="32" selected>32 (Recommandé)</option>
+                                        <option value="64">64 (GPU puissant)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Taux d'Apprentissage</label>
+                                    <input type="number" class="form-control" id="learningRateInput" 
+                                           value="0.0001" step="0.00001" min="0.00001" max="0.01">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Données d'Entraînement (CSV)</label>
+                                    <input type="text" class="form-control" id="trainCsvInput" 
+                                           placeholder="Chemin vers train.csv" value="data/processed/csv/train.csv">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Données de Validation (CSV)</label>
+                                    <input type="text" class="form-control" id="valCsvInput" 
+                                           placeholder="Chemin vers val.csv" value="data/processed/csv/val.csv">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Conseil :</strong> Assurez-vous que vos données sont préprocessées et que les chemins CSV sont corrects.
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-success" onclick="startTraining()">
+                        <i class="fas fa-play me-2"></i>Démarrer l'Entraînement
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/training.js"></script>
+</body>
+</html>

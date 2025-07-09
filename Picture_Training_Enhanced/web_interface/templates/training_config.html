@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NightScan - Configuration {{ modality.title() }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .audio-theme {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .photo-theme {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .config-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .config-card:hover {
+            transform: translateY(-2px);
+        }
+        .preset-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .preset-badge:hover {
+            transform: scale(1.05);
+        }
+        .preset-badge.audio {
+            background: #667eea;
+            color: white;
+        }
+        .preset-badge.photo {
+            background: #f5576c;
+            color: white;
+        }
+        .preset-badge.selected {
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.5);
+        }
+        .parameter-group {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark {{ 'audio-theme' if modality == 'audio' else 'photo-theme' }}">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-arrow-left"></i> Retour au Dashboard
+            </a>
+            <h4 class="text-white mb-0">
+                <i class="fas fa-{{ 'volume-up' if modality == 'audio' else 'camera' }}"></i> 
+                Configuration {{ modality.title() }}
+            </h4>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card config-card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-sliders-h"></i> Configurations Prédéfinies</h5>
+                        <p>Sélectionnez une configuration optimisée pour votre cas d'usage :</p>
+                        
+                        <div class="row">
+                            {% for config in configs %}
+                            <div class="col-md-6 mb-3">
+                                <div class="preset-badge {{ modality }}" onclick="selectPreset('{{ config }}')">
+                                    <strong>{{ config }}</strong>
+                                    <br>
+                                    <small id="preset-{{ config }}-desc">Chargement...</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card config-card mt-4">
+                    <div class="card-body">
+                        <h5><i class="fas fa-cog"></i> Paramètres d'Entraînement</h5>
+                        
+                        <form id="configForm">
+                            <div class="parameter-group">
+                                <h6><i class="fas fa-play"></i> Paramètres Principaux</h6>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Époques</label>
+                                        <input type="number" class="form-control" id="epochs" min="1" max="500" value="100">
+                                        <small class="text-muted">Nombre d'époques d'entraînement</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Taille de Batch</label>
+                                        <input type="number" class="form-control" id="batch_size" min="1" max="128" value="32">
+                                        <small class="text-muted">Nombre d'échantillons par batch</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Taux d'Apprentissage</label>
+                                        <input type="number" class="form-control" id="learning_rate" step="0.000001" value="0.0001">
+                                        <small class="text-muted">Taux d'apprentissage initial</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="parameter-group">
+                                <h6><i class="fas fa-database"></i> Données</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">CSV d'Entraînement</label>
+                                        <input type="text" class="form-control" id="train_csv" 
+                                               placeholder="/chemin/vers/train.csv" required>
+                                        <small class="text-muted">Fichier CSV avec colonnes 'path' et 'label'</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">CSV de Validation</label>
+                                        <input type="text" class="form-control" id="val_csv" 
+                                               placeholder="/chemin/vers/val.csv" required>
+                                        <small class="text-muted">Fichier CSV avec colonnes 'path' et 'label'</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="parameter-group">
+                                <h6><i class="fas fa-chart-line"></i> Optimisation</h6>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Optimiseur</label>
+                                        <select class="form-select" id="optimizer">
+                                            <option value="adamw">AdamW</option>
+                                            <option value="adam">Adam</option>
+                                            <option value="sgd">SGD</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Scheduler</label>
+                                        <select class="form-select" id="scheduler">
+                                            <option value="cosine">Cosine Annealing</option>
+                                            <option value="step">Step LR</option>
+                                            <option value="reduce_on_plateau">Reduce on Plateau</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Patience</label>
+                                        <input type="number" class="form-control" id="patience" min="1" max="100" value="15">
+                                        <small class="text-muted">Patience pour l'arrêt précoce</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if modality == 'photo' %}
+                            <div class="parameter-group">
+                                <h6><i class="fas fa-magic"></i> Augmentation (Photo)</h6>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="use_augmentation" checked>
+                                            <label class="form-check-label">Augmentation</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="use_cutmix">
+                                            <label class="form-check-label">CutMix</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="use_mixup">
+                                            <label class="form-check-label">MixUp</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="night_vision">
+                                            <label class="form-check-label">Vision Nocturne</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card config-card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-info-circle"></i> Détails de Configuration</h5>
+                        <div id="configDetails">
+                            <p class="text-muted">Sélectionnez une configuration pour voir les détails</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card config-card mt-4">
+                    <div class="card-body">
+                        <h5><i class="fas fa-lightbulb"></i> Recommandations</h5>
+                        <div id="recommendations">
+                            {% if modality == 'audio' %}
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> <strong>Développement:</strong> efficientnet_b0_fast</li>
+                                <li><i class="fas fa-check text-success"></i> <strong>Production:</strong> efficientnet_b2_quality</li>
+                                <li><i class="fas fa-check text-success"></i> <strong>Balanced:</strong> efficientnet_b1_balanced</li>
+                            </ul>
+                            {% else %}
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> <strong>Développement:</strong> efficientnet_b0_fast</li>
+                                <li><i class="fas fa-check text-success"></i> <strong>Production:</strong> vit_b_16_quality</li>
+                                <li><i class="fas fa-check text-success"></i> <strong>Balanced:</strong> resnet50_quality</li>
+                                <li><i class="fas fa-check text-success"></i> <strong>Rapide:</strong> resnet18_fast</li>
+                            </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card config-card mt-4">
+                    <div class="card-body text-center">
+                        <h5><i class="fas fa-rocket"></i> Lancer l'Entraînement</h5>
+                        <p>Configuration prête pour l'entraînement {{ modality }}</p>
+                        <button class="btn btn-primary btn-lg" onclick="startTraining()">
+                            <i class="fas fa-play"></i> Démarrer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedPreset = null;
+        const modality = '{{ modality }}';
+
+        // Load preset descriptions
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPresetDescriptions();
+        });
+
+        function loadPresetDescriptions() {
+            const configs = {{ configs | tojsonfilter }};
+            
+            configs.forEach(config => {
+                fetch(`/api/config_details/${modality}/${config}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const desc = document.getElementById(`preset-${config}-desc`);
+                        if (data.config) {
+                            desc.textContent = `${data.config.epochs} epochs, batch ${data.config.batch_size}`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading preset:', error);
+                    });
+            });
+        }
+
+        function selectPreset(configName) {
+            // Remove previous selection
+            document.querySelectorAll('.preset-badge').forEach(badge => {
+                badge.classList.remove('selected');
+            });
+            
+            // Add selection to current
+            event.target.classList.add('selected');
+            selectedPreset = configName;
+            
+            // Load config details
+            loadConfigDetails(configName);
+        }
+
+        function loadConfigDetails(configName) {
+            fetch(`/api/config_details/${modality}/${configName}`)
+                .then(response => response.json())
+                .then(data => {
+                    const config = data.config;
+                    
+                    // Update details display
+                    const detailsDiv = document.getElementById('configDetails');
+                    detailsDiv.innerHTML = `
+                        <div class="mb-3">
+                            <h6><i class="fas fa-brain"></i> ${config.architecture || 'EfficientNet'}</h6>
+                            <p><strong>Modèle:</strong> ${config.model_name}</p>
+                            <p><strong>Optimiseur:</strong> ${config.optimizer}</p>
+                            <p><strong>Scheduler:</strong> ${config.scheduler}</p>
+                            <p><strong>Précision mixte:</strong> ${config.mixed_precision ? 'Oui' : 'Non'}</p>
+                            <p><strong>Augmentation:</strong> ${config.use_augmentation ? 'Activée' : 'Désactivée'}</p>
+                        </div>
+                    `;
+                    
+                    // Update form fields
+                    document.getElementById('epochs').value = config.epochs;
+                    document.getElementById('batch_size').value = config.batch_size;
+                    document.getElementById('learning_rate').value = config.learning_rate;
+                    document.getElementById('optimizer').value = config.optimizer;
+                    document.getElementById('scheduler').value = config.scheduler;
+                    document.getElementById('patience').value = config.patience;
+                    
+                    // Update photo-specific fields
+                    if (modality === 'photo') {
+                        document.getElementById('use_augmentation').checked = config.use_augmentation;
+                        if (document.getElementById('use_cutmix')) {
+                            document.getElementById('use_cutmix').checked = config.use_cutmix || false;
+                        }
+                        if (document.getElementById('use_mixup')) {
+                            document.getElementById('use_mixup').checked = config.use_mixup || false;
+                        }
+                        if (document.getElementById('night_vision')) {
+                            document.getElementById('night_vision').checked = config.use_night_vision || false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading config details:', error);
+                });
+        }
+
+        function startTraining() {
+            if (!selectedPreset) {
+                alert('Veuillez sélectionner une configuration prédéfinie');
+                return;
+            }
+
+            const formData = {
+                modality: modality,
+                config_name: selectedPreset,
+                epochs: parseInt(document.getElementById('epochs').value),
+                batch_size: parseInt(document.getElementById('batch_size').value),
+                learning_rate: parseFloat(document.getElementById('learning_rate').value),
+                train_csv: document.getElementById('train_csv').value,
+                val_csv: document.getElementById('val_csv').value
+            };
+
+            // Add photo-specific parameters
+            if (modality === 'photo') {
+                formData.use_augmentation = document.getElementById('use_augmentation').checked;
+                formData.use_cutmix = document.getElementById('use_cutmix')?.checked || false;
+                formData.use_mixup = document.getElementById('use_mixup')?.checked || false;
+                formData.night_vision = document.getElementById('night_vision')?.checked || false;
+            }
+
+            // Validate required fields
+            if (!formData.train_csv || !formData.val_csv) {
+                alert('Veuillez spécifier les fichiers CSV d\'entraînement et de validation');
+                return;
+            }
+
+            // Send training request
+            fetch('/api/start_training', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Erreur: ' + data.error);
+                } else {
+                    alert('Entraînement démarré avec succès!');
+                    window.location.href = '/';
+                }
+            })
+            .catch(error => {
+                console.error('Error starting training:', error);
+                alert('Erreur lors du démarrage de l\'entraînement');
+            });
+        }
+    </script>
+</body>
+</html>

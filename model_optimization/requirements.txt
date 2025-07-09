@@ -1,0 +1,28 @@
+# Requirements pour la quantification des modèles NightScan
+
+# Core dependencies
+torch>=1.11.0
+torchvision>=0.12.0
+numpy>=1.21.0
+pillow>=8.3.0
+
+# Model conversion
+onnx>=1.12.0
+onnxruntime>=1.12.0
+
+# TensorFlow Lite conversion
+tensorflow>=2.8.0
+tf2onnx>=1.10.0
+
+# Core ML conversion (macOS only)
+coremltools>=6.0.0
+onnx-coreml>=1.4.0
+
+# Optimization tools
+onnx-simplifier>=0.4.0
+onnxoptimizer>=0.2.0
+
+# Utilities
+tqdm>=4.64.0
+matplotlib>=3.5.0
+seaborn>=0.11.0

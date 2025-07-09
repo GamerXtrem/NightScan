@@ -15,13 +15,21 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nightscan.app"
+      "bundleIdentifier": "com.nightscan.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "NightScan utilise votre localisation pour configurer automatiquement la position géographique de votre Pi.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "NightScan utilise votre localisation pour configurer automatiquement la position géographique de votre Pi."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0F1420"
       },
-      "package": "com.nightscan.app"
+      "package": "com.nightscan.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro"

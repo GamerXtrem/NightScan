@@ -1,0 +1,90 @@
+{
+  "timestamp": "2025-07-09T08:00:06.722438",
+  "results": [
+    [
+      "Audio format",
+      true
+    ],
+    [
+      "Image format",
+      true
+    ],
+    [
+      "Extension audio",
+      true
+    ],
+    [
+      "Extension image",
+      true
+    ],
+    [
+      "Parse nouveau audio AUD_20240109_143045_4695_0745.wav",
+      true
+    ],
+    [
+      "Parse nouveau image IMG_20240109_143045_4695_0745.jpg",
+      true
+    ],
+    [
+      "Parse nouveau video VID_20240109_143045_4695_0745.mp4",
+      true
+    ],
+    [
+      "Coordonn\u00e9es 46.948,7.4474",
+      false
+    ],
+    [
+      "Coordonn\u00e9es 47.3769,8.5417",
+      false
+    ],
+    [
+      "Coordonn\u00e9es 45.5017,6.0863",
+      false
+    ],
+    [
+      "Coordonn\u00e9es 0.0,0.0",
+      false
+    ],
+    [
+      "Coordonn\u00e9es -33.8688,151.2093",
+      false
+    ],
+    [
+      "Coordonn\u00e9es 90.0,180.0",
+      false
+    ],
+    [
+      "Coordonn\u00e9es -90.0,-180.0",
+      true
+    ],
+    [
+      "Fonction audio",
+      true
+    ],
+    [
+      "Fonction image",
+      true
+    ],
+    [
+      "GPS int\u00e9gr\u00e9 audio",
+      true
+    ],
+    [
+      "GPS int\u00e9gr\u00e9 image",
+      true
+    ],
+    [
+      "Cr\u00e9ation fichier audio",
+      true
+    ],
+    [
+      "Cr\u00e9ation fichier image",
+      true
+    ]
+  ],
+  "summary": {
+    "total_tests": 20,
+    "passed": 14,
+    "failed": 6
+  }
+}

@@ -6,6 +6,7 @@ export const BASE_URL = 'http://localhost:8000';
 export const API_BASE_URL = 'http://localhost:8000/api/v1';
 export const PREDICT_API_URL = process.env.PREDICT_API_URL || 'http://localhost:8001/api/v1/predict';
 export const PI_SERVICE_URL = 'http://192.168.4.1:5000';
+export const PI_LOCATION_URL = 'http://192.168.4.1:5001';
 
 const CACHE_PREFIX = 'nightscan_cache_';
 const SYNC_QUEUE_KEY = 'nightscan_sync_queue';
@@ -740,6 +741,218 @@ export async function getWifiStatus() {
     throw error;
   }
 }
+
+// Location management functions
+export async function getLocationStatus() {
+  try {
+    const response = await fetch(`${PI_LOCATION_URL}/api/location/status`);
+    if (!response.ok) {
+      throw new Error(`Location status request failed: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Location status error:', error);
+    throw error;
+  }
+}
+
+export async function getCurrentLocation() {
+  try {
+    const response = await fetch(`${PI_LOCATION_URL}/api/location`);
+    if (!response.ok) {
+      throw new Error(`Get location request failed: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Get location error:', error);
+    throw error;
+  }
+}
+
+export async function updatePiLocation(locationData) {
+  try {
+    const response = await fetch(`${PI_LOCATION_URL}/api/location`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(locationData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update Pi location');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Update Pi location error:', error);
+    throw error;
+  }
+}
+
+export async function updateLocationFromPhone(phoneLocationData) {
+  try {
+    const response = await fetch(`${PI_LOCATION_URL}/api/location/phone`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(phoneLocationData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update location from phone');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Update location from phone error:', error);
+    throw error;
+  }
+}
+
+export async function getLocationHistory(limit = 10) {
+  try {
+    const response = await fetch(`${PI_LOCATION_URL}/api/location/history?limit=${limit}`);
+    if (!response.ok) {
+      throw new Error(`Location history request failed: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Location history error:', error);
+    throw error;
+  }
+}
+
+export async function validateCoordinates(latitude, longitude) {
+  try {
+    const response = await fetch(`${PI_LOCATION_URL}/api/location/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ latitude, longitude }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to validate coordinates');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Validate coordinates error:', error);
+    throw error;
+  }
+}
+
+export async function resetLocationToDefault() {
+  try {
+    const response = await fetch(`${PI_LOCATION_URL}/api/location/reset`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to reset location');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Reset location error:', error);
+    throw error;
+  }
+}
+
+export async function exportLocationData() {
+  try {
+    const response = await fetch(`${PI_LOCATION_URL}/api/location/export`);
+    if (!response.ok) {
+      throw new Error(`Export location data request failed: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Export location data error:', error);
+    throw error;
+  }
+}
+
+// Enhanced API service with location functions
+apiService.getLocationStatus = () => getLocationStatus();
+apiService.getCurrentLocation = () => getCurrentLocation();
+apiService.updatePiLocation = (locationData) => updatePiLocation(locationData);
+apiService.updateLocationFromPhone = (phoneLocationData) => updateLocationFromPhone(phoneLocationData);
+apiService.getLocationHistory = (limit) => getLocationHistory(limit);
+apiService.validateCoordinates = (latitude, longitude) => validateCoordinates(latitude, longitude);
+apiService.resetLocationToDefault = () => resetLocationToDefault();
+apiService.exportLocationData = () => exportLocationData();
+
+// Create a simplified api object for easier imports
+export const api = {
+  // Existing functions
+  login: apiService.login.bind(apiService),
+  register: apiService.register.bind(apiService),
+  fetchDetections: apiService.fetchDetections.bind(apiService),
+  uploadMedia: apiService.uploadMedia.bind(apiService),
+  getHealth: apiService.getHealth.bind(apiService),
+  getSyncStatus: apiService.getSyncStatus.bind(apiService),
+  clearCache: apiService.clearCache.bind(apiService),
+  forceSyncNow: apiService.forceSyncNow.bind(apiService),
+  
+  // Camera functions
+  getCameraStatus: apiService.getCameraStatus.bind(apiService),
+  startCameraPreview: apiService.startCameraPreview.bind(apiService),
+  stopCameraPreview: apiService.stopCameraPreview.bind(apiService),
+  captureImage: apiService.captureImage.bind(apiService),
+  getPiHealth: apiService.getPiHealth.bind(apiService),
+  
+  // Audio threshold functions
+  getAudioThresholdStatus: apiService.getAudioThresholdStatus.bind(apiService),
+  updateAudioThresholdConfig: apiService.updateAudioThresholdConfig.bind(apiService),
+  applyAudioThresholdPreset: apiService.applyAudioThresholdPreset.bind(apiService),
+  calibrateAudioThreshold: apiService.calibrateAudioThreshold.bind(apiService),
+  testAudioThreshold: apiService.testAudioThreshold.bind(apiService),
+  getAudioThresholdPresets: apiService.getAudioThresholdPresets.bind(apiService),
+  getLiveAudioLevels: apiService.getLiveAudioLevels.bind(apiService),
+  
+  // Energy management functions
+  getEnergyStatus,
+  activateWifi,
+  deactivateWifi,
+  extendWifi,
+  getWifiStatus,
+  
+  // Location functions
+  get: (endpoint) => {
+    const url = endpoint.startsWith('/location') ? `${PI_LOCATION_URL}/api${endpoint}` : `${API_BASE_URL}${endpoint}`;
+    return fetch(url).then(response => response.json());
+  },
+  post: (endpoint, data) => {
+    const url = endpoint.startsWith('/location') ? `${PI_LOCATION_URL}/api${endpoint}` : `${API_BASE_URL}${endpoint}`;
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }).then(response => response.json());
+  },
+  
+  // Direct location functions
+  getLocationStatus: apiService.getLocationStatus.bind(apiService),
+  getCurrentLocation: apiService.getCurrentLocation.bind(apiService),
+  updatePiLocation: apiService.updatePiLocation.bind(apiService),
+  updateLocationFromPhone: apiService.updateLocationFromPhone.bind(apiService),
+  getLocationHistory: apiService.getLocationHistory.bind(apiService),
+  validateCoordinates: apiService.validateCoordinates.bind(apiService),
+  resetLocationToDefault: apiService.resetLocationToDefault.bind(apiService),
+  exportLocationData: apiService.exportLocationData.bind(apiService),
+};
 
 // Export the enhanced service
 export default apiService;

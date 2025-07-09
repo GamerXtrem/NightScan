@@ -12,6 +12,8 @@ from .utils import energy_manager
 from .utils import detector
 from .utils.smart_scheduler import get_energy_scheduler
 from . import spectrogram_gen
+from filename_utils import FilenameGenerator
+from location_manager import location_manager
 
 LOG_PATH = Path(os.getenv("NIGHTSCAN_LOG", "nightscan.log"))
 logging.basicConfig(
@@ -29,15 +31,20 @@ def run_cycle(base_dir: Path, camera_enabled: bool = True) -> None:
     start_time = time.time()
     audio_dir = base_dir / "audio"
     image_dir = base_dir / "images"
-    ts = int(time.time())
+    
+    # Initialize filename generator with current location
+    filename_gen = FilenameGenerator(location_manager)
+    
+    # Generate audio filename with GPS metadata
+    audio_filename = filename_gen.generate_audio_filename()
     
     mode = "full" if camera_enabled else "audio-only"
-    logging.info(f"Starting {mode} capture cycle {ts}")
+    logging.info(f"Starting {mode} capture cycle - Audio: {audio_filename}")
     
     try:
         # Always record audio
         audio_start = time.time()
-        audio_capture.record_segment(8, audio_dir / f"{ts}.wav")
+        audio_capture.record_segment(8, audio_dir / audio_filename)
         audio_duration = time.time() - audio_start
         logging.info(f"Audio capture completed in {audio_duration:.3f}s")
         

@@ -6,6 +6,8 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Tuple
+from filename_utils import FilenameGenerator
+from location_manager import location_manager
 
 # Modern picamera2 API (libcamera-based)
 try:
@@ -272,7 +274,10 @@ def capture_image(out_dir: Path, resolution: Optional[Tuple[int, int]] = None) -
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    filename = datetime.now().strftime("%Y%m%d_%H%M%S.jpg")
+    
+    # Generate filename with GPS metadata using new format
+    filename_gen = FilenameGenerator(location_manager)
+    filename = filename_gen.generate_image_filename()
     out_path = out_dir / filename
 
     success = camera_manager.capture_image(out_path, resolution)
