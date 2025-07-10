@@ -273,8 +273,19 @@ class Prediction(db.Model):
     filename = db.Column(db.String(200))
     result = db.Column(db.Text)
     file_size = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     user = db.relationship("User", backref=db.backref("predictions", lazy=True))
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "filename": self.filename,
+            "result": self.result,
+            "file_size": self.file_size,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "user_id": self.user_id
+        }
 
 
 class Detection(db.Model):
@@ -359,6 +370,7 @@ class PlanFeatures(db.Model):
     features_json = db.Column(db.Text)  # JSON string for additional features
     price_monthly_cents = db.Column(db.Integer, nullable=False, default=0)
     price_yearly_cents = db.Column(db.Integer)
+    data_retention_days = db.Column(db.Integer, nullable=False, default=30)  # Data retention period
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -368,6 +380,7 @@ class PlanFeatures(db.Model):
             "plan_type": self.plan_type,
             "plan_name": self.plan_name,
             "monthly_quota": self.monthly_quota,
+            "data_retention_days": self.data_retention_days,
             "price_monthly": self.price_monthly_cents / 100 if self.price_monthly_cents else 0,
             "is_active": self.is_active
         }
@@ -546,6 +559,75 @@ class SubscriptionEvent(db.Model):
             "metadata": json.loads(self.metadata) if self.metadata else {},
             "created_by": self.created_by,
             "created_at": self.created_at.isoformat()
+        }
+
+
+# ===== DATA RETENTION MODELS =====
+
+class DataRetentionLog(db.Model):
+    """Log of data retention operations for audit purposes"""
+    __tablename__ = 'data_retention_log'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    plan_type = db.Column(db.String(50), nullable=False)
+    retention_days = db.Column(db.Integer, nullable=False)
+    records_deleted = db.Column(db.Integer, nullable=False, default=0)
+    total_size_deleted_bytes = db.Column(db.BigInteger, nullable=False, default=0)
+    deletion_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    retention_policy_version = db.Column(db.String(50), default='1.0')
+    admin_override = db.Column(db.Boolean, default=False)
+    admin_reason = db.Column(db.Text)
+    metadata = db.Column(db.Text)  # JSON string for additional info
+    
+    # Relationships
+    user = db.relationship("User", backref=db.backref("retention_logs", lazy=True))
+    
+    def to_dict(self) -> dict:
+        import json
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "plan_type": self.plan_type,
+            "retention_days": self.retention_days,
+            "records_deleted": self.records_deleted,
+            "total_size_deleted_bytes": self.total_size_deleted_bytes,
+            "total_size_deleted_mb": round(self.total_size_deleted_bytes / 1024 / 1024, 2),
+            "deletion_date": self.deletion_date.isoformat(),
+            "admin_override": self.admin_override,
+            "admin_reason": self.admin_reason,
+            "metadata": json.loads(self.metadata) if self.metadata else {}
+        }
+
+
+class PredictionArchive(db.Model):
+    """Archive of deleted predictions for soft delete functionality"""
+    __tablename__ = 'prediction_archive'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    original_prediction_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
+    filename = db.Column(db.String(200))
+    result = db.Column(db.Text)
+    file_size = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, nullable=False)
+    archived_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    plan_type_at_archive = db.Column(db.String(50))
+    retention_days = db.Column(db.Integer)
+    archived_by = db.Column(db.String(50), default='system')
+    
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "original_prediction_id": self.original_prediction_id,
+            "user_id": self.user_id,
+            "filename": self.filename,
+            "file_size": self.file_size,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "archived_at": self.archived_at.isoformat(),
+            "plan_type_at_archive": self.plan_type_at_archive,
+            "retention_days": self.retention_days,
+            "archived_by": self.archived_by
         }
 
 
@@ -811,6 +893,14 @@ def readiness_check():
 def dashboard():
     """Live dashboard with real-time notifications."""
     return render_template("dashboard.html")
+
+
+@app.route("/data-retention")
+@login_required
+@track_request_metrics
+def data_retention():
+    """Data retention management page."""
+    return render_template("data_retention.html")
 
 
 @app.route("/api/detections")

@@ -883,6 +883,415 @@ def handle_validation_error(error):
     }), 400
 
 
+# ===== DATA RETENTION ENDPOINTS =====
+
+class RetentionPolicySchema(Schema):
+    """Schema for data retention policy."""
+    user_id = fields.Int(required=True, description="User ID")
+    plan_type = fields.Str(required=True, description="Current plan type")
+    plan_name = fields.Str(required=True, description="Plan display name")
+    retention_days = fields.Int(required=True, description="Data retention period in days")
+    retention_description = fields.Str(required=True, description="Human-readable retention period")
+
+
+class RetentionStatsSchema(Schema):
+    """Schema for user retention statistics."""
+    user_id = fields.Int(required=True, description="User ID")
+    plan_type = fields.Str(required=True, description="Current plan type")
+    retention_days = fields.Int(required=True, description="Retention period in days")
+    total_predictions = fields.Int(required=True, description="Total predictions count")
+    expired_predictions = fields.Int(required=True, description="Expired predictions count")
+    expiring_soon = fields.Int(required=True, description="Predictions expiring soon")
+    expired_size_mb = fields.Float(required=True, description="Size of expired data in MB")
+
+
+class PlanRetentionSchema(Schema):
+    """Schema for plan with retention information."""
+    plan_type = fields.Str(required=True, description="Plan identifier")
+    plan_name = fields.Str(required=True, description="Plan display name")
+    monthly_quota = fields.Int(required=True, description="Monthly prediction quota")
+    data_retention_days = fields.Int(required=True, description="Data retention days")
+    retention_description = fields.Str(required=True, description="Human-readable retention")
+    price_monthly = fields.Float(required=True, description="Monthly price")
+
+
+@api_v1.route('/retention/policy', methods=['GET'])
+@login_required
+@track_request_metrics
+def get_user_retention_policy():
+    """
+    Get current user's data retention policy.
+    ---
+    tags:
+      - Data Retention
+    security:
+      - login_required: []
+    responses:
+      200:
+        description: Current retention policy
+        content:
+          application/json:
+            schema: RetentionPolicySchema
+      401:
+        description: Authentication required
+        content:
+          application/json:
+            schema: ErrorSchema
+    """
+    try:
+        from quota_manager import get_quota_manager
+        
+        quota_manager = get_quota_manager()
+        policy = quota_manager.get_user_retention_policy(current_user.id)
+        
+        if policy.get('error'):
+            return jsonify({
+                "error": policy['error'],
+                "code": "RETENTION_ERROR"
+            }), 400
+        
+        return jsonify(policy)
+        
+    except Exception as e:
+        logger.error(f"Error getting retention policy: {e}")
+        return jsonify({
+            "error": "Failed to get retention policy",
+            "code": "RETENTION_ERROR"
+        }), 500
+
+
+@api_v1.route('/retention/stats', methods=['GET'])
+@login_required
+@track_request_metrics
+def get_user_retention_stats():
+    """
+    Get user's data retention statistics.
+    ---
+    tags:
+      - Data Retention
+    security:
+      - login_required: []
+    responses:
+      200:
+        description: User retention statistics
+        content:
+          application/json:
+            schema: RetentionStatsSchema
+      401:
+        description: Authentication required
+        content:
+          application/json:
+            schema: ErrorSchema
+    """
+    try:
+        from quota_manager import get_quota_manager
+        
+        quota_manager = get_quota_manager()
+        stats = quota_manager.get_retention_stats_for_user(current_user.id)
+        
+        if stats.get('error'):
+            return jsonify({
+                "error": stats['error'],
+                "code": "RETENTION_ERROR"
+            }), 400
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting retention stats: {e}")
+        return jsonify({
+            "error": "Failed to get retention statistics",
+            "code": "RETENTION_ERROR"
+        }), 500
+
+
+@api_v1.route('/retention/expired-count', methods=['GET'])
+@login_required
+@track_request_metrics
+def get_expired_predictions_count():
+    """
+    Get count of expired predictions for current user.
+    ---
+    tags:
+      - Data Retention
+    security:
+      - login_required: []
+    responses:
+      200:
+        description: Count of expired predictions
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  description: User ID
+                expired_predictions:
+                  type: integer
+                  description: Number of expired predictions
+                expiring_soon:
+                  type: integer
+                  description: Number of predictions expiring soon
+                expired_size_mb:
+                  type: number
+                  description: Size of expired data in MB
+    """
+    try:
+        from quota_manager import get_quota_manager
+        
+        quota_manager = get_quota_manager()
+        expired_info = quota_manager.get_expired_predictions_count(current_user.id)
+        
+        if expired_info.get('error'):
+            return jsonify({
+                "error": expired_info['error'],
+                "code": "RETENTION_ERROR"
+            }), 400
+        
+        return jsonify(expired_info)
+        
+    except Exception as e:
+        logger.error(f"Error getting expired predictions count: {e}")
+        return jsonify({
+            "error": "Failed to get expired predictions count",
+            "code": "RETENTION_ERROR"
+        }), 500
+
+
+@api_v1.route('/retention/plans', methods=['GET'])
+@track_request_metrics
+def get_plans_with_retention():
+    """
+    Get all available plans with retention information.
+    ---
+    tags:
+      - Data Retention
+    responses:
+      200:
+        description: List of plans with retention info
+        content:
+          application/json:
+            schema:
+              type: array
+              items: PlanRetentionSchema
+    """
+    try:
+        from quota_manager import get_quota_manager
+        
+        quota_manager = get_quota_manager()
+        plans = quota_manager.get_all_plans_with_retention()
+        
+        return jsonify({
+            "plans": plans,
+            "total": len(plans)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting plans with retention: {e}")
+        return jsonify({
+            "error": "Failed to get plans information",
+            "code": "RETENTION_ERROR"
+        }), 500
+
+
+@api_v1.route('/retention/cleanup/preview', methods=['POST'])
+@login_required
+@track_request_metrics
+def preview_retention_cleanup():
+    """
+    Preview what would be deleted in a retention cleanup (dry run).
+    ---
+    tags:
+      - Data Retention
+    security:
+      - login_required: []
+    responses:
+      200:
+        description: Preview of cleanup operation
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run:
+                  type: boolean
+                  description: Always true for preview
+                deleted_count:
+                  type: integer
+                  description: Number of predictions that would be deleted
+                total_size_deleted_mb:
+                  type: number
+                  description: Total size that would be freed in MB
+    """
+    try:
+        from quota_manager import get_quota_manager
+        
+        quota_manager = get_quota_manager()
+        preview = quota_manager.cleanup_expired_predictions(
+            user_id=current_user.id,
+            dry_run=True
+        )
+        
+        return jsonify(preview)
+        
+    except Exception as e:
+        logger.error(f"Error previewing cleanup: {e}")
+        return jsonify({
+            "error": "Failed to preview cleanup",
+            "code": "RETENTION_ERROR"
+        }), 500
+
+
+@api_v1.route('/predictions', methods=['GET'])
+@login_required
+@track_request_metrics
+def get_user_predictions():
+    """
+    Get user's predictions with retention filtering.
+    ---
+    tags:
+      - Predictions
+    security:
+      - login_required: []
+    parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+        description: Page number
+      - name: per_page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        description: Items per page
+      - name: include_expired
+        in: query
+        schema:
+          type: boolean
+          default: false
+        description: Include expired predictions (normally hidden)
+    responses:
+      200:
+        description: List of user's predictions
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                predictions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      filename:
+                        type: string
+                      result:
+                        type: string
+                      file_size:
+                        type: integer
+                      created_at:
+                        type: string
+                        format: date-time
+                      days_old:
+                        type: integer
+                      expires_in_days:
+                        type: integer
+                pagination:
+                  $ref: '#/components/schemas/PaginationSchema'
+                retention_info:
+                  type: object
+                  properties:
+                    retention_days:
+                      type: integer
+                    plan_type:
+                      type: string
+    """
+    try:
+        # Validate query parameters
+        page = int(request.args.get('page', 1))
+        per_page = min(int(request.args.get('per_page', 20)), 100)
+        include_expired = request.args.get('include_expired', 'false').lower() == 'true'
+        
+        if page < 1 or per_page < 1:
+            return jsonify({"error": "Invalid pagination parameters"}), 400
+        
+        from web.app import Prediction
+        from quota_manager import get_quota_manager
+        
+        # Get user's retention policy
+        quota_manager = get_quota_manager()
+        retention_policy = quota_manager.get_user_retention_policy(current_user.id)
+        retention_days = retention_policy.get('retention_days', 30)
+        
+        # Build query
+        query = Prediction.query.filter_by(user_id=current_user.id)
+        
+        # Filter expired predictions unless explicitly requested
+        if not include_expired:
+            from sqlalchemy import text
+            query = query.filter(
+                text(f"EXTRACT(DAY FROM (CURRENT_TIMESTAMP - created_at)) <= {retention_days}")
+            )
+        
+        query = query.order_by(Prediction.created_at.desc())
+        
+        # Paginate
+        predictions = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        # Format results
+        results = []
+        for pred in predictions.items:
+            from datetime import datetime
+            days_old = (datetime.now() - pred.created_at).days if pred.created_at else 0
+            expires_in = max(0, retention_days - days_old)
+            
+            pred_dict = pred.to_dict()
+            pred_dict.update({
+                'days_old': days_old,
+                'expires_in_days': expires_in,
+                'is_expired': days_old > retention_days
+            })
+            results.append(pred_dict)
+        
+        return jsonify({
+            "predictions": results,
+            "pagination": {
+                "page": predictions.page,
+                "per_page": predictions.per_page,
+                "total": predictions.total,
+                "pages": predictions.pages,
+                "has_next": predictions.has_next,
+                "has_prev": predictions.has_prev
+            },
+            "retention_info": {
+                "retention_days": retention_days,
+                "plan_type": retention_policy.get('plan_type'),
+                "plan_name": retention_policy.get('plan_name')
+            }
+        })
+        
+    except ValueError:
+        return jsonify({"error": "Invalid parameter format"}), 400
+    except Exception as e:
+        logger.error(f"Error getting predictions: {e}")
+        return jsonify({
+            "error": "Failed to get predictions",
+            "code": "PREDICTIONS_ERROR"
+        }), 500
+
+
 @api_v1.errorhandler(404)
 def handle_not_found(error):
     """Handle 404 errors."""

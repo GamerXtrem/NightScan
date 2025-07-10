@@ -39,6 +39,7 @@ class PlanFeatures:
     email_support: bool
     phone_support: bool
     price_monthly_cents: int
+    data_retention_days: int
     features_json: Dict[str, Any]
 
 @dataclass
@@ -135,7 +136,7 @@ class QuotaManager:
         SELECT plan_type, plan_name, monthly_quota, max_file_size_mb,
                max_concurrent_uploads, priority_queue, advanced_analytics,
                api_access, email_support, phone_support, price_monthly_cents,
-               features_json
+               data_retention_days, features_json
         FROM plan_features 
         WHERE is_active = true
         """
@@ -156,6 +157,7 @@ class QuotaManager:
                 email_support=plan['email_support'],
                 phone_support=plan['phone_support'],
                 price_monthly_cents=plan['price_monthly_cents'],
+                data_retention_days=plan['data_retention_days'],
                 features_json=plan['features_json'] or {}
             )
         
@@ -494,6 +496,239 @@ class QuotaManager:
         except Exception as e:
             logger.error(f"Failed to reset quota for user {user_id}: {e}")
             return False
+    
+    # ===== DATA RETENTION METHODS =====
+    
+    def get_user_retention_policy(self, user_id: int) -> Dict[str, Any]:
+        """Get the data retention policy for a user"""
+        try:
+            query = """
+            SELECT 
+                up.plan_type,
+                pf.data_retention_days,
+                pf.plan_name
+            FROM user_plans up
+            JOIN plan_features pf ON up.plan_type = pf.plan_type
+            WHERE up.user_id = %s AND up.status = 'active' AND pf.is_active = true
+            """
+            
+            result = self._execute_query(query, (user_id,), fetch_one=True)
+            
+            if not result:
+                return {
+                    'error': 'User has no active plan',
+                    'plan_type': None,
+                    'retention_days': 0
+                }
+            
+            return {
+                'user_id': user_id,
+                'plan_type': result['plan_type'],
+                'plan_name': result['plan_name'],
+                'retention_days': result['data_retention_days'],
+                'retention_description': self._get_retention_description(result['data_retention_days'])
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting retention policy for user {user_id}: {e}")
+            return {
+                'error': str(e),
+                'retention_days': 0
+            }
+    
+    def get_expired_predictions_count(self, user_id: int) -> Dict[str, Any]:
+        """Get count of predictions that should be deleted according to retention policy"""
+        try:
+            query = """
+            SELECT 
+                up.plan_type,
+                pf.data_retention_days,
+                COUNT(p.id) as total_predictions,
+                COUNT(CASE WHEN EXTRACT(DAY FROM (CURRENT_TIMESTAMP - p.created_at)) > pf.data_retention_days THEN 1 END) as expired_predictions,
+                COUNT(CASE WHEN EXTRACT(DAY FROM (CURRENT_TIMESTAMP - p.created_at)) > (pf.data_retention_days - 7) THEN 1 END) as expiring_soon,
+                SUM(CASE WHEN EXTRACT(DAY FROM (CURRENT_TIMESTAMP - p.created_at)) > pf.data_retention_days THEN p.file_size ELSE 0 END) as expired_size_bytes
+            FROM user_plans up
+            JOIN plan_features pf ON up.plan_type = pf.plan_type
+            LEFT JOIN prediction p ON up.user_id = p.user_id
+            WHERE up.user_id = %s AND up.status = 'active' AND pf.is_active = true
+            GROUP BY up.plan_type, pf.data_retention_days
+            """
+            
+            result = self._execute_query(query, (user_id,), fetch_one=True)
+            
+            if not result:
+                return {
+                    'error': 'User not found or no predictions',
+                    'expired_predictions': 0,
+                    'expiring_soon': 0
+                }
+            
+            return {
+                'user_id': user_id,
+                'plan_type': result['plan_type'],
+                'retention_days': result['data_retention_days'],
+                'total_predictions': result['total_predictions'] or 0,
+                'expired_predictions': result['expired_predictions'] or 0,
+                'expiring_soon': result['expiring_soon'] or 0,
+                'expired_size_bytes': result['expired_size_bytes'] or 0,
+                'expired_size_mb': round((result['expired_size_bytes'] or 0) / 1024 / 1024, 2)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting expired predictions for user {user_id}: {e}")
+            return {
+                'error': str(e),
+                'expired_predictions': 0
+            }
+    
+    def cleanup_expired_predictions(self, user_id: int = None, dry_run: bool = True) -> Dict[str, Any]:
+        """Clean up expired predictions according to retention policies"""
+        try:
+            # Use PostgreSQL function for cleanup
+            query = "SELECT cleanup_expired_predictions(%s, %s)"
+            result = self._execute_query(query, (user_id, dry_run), fetch_one=True)
+            
+            if result:
+                cleanup_result = list(result.values())[0]  # Get the JSON result
+                
+                # Log the cleanup operation
+                if not dry_run and cleanup_result.get('deleted_count', 0) > 0:
+                    logger.info(f"Data retention cleanup completed: {cleanup_result}")
+                
+                return cleanup_result
+            
+            return {
+                'success': False,
+                'error': 'No result from cleanup function',
+                'deleted_count': 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Error during retention cleanup: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'deleted_count': 0
+            }
+    
+    def get_retention_stats_for_user(self, user_id: int) -> Dict[str, Any]:
+        """Get comprehensive retention statistics for a user"""
+        try:
+            # Use PostgreSQL function for stats
+            query = "SELECT get_user_retention_stats(%s)"
+            result = self._execute_query(query, (user_id,), fetch_one=True)
+            
+            if result:
+                stats = list(result.values())[0]  # Get the JSON result
+                return stats
+            
+            return {
+                'error': 'No statistics available',
+                'user_id': user_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting retention stats for user {user_id}: {e}")
+            return {
+                'error': str(e),
+                'user_id': user_id
+            }
+    
+    def notify_expiring_data(self, user_id: int, days_before: int = 7) -> Dict[str, Any]:
+        """Check if user has data expiring soon and needs notification"""
+        try:
+            expired_info = self.get_expired_predictions_count(user_id)
+            
+            if expired_info.get('error'):
+                return expired_info
+            
+            expiring_count = expired_info.get('expiring_soon', 0) - expired_info.get('expired_predictions', 0)
+            
+            if expiring_count > 0:
+                retention_policy = self.get_user_retention_policy(user_id)
+                
+                return {
+                    'should_notify': True,
+                    'user_id': user_id,
+                    'expiring_count': expiring_count,
+                    'days_until_deletion': days_before,
+                    'plan_type': retention_policy.get('plan_type'),
+                    'retention_days': retention_policy.get('retention_days'),
+                    'upgrade_options': self._get_upgrade_options_for_retention(retention_policy.get('plan_type'))
+                }
+            
+            return {
+                'should_notify': False,
+                'user_id': user_id,
+                'expiring_count': 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Error checking expiring data for user {user_id}: {e}")
+            return {
+                'error': str(e),
+                'should_notify': False
+            }
+    
+    def get_all_plans_with_retention(self) -> List[Dict[str, Any]]:
+        """Get all plans with retention information for user comparison"""
+        plans = self.get_available_plans()
+        
+        # Add retention information to each plan
+        for plan in plans:
+            plan_details = self.get_plan_features(plan['plan_type'])
+            if plan_details:
+                # Add retention info from the enhanced plan features
+                plan['data_retention_days'] = getattr(plan_details, 'data_retention_days', 30)
+                plan['retention_description'] = self._get_retention_description(plan['data_retention_days'])
+                plan['features']['data_retention_days'] = plan['data_retention_days']
+        
+        return plans
+    
+    def _get_retention_description(self, days: int) -> str:
+        """Get human-readable description of retention period"""
+        if days <= 7:
+            return f"{days} jour{'s' if days > 1 else ''}"
+        elif days <= 31:
+            return f"{days} jours"
+        elif days <= 180:
+            months = days // 30
+            return f"{months} mois"
+        else:
+            years = days // 365
+            return f"{years} an{'s' if years > 1 else ''}"
+    
+    def _get_upgrade_options_for_retention(self, current_plan: str) -> List[Dict[str, Any]]:
+        """Get upgrade options that provide longer retention"""
+        if not current_plan:
+            return []
+        
+        all_plans = self.get_all_plans_with_retention()
+        current_retention = None
+        
+        # Find current plan retention
+        for plan in all_plans:
+            if plan['plan_type'] == current_plan:
+                current_retention = plan.get('data_retention_days', 0)
+                break
+        
+        if current_retention is None:
+            return []
+        
+        # Find plans with longer retention
+        upgrade_options = []
+        for plan in all_plans:
+            if plan.get('data_retention_days', 0) > current_retention:
+                upgrade_options.append({
+                    'plan_type': plan['plan_type'],
+                    'plan_name': plan['plan_name'],
+                    'retention_days': plan['data_retention_days'],
+                    'retention_description': plan['retention_description'],
+                    'price_monthly': plan['price_monthly'],
+                    'retention_improvement': plan['data_retention_days'] - current_retention
+                })
+        
+        return sorted(upgrade_options, key=lambda x: x['price_monthly'])
 
 # Global quota manager instance
 _quota_manager = None
