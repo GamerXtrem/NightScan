@@ -1,0 +1,86 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true,
+    "react-native/react-native": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "plugins": [
+    "react",
+    "react-native"
+  ],
+  "rules": {
+    // Enforce camelCase for variables and functions
+    "camelcase": ["error", {
+      "properties": "always",
+      "ignoreDestructuring": false,
+      "ignoreImports": false,
+      "ignoreGlobals": false
+    }],
+    
+    // Enforce naming conventions
+    "id-match": ["error", "^[a-z][a-zA-Z0-9]*$|^[A-Z][a-zA-Z0-9]*$", {
+      "properties": true,
+      "onlyDeclarations": false,
+      "ignoreDestructuring": false
+    }],
+    
+    // Style rules
+    "indent": ["error", 2, { "SwitchCase": 1 }],
+    "linebreak-style": ["error", "unix"],
+    "quotes": ["error", "single", { "avoidEscape": true }],
+    "semi": ["error", "always"],
+    "no-trailing-spaces": "error",
+    "eol-last": ["error", "always"],
+    "comma-dangle": ["error", "only-multiline"],
+    "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 0 }],
+    
+    // Best practices
+    "no-unused-vars": ["error", { 
+      "vars": "all", 
+      "args": "after-used",
+      "ignoreRestSiblings": true 
+    }],
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "prefer-const": "error",
+    "no-var": "error",
+    "arrow-spacing": ["error", { "before": true, "after": true }],
+    "object-curly-spacing": ["error", "always"],
+    "array-bracket-spacing": ["error", "never"],
+    
+    // React specific
+    "react/jsx-uses-react": "error",
+    "react/jsx-uses-vars": "error",
+    "react/prop-types": "off",
+    "react/react-in-jsx-scope": "off",
+    
+    // React Native specific
+    "react-native/no-unused-styles": "error",
+    "react-native/no-inline-styles": "warn",
+    "react-native/no-raw-text": "off"
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "overrides": [
+    {
+      "files": ["*.test.js", "*.spec.js"],
+      "env": {
+        "jest": true
+      }
+    }
+  ]
+}

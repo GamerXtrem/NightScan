@@ -130,12 +130,26 @@ class UnifiedPredictionAPI:
                         "error": f"Extension non autorisée. Autorisées: {', '.join(ALLOWED_EXTENSIONS)}"
                     }), 400
                 
-                # Sauvegarder le fichier temporairement
+                # Sauvegarder le fichier temporairement avec streaming
+                from streaming_utils import StreamingFileHandler
+                
                 filename = secure_filename(file.filename)
                 unique_filename = f"{uuid.uuid4()}_{filename}"
                 filepath = UPLOAD_FOLDER / unique_filename
                 
-                file.save(filepath)
+                # Use streaming to save file
+                handler = StreamingFileHandler()
+                try:
+                    file_size, file_hash = handler.save_file_streaming(
+                        file,
+                        filepath,
+                        max_size=100 * 1024 * 1024  # 100MB limit
+                    )
+                except ValueError as e:
+                    return jsonify({
+                        "success": False,
+                        "error": str(e)
+                    }), 400
                 
                 try:
                     # Paramètres optionnels

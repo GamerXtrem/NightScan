@@ -1,9 +1,9 @@
-"""Analytics and reporting dashboard for NightScan."""
+"""Optimized Analytics and reporting dashboard for NightScan - No N+1 queries."""
 
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Iterator
 from dataclasses import dataclass, asdict
 from collections import defaultdict, Counter
 import io
@@ -25,18 +25,25 @@ try:
 except ImportError:
     PDF_AVAILABLE = False
 
-from flask import Blueprint, render_template_string, jsonify, request, send_file
+from flask import Blueprint, render_template_string, jsonify, request, send_file, Response
 from flask_login import login_required, current_user
-from sqlalchemy import func, and_, or_, desc
+from sqlalchemy import func, and_, or_, desc, text
 from datetime import datetime
 
 from config import get_config
 from metrics import track_request_metrics
+from cache_manager import cache_analytics_result, invalidate_analytics_cache, get_cache_manager
+from cache_middleware import cache_for_analytics
 
 logger = logging.getLogger(__name__)
 
 # Create analytics blueprint
 analytics_bp = Blueprint('analytics', __name__, url_prefix='/analytics')
+
+# Constants for performance
+MAX_EXPORT_ROWS = 10000  # Maximum rows for CSV export
+PAGINATION_SIZE = 1000   # Rows per page for exports
+CACHE_TTL = 300         # 5 minutes cache
 
 
 @dataclass
@@ -65,16 +72,17 @@ class AnalyticsMetrics:
             self.confidence_distribution = {}
 
 
-class AnalyticsEngine:
-    """Main analytics engine for generating insights."""
+class OptimizedAnalyticsEngine:
+    """Optimized analytics engine with no N+1 queries."""
     
     def __init__(self, db):
         """Initialize analytics engine with database connection."""
         self.db = db
         self.config = get_config()
     
+    @cache_analytics_result(ttl=300)  # Cache for 5 minutes
     def get_detection_metrics(self, days: int = 30) -> AnalyticsMetrics:
-        """Get comprehensive detection metrics."""
+        """Get comprehensive detection metrics using aggregated queries."""
         from web.app import Detection
         
         # Date ranges
@@ -84,92 +92,127 @@ class AnalyticsEngine:
         week_start = now - timedelta(days=7)
         month_start = now - timedelta(days=30)
         
-        # Basic metrics
-        total_detections = Detection.query.filter(Detection.time >= start_date).count()
-        unique_species = self.db.session.query(func.count(func.distinct(Detection.species))).filter(
-            Detection.time >= start_date
-        ).scalar() or 0
+        # Single aggregated query for all basic metrics
+        metrics_query = self.db.session.query(
+            func.count(Detection.id).label('total'),
+            func.count(func.distinct(Detection.species)).label('unique_species'),
+            func.avg(Detection.confidence).label('avg_confidence'),
+            func.sum(
+                func.cast(Detection.time >= today_start, db.Integer)
+            ).label('today'),
+            func.sum(
+                func.cast(Detection.time >= week_start, db.Integer)
+            ).label('week'),
+            func.sum(
+                func.cast(Detection.time >= month_start, db.Integer)
+            ).label('month')
+        ).filter(Detection.time >= start_date).first()
         
-        # Time-based metrics
-        detections_today = Detection.query.filter(Detection.time >= today_start).count()
-        detections_this_week = Detection.query.filter(Detection.time >= week_start).count()
-        detections_this_month = Detection.query.filter(Detection.time >= month_start).count()
-        
-        # Top species
-        species_query = self.db.session.query(
-            Detection.species, func.count(Detection.id).label('count')
-        ).filter(Detection.time >= start_date).group_by(Detection.species).order_by(desc('count')).limit(10)
-        
-        top_species = [(species, count) for species, count in species_query.all()]
-        
-        # Hourly distribution
-        hourly_query = self.db.session.query(
-            func.extract('hour', Detection.time).label('hour'),
-            func.count(Detection.id).label('count')
-        ).filter(Detection.time >= start_date).group_by('hour').all()
-        
-        hourly_distribution = {int(hour): count for hour, count in hourly_query}
-        
-        # Daily distribution (last 7 days)
-        daily_query = self.db.session.query(
-            func.date(Detection.time).label('date'),
-            func.count(Detection.id).label('count')
-        ).filter(Detection.time >= week_start).group_by('date').all()
-        
-        daily_distribution = {str(date): count for date, count in daily_query}
-        
-        # Average confidence (if available in your data model)
-        # This would need to be added to the Detection model
-        avg_confidence = 0.85  # Placeholder
-        
-        # Active sensors (zones with recent activity)
-        active_sensors = self.db.session.query(func.count(func.distinct(Detection.zone))).filter(
+        # Active sensors (single query)
+        active_sensors = self.db.session.query(
+            func.count(func.distinct(Detection.zone))
+        ).filter(
             Detection.time >= now - timedelta(hours=24),
             Detection.zone.isnot(None)
         ).scalar() or 0
         
+        # Top species (already optimized)
+        top_species = self.db.session.query(
+            Detection.species, 
+            func.count(Detection.id).label('count')
+        ).filter(
+            Detection.time >= start_date
+        ).group_by(
+            Detection.species
+        ).order_by(
+            desc('count')
+        ).limit(10).all()
+        
+        # Hourly distribution (optimized)
+        hourly_dist = self.db.session.query(
+            func.extract('hour', Detection.time).label('hour'),
+            func.count(Detection.id).label('count')
+        ).filter(
+            Detection.time >= start_date
+        ).group_by('hour').all()
+        
+        # Daily distribution (optimized)
+        daily_dist = self.db.session.query(
+            func.date(Detection.time).label('date'),
+            func.count(Detection.id).label('count')
+        ).filter(
+            Detection.time >= week_start
+        ).group_by('date').all()
+        
         return AnalyticsMetrics(
-            total_detections=total_detections,
-            unique_species=unique_species,
+            total_detections=metrics_query.total or 0,
+            unique_species=metrics_query.unique_species or 0,
             active_sensors=active_sensors,
-            avg_confidence=avg_confidence,
-            detections_today=detections_today,
-            detections_this_week=detections_this_week,
-            detections_this_month=detections_this_month,
-            top_species=top_species,
-            hourly_distribution=hourly_distribution,
-            daily_distribution=daily_distribution
+            avg_confidence=float(metrics_query.avg_confidence or 0),
+            detections_today=metrics_query.today or 0,
+            detections_this_week=metrics_query.week or 0,
+            detections_this_month=metrics_query.month or 0,
+            top_species=[(s, c) for s, c in top_species],
+            hourly_distribution={int(h): c for h, c in hourly_dist},
+            daily_distribution={str(d): c for d, c in daily_dist}
         )
     
-    def get_species_insights(self, species: str, days: int = 30) -> Dict[str, Any]:
-        """Get detailed insights for a specific species."""
+    @cache_analytics_result(ttl=300)  # Cache for 5 minutes
+    def get_species_insights_optimized(self, species: str, days: int = 30) -> Dict[str, Any]:
+        """Get detailed insights for a specific species without loading all records."""
         from web.app import Detection
         
         start_date = datetime.utcnow() - timedelta(days=days)
         
-        # Basic species metrics
-        detections = Detection.query.filter(
+        # Check if species exists and get count
+        species_stats = self.db.session.query(
+            func.count(Detection.id).label('total'),
+            func.min(Detection.time).label('first'),
+            func.max(Detection.time).label('last')
+        ).filter(
             Detection.species == species,
             Detection.time >= start_date
-        ).all()
+        ).first()
         
-        if not detections:
+        if not species_stats.total:
             return {'error': f'No data found for species: {species}'}
         
-        # Zone distribution
-        zone_counts = Counter(d.zone for d in detections if d.zone)
+        # Zone distribution (aggregated query)
+        zone_dist = self.db.session.query(
+            Detection.zone,
+            func.count(Detection.id).label('count')
+        ).filter(
+            Detection.species == species,
+            Detection.time >= start_date,
+            Detection.zone.isnot(None)
+        ).group_by(
+            Detection.zone
+        ).order_by(
+            desc('count')
+        ).limit(10).all()
         
-        # Time patterns
-        hour_counts = Counter(d.time.hour for d in detections)
+        # Hourly pattern (aggregated query)
+        hourly_pattern = self.db.session.query(
+            func.extract('hour', Detection.time).label('hour'),
+            func.count(Detection.id).label('count')
+        ).filter(
+            Detection.species == species,
+            Detection.time >= start_date
+        ).group_by('hour').all()
         
-        # Recent activity
-        recent_detections = sorted(detections, key=lambda x: x.time, reverse=True)[:10]
+        # Recent detections (limited to 10)
+        recent = self.db.session.query(Detection).filter(
+            Detection.species == species,
+            Detection.time >= start_date
+        ).order_by(
+            Detection.time.desc()
+        ).limit(10).all()
         
         return {
             'species': species,
-            'total_detections': len(detections),
-            'zones': dict(zone_counts.most_common(10)),
-            'hourly_pattern': dict(hour_counts),
+            'total_detections': species_stats.total,
+            'zones': {z: c for z, c in zone_dist},
+            'hourly_pattern': {int(h): c for h, c in hourly_pattern},
             'recent_detections': [
                 {
                     'id': d.id,
@@ -177,46 +220,209 @@ class AnalyticsEngine:
                     'zone': d.zone,
                     'latitude': d.latitude,
                     'longitude': d.longitude
-                } for d in recent_detections
+                } for d in recent
             ],
-            'first_detection': min(detections, key=lambda x: x.time).time.isoformat(),
-            'last_detection': max(detections, key=lambda x: x.time).time.isoformat()
+            'first_detection': species_stats.first.isoformat() if species_stats.first else None,
+            'last_detection': species_stats.last.isoformat() if species_stats.last else None
         }
     
-    def get_zone_analytics(self, zone: str, days: int = 30) -> Dict[str, Any]:
-        """Get analytics for a specific zone/sensor."""
+    @cache_analytics_result(ttl=300)  # Cache for 5 minutes
+    def get_zone_analytics_optimized(self, zone: str, days: int = 30) -> Dict[str, Any]:
+        """Get analytics for a specific zone without loading all records."""
         from web.app import Detection
         
         start_date = datetime.utcnow() - timedelta(days=days)
         
-        detections = Detection.query.filter(
+        # Basic zone stats
+        zone_stats = self.db.session.query(
+            func.count(Detection.id).label('total'),
+            func.count(func.distinct(Detection.species)).label('species_count')
+        ).filter(
             Detection.zone == zone,
             Detection.time >= start_date
-        ).all()
+        ).first()
         
-        if not detections:
+        if not zone_stats.total:
             return {'error': f'No data found for zone: {zone}'}
         
-        # Species diversity
-        species_counts = Counter(d.species for d in detections)
+        # Species breakdown (aggregated)
+        species_breakdown = self.db.session.query(
+            Detection.species,
+            func.count(Detection.id).label('count')
+        ).filter(
+            Detection.zone == zone,
+            Detection.time >= start_date
+        ).group_by(
+            Detection.species
+        ).order_by(
+            desc('count')
+        ).all()
         
-        # Activity timeline
-        daily_counts = defaultdict(int)
-        for detection in detections:
-            date_key = detection.time.date().isoformat()
-            daily_counts[date_key] += 1
+        # Daily activity (aggregated)
+        daily_activity = self.db.session.query(
+            func.date(Detection.time).label('date'),
+            func.count(Detection.id).label('count')
+        ).filter(
+            Detection.zone == zone,
+            Detection.time >= start_date
+        ).group_by('date').all()
+        
+        # Peak hour calculation
+        peak_hour = self.db.session.query(
+            func.extract('hour', Detection.time).label('hour'),
+            func.count(Detection.id).label('count')
+        ).filter(
+            Detection.zone == zone,
+            Detection.time >= start_date
+        ).group_by('hour').order_by(desc('count')).first()
         
         return {
             'zone': zone,
-            'total_detections': len(detections),
-            'species_diversity': len(species_counts),
-            'species_breakdown': dict(species_counts.most_common()),
-            'daily_activity': dict(daily_counts),
-            'avg_detections_per_day': len(detections) / days,
-            'peak_activity_hour': Counter(d.time.hour for d in detections).most_common(1)[0] if detections else None
+            'total_detections': zone_stats.total,
+            'species_diversity': zone_stats.species_count,
+            'species_breakdown': {s: c for s, c in species_breakdown},
+            'daily_activity': {str(d): c for d, c in daily_activity},
+            'avg_detections_per_day': zone_stats.total / days,
+            'peak_activity_hour': (int(peak_hour.hour), peak_hour.count) if peak_hour else None
         }
 
 
+class OptimizedReportGenerator:
+    """Generate reports with pagination to avoid memory issues."""
+    
+    def __init__(self, analytics_engine: OptimizedAnalyticsEngine):
+        """Initialize report generator."""
+        self.analytics_engine = analytics_engine
+        self.config = get_config()
+    
+    def generate_csv_report_paginated(self, start_date: datetime, end_date: datetime) -> Iterator[str]:
+        """Generate CSV report using pagination to avoid loading all data."""
+        from web.app import Detection
+        
+        # Yield header
+        yield 'ID,Species,Time,Zone,Latitude,Longitude,Image URL\n'
+        
+        # Get total count first
+        total_count = self.db.session.query(
+            func.count(Detection.id)
+        ).filter(
+            Detection.time >= start_date,
+            Detection.time <= end_date
+        ).scalar()
+        
+        if total_count > MAX_EXPORT_ROWS:
+            logger.warning(f"Export limited to {MAX_EXPORT_ROWS} rows out of {total_count}")
+        
+        # Paginate through results
+        page = 1
+        exported = 0
+        
+        while exported < min(total_count, MAX_EXPORT_ROWS):
+            # Get page of results
+            detections = Detection.query.filter(
+                Detection.time >= start_date,
+                Detection.time <= end_date
+            ).order_by(
+                Detection.time.desc()
+            ).paginate(
+                page=page, 
+                per_page=PAGINATION_SIZE,
+                error_out=False
+            )
+            
+            if not detections.items:
+                break
+            
+            # Yield rows
+            for detection in detections.items:
+                yield (
+                    f'{detection.id},{detection.species},'
+                    f'{detection.time.isoformat()},'
+                    f'{detection.zone or ""},{detection.latitude or ""},'
+                    f'{detection.longitude or ""},{detection.image_url or ""}\n'
+                )
+                exported += 1
+                
+                if exported >= MAX_EXPORT_ROWS:
+                    break
+            
+            page += 1
+    
+    def generate_streaming_csv_response(self, start_date: datetime, end_date: datetime) -> Response:
+        """Generate streaming CSV response."""
+        def generate():
+            for row in self.generate_csv_report_paginated(start_date, end_date):
+                yield row
+        
+        return Response(
+            generate(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=nightscan_detections_{start_date.strftime("%Y%m%d")}_{end_date.strftime("%Y%m%d")}.csv'
+            }
+        )
+    
+    def generate_pdf_report(self, metrics: AnalyticsMetrics, period_days: int = 30) -> io.BytesIO:
+        """Generate PDF analytics report (unchanged as it uses pre-aggregated data)."""
+        if not PDF_AVAILABLE:
+            raise ImportError("PDF generation requires fpdf2: pip install fpdf2")
+        
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font('Arial', 'B', 16)
+        
+        # Title
+        pdf.cell(200, 10, 'NightScan Wildlife Analytics Report', ln=True, align='C')
+        pdf.ln(10)
+        
+        # Report period
+        pdf.set_font('Arial', '', 12)
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=period_days)
+        pdf.cell(200, 10, f'Report Period: {start_date.strftime("%Y-%m-%d")} to {end_date.strftime("%Y-%m-%d")}', ln=True, align='C')
+        pdf.ln(10)
+        
+        # Summary metrics
+        pdf.set_font('Arial', 'B', 14)
+        pdf.cell(200, 10, 'Summary Metrics', ln=True)
+        pdf.ln(5)
+        
+        pdf.set_font('Arial', '', 12)
+        summary_data = [
+            ('Total Detections', metrics.total_detections),
+            ('Unique Species', metrics.unique_species),
+            ('Active Sensors', metrics.active_sensors),
+            ('Average Confidence', f'{metrics.avg_confidence:.2%}'),
+            ('Detections Today', metrics.detections_today),
+            ('Detections This Week', metrics.detections_this_week),
+            ('Detections This Month', metrics.detections_this_month),
+        ]
+        
+        for label, value in summary_data:
+            pdf.cell(100, 8, f'{label}:', 0, 0)
+            pdf.cell(100, 8, str(value), 0, 1)
+        
+        pdf.ln(10)
+        
+        # Top species
+        pdf.set_font('Arial', 'B', 14)
+        pdf.cell(200, 10, 'Top Species', ln=True)
+        pdf.ln(5)
+        
+        pdf.set_font('Arial', '', 12)
+        for i, (species, count) in enumerate(metrics.top_species[:10], 1):
+            pdf.cell(200, 6, f'{i}. {species}: {count} detections', ln=True)
+        
+        # Convert to bytes
+        output = io.BytesIO()
+        pdf_string = pdf.output(dest='S').encode('latin-1')
+        output.write(pdf_string)
+        output.seek(0)
+        
+        return output
+
+
+# Unchanged chart generator (works with aggregated data)
 class ChartGenerator:
     """Generate interactive charts for analytics dashboard."""
     
@@ -370,108 +576,25 @@ class ChartGenerator:
         """
 
 
-class ReportGenerator:
-    """Generate PDF and CSV reports."""
-    
-    def __init__(self, analytics_engine: AnalyticsEngine):
-        """Initialize report generator."""
-        self.analytics_engine = analytics_engine
-        self.config = get_config()
-    
-    def generate_csv_report(self, start_date: datetime, end_date: datetime) -> io.StringIO:
-        """Generate CSV report for detections."""
-        from web.app import Detection
-        
-        detections = Detection.query.filter(
-            Detection.time >= start_date,
-            Detection.time <= end_date
-        ).order_by(Detection.time.desc()).all()
-        
-        # Create CSV data
-        output = io.StringIO()
-        output.write('ID,Species,Time,Zone,Latitude,Longitude,Image URL\\n')
-        
-        for detection in detections:
-            output.write(f'{detection.id},{detection.species},{detection.time.isoformat()},')
-            output.write(f'{detection.zone or ""},{detection.latitude or ""},{detection.longitude or ""},')
-            output.write(f'{detection.image_url or ""}\\n')
-        
-        output.seek(0)
-        return output
-    
-    def generate_pdf_report(self, metrics: AnalyticsMetrics, period_days: int = 30) -> io.BytesIO:
-        """Generate PDF analytics report."""
-        if not PDF_AVAILABLE:
-            raise ImportError("PDF generation requires fpdf2: pip install fpdf2")
-        
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font('Arial', 'B', 16)
-        
-        # Title
-        pdf.cell(200, 10, 'NightScan Wildlife Analytics Report', ln=True, align='C')
-        pdf.ln(10)
-        
-        # Report period
-        pdf.set_font('Arial', '', 12)
-        end_date = datetime.utcnow()
-        start_date = end_date - timedelta(days=period_days)
-        pdf.cell(200, 10, f'Report Period: {start_date.strftime("%Y-%m-%d")} to {end_date.strftime("%Y-%m-%d")}', ln=True, align='C')
-        pdf.ln(10)
-        
-        # Summary metrics
-        pdf.set_font('Arial', 'B', 14)
-        pdf.cell(200, 10, 'Summary Metrics', ln=True)
-        pdf.ln(5)
-        
-        pdf.set_font('Arial', '', 12)
-        summary_data = [
-            ('Total Detections', metrics.total_detections),
-            ('Unique Species', metrics.unique_species),
-            ('Active Sensors', metrics.active_sensors),
-            ('Detections Today', metrics.detections_today),
-            ('Detections This Week', metrics.detections_this_week),
-            ('Detections This Month', metrics.detections_this_month),
-        ]
-        
-        for label, value in summary_data:
-            pdf.cell(100, 8, f'{label}:', 0, 0)
-            pdf.cell(100, 8, str(value), 0, 1)
-        
-        pdf.ln(10)
-        
-        # Top species
-        pdf.set_font('Arial', 'B', 14)
-        pdf.cell(200, 10, 'Top Species', ln=True)
-        pdf.ln(5)
-        
-        pdf.set_font('Arial', '', 12)
-        for i, (species, count) in enumerate(metrics.top_species[:10], 1):
-            pdf.cell(200, 6, f'{i}. {species}: {count} detections', ln=True)
-        
-        # Convert to bytes
-        output = io.BytesIO()
-        pdf_string = pdf.output(dest='S').encode('latin-1')
-        output.write(pdf_string)
-        output.seek(0)
-        
-        return output
-
-
-# Route handlers
+# Optimized route handlers
 @analytics_bp.route('/dashboard')
 @login_required
 @track_request_metrics
 def dashboard():
-    """Main analytics dashboard."""
+    """Main analytics dashboard with optimized queries."""
     try:
-        from web.app import db
+        from web.app import db, Detection
         
-        analytics_engine = AnalyticsEngine(db)
+        analytics_engine = OptimizedAnalyticsEngine(db)
         chart_generator = ChartGenerator()
         
         # Get metrics for last 30 days
         days = int(request.args.get('days', 30))
+        
+        # Validate days parameter
+        if days > 365:
+            days = 365  # Limit to 1 year
+        
         metrics = analytics_engine.get_detection_metrics(days)
         
         # Generate charts
@@ -479,19 +602,23 @@ def dashboard():
         hourly_chart = chart_generator.create_hourly_activity_chart(metrics.hourly_distribution)
         daily_chart = chart_generator.create_daily_trend_chart(metrics.daily_distribution)
         
-        # Zone data (get from detections)
-        from web.app import Detection
+        # Zone data (already optimized query)
         zone_query = db.session.query(
-            Detection.zone, func.count(Detection.id).label('count')
+            Detection.zone, 
+            func.count(Detection.id).label('count')
         ).filter(
             Detection.zone.isnot(None),
             Detection.time >= datetime.utcnow() - timedelta(days=days)
-        ).group_by(Detection.zone).all()
+        ).group_by(
+            Detection.zone
+        ).order_by(
+            desc('count')
+        ).limit(20).all()  # Limit zones to top 20
         
         zone_data = {zone: count for zone, count in zone_query}
         zone_chart = chart_generator.create_zone_heatmap(zone_data)
         
-        # Dashboard HTML template
+        # Dashboard HTML template (unchanged)
         dashboard_html = '''
         <!DOCTYPE html>
         <html>
@@ -513,8 +640,8 @@ def dashboard():
                         <p class="lead">Wildlife detection insights for the last {{ days }} days</p>
                     </div>
                     <div class="col-auto">
-                        <a href="/analytics/export/csv" class="btn btn-outline-primary">Export CSV</a>
-                        <a href="/analytics/export/pdf" class="btn btn-primary">Export PDF</a>
+                        <a href="/analytics/export/csv?days={{ days }}" class="btn btn-outline-primary">Export CSV</a>
+                        <a href="/analytics/export/pdf?days={{ days }}" class="btn btn-primary">Export PDF</a>
                     </div>
                 </div>
                 
@@ -604,6 +731,12 @@ def dashboard():
                         </div>
                     </div>
                 </div>
+                
+                <div class="row">
+                    <div class="col-12 text-center text-muted">
+                        <small>Performance optimized - Large datasets are paginated</small>
+                    </div>
+                </div>
             </div>
             
             <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -629,13 +762,18 @@ def dashboard():
 @analytics_bp.route('/api/metrics')
 @login_required
 @track_request_metrics
+@cache_for_analytics(ttl=300)  # Cache for 5 minutes
 def api_metrics():
     """API endpoint for analytics metrics."""
     try:
         from web.app import db
         
-        analytics_engine = AnalyticsEngine(db)
+        analytics_engine = OptimizedAnalyticsEngine(db)
         days = int(request.args.get('days', 30))
+        
+        # Limit days
+        days = min(days, 365)
+        
         metrics = analytics_engine.get_detection_metrics(days)
         
         return jsonify(asdict(metrics))
@@ -648,14 +786,19 @@ def api_metrics():
 @analytics_bp.route('/api/species/<species>')
 @login_required
 @track_request_metrics
+@cache_for_analytics(ttl=300)  # Cache for 5 minutes
 def species_insights(species):
-    """Get insights for a specific species."""
+    """Get insights for a specific species (optimized)."""
     try:
         from web.app import db
         
-        analytics_engine = AnalyticsEngine(db)
+        analytics_engine = OptimizedAnalyticsEngine(db)
         days = int(request.args.get('days', 30))
-        insights = analytics_engine.get_species_insights(species, days)
+        
+        # Limit days
+        days = min(days, 365)
+        
+        insights = analytics_engine.get_species_insights_optimized(species, days)
         
         return jsonify(insights)
         
@@ -664,37 +807,50 @@ def species_insights(species):
         return jsonify({'error': 'Failed to get species insights'}), 500
 
 
+@analytics_bp.route('/api/zone/<zone>')
+@login_required
+@track_request_metrics
+@cache_for_analytics(ttl=300)  # Cache for 5 minutes
+def zone_analytics(zone):
+    """Get analytics for a specific zone (optimized)."""
+    try:
+        from web.app import db
+        
+        analytics_engine = OptimizedAnalyticsEngine(db)
+        days = int(request.args.get('days', 30))
+        
+        # Limit days
+        days = min(days, 365)
+        
+        analytics = analytics_engine.get_zone_analytics_optimized(zone, days)
+        
+        return jsonify(analytics)
+        
+    except Exception as e:
+        logger.error(f"Zone analytics error: {e}")
+        return jsonify({'error': 'Failed to get zone analytics'}), 500
+
+
 @analytics_bp.route('/export/csv')
 @login_required
 @track_request_metrics
 def export_csv():
-    """Export detections data as CSV."""
+    """Export detections data as CSV with streaming."""
     try:
         from web.app import db
         
         # Date range
         days = int(request.args.get('days', 30))
+        days = min(days, 365)  # Limit to 1 year
+        
         end_date = datetime.utcnow()
         start_date = end_date - timedelta(days=days)
         
-        analytics_engine = AnalyticsEngine(db)
-        report_generator = ReportGenerator(analytics_engine)
+        analytics_engine = OptimizedAnalyticsEngine(db)
+        report_generator = OptimizedReportGenerator(analytics_engine)
         
-        csv_data = report_generator.generate_csv_report(start_date, end_date)
-        
-        # Create response
-        output = io.BytesIO()
-        output.write(csv_data.getvalue().encode('utf-8'))
-        output.seek(0)
-        
-        filename = f'nightscan_detections_{start_date.strftime("%Y%m%d")}_{end_date.strftime("%Y%m%d")}.csv'
-        
-        return send_file(
-            output,
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=filename
-        )
+        # Return streaming response
+        return report_generator.generate_streaming_csv_response(start_date, end_date)
         
     except Exception as e:
         logger.error(f"CSV export error: {e}")
@@ -710,9 +866,10 @@ def export_pdf():
         from web.app import db
         
         days = int(request.args.get('days', 30))
+        days = min(days, 365)  # Limit to 1 year
         
-        analytics_engine = AnalyticsEngine(db)
-        report_generator = ReportGenerator(analytics_engine)
+        analytics_engine = OptimizedAnalyticsEngine(db)
+        report_generator = OptimizedReportGenerator(analytics_engine)
         
         metrics = analytics_engine.get_detection_metrics(days)
         pdf_data = report_generator.generate_pdf_report(metrics, days)
@@ -735,13 +892,19 @@ def export_pdf():
 
 if __name__ == "__main__":
     # Test analytics functionality
-    print("Analytics dashboard module loaded")
+    print("Optimized analytics dashboard module loaded")
+    print("Key optimizations:")
+    print("- No N+1 queries - all data aggregated in SQL")
+    print("- Streaming CSV export with pagination")
+    print("- Limited result sets (max 10k rows for export)")
+    print("- Query result limits (top 20 zones, last 365 days max)")
+    
     if PLOTLY_AVAILABLE:
-        print("Plotly available - charts enabled")
+        print("✓ Plotly available - charts enabled")
     else:
-        print("Plotly not available - install with: pip install plotly pandas")
+        print("✗ Plotly not available - install with: pip install plotly pandas")
     
     if PDF_AVAILABLE:
-        print("PDF generation available")
+        print("✓ PDF generation available")
     else:
-        print("PDF generation not available - install with: pip install fpdf2")
+        print("✗ PDF generation not available - install with: pip install fpdf2")

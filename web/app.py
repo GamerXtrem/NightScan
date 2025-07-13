@@ -9,6 +9,7 @@ import requests
 import json
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 import psutil
 
 from log_utils import setup_logging
@@ -47,7 +48,13 @@ from openapi_spec import create_openapi_endpoint
 from config import get_config
 from websocket_service import FlaskWebSocketIntegration, get_websocket_manager
 from analytics_dashboard import analytics_bp
+from cache_manager import invalidate_analytics_cache
+from cache_monitoring import cache_monitor_bp
 from notification_service import get_notification_service
+from security.csp_nonce import CSPNonceManager, csp_nonce_required
+from auth.auth_routes import auth_bp
+from auth.session_jwt_bridge import init_session_jwt_bridge
+from health_checks import health_bp
 
 logger = logging.getLogger(__name__)
 setup_logging()
@@ -64,26 +71,14 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy()
 
 # Enhanced Content Security Policy
-csp = {
-    "default-src": "'self'",
-    "script-src": "'self' 'unsafe-inline'",  # Allow inline scripts for forms
-    "style-src": "'self' 'unsafe-inline'",   # Allow inline styles
-    "img-src": "'self' data:",              # Allow data URLs for images
-    "font-src": "'self'",
-    "connect-src": "'self'",
-    "media-src": "'self'",
-    "object-src": "'none'",
-    "base-uri": "'self'",
-    "form-action": "'self'",
-    "frame-ancestors": "'none'",
-    "upgrade-insecure-requests": True
-}
+# Initialize CSP nonce manager
+csp_manager = CSPNonceManager(app)
 
-# Enhanced security headers
+# Enhanced security headers without CSP (handled by CSP manager)
 Talisman(app, 
     force_https=True, 
     frame_options="DENY",
-    content_security_policy=csp,
+    content_security_policy=None,  # CSP handled by CSPNonceManager with nonces
     referrer_policy="strict-origin-when-cross-origin",
     feature_policy={
         "microphone": "'self'",
@@ -639,6 +634,7 @@ def load_user(user_id: str):
 @app.route("/register", methods=["GET", "POST"])
 @limiter.limit(config.rate_limit.login_limit if limiter else None)
 @track_request_metrics
+@csp_nonce_required
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
@@ -669,6 +665,7 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 @limiter.limit(config.rate_limit.login_limit if limiter else None)
 @track_request_metrics
+@csp_nonce_required
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
@@ -726,10 +723,59 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/api/v1/user/change-password", methods=["POST"])
+@login_required
+@limiter.limit("5 per hour")
+@track_request_metrics
+def change_password():
+    """Handle password change for authenticated users."""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+        
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+    
+    if not current_password or not new_password:
+        return jsonify({"error": "Current and new passwords are required"}), 400
+        
+    # Verify current password
+    if not current_user.check_password(current_password):
+        return jsonify({"error": "Current password is incorrect"}), 401
+        
+    # Validate new password
+    if not PASSWORD_RE.match(new_password):
+        return jsonify({
+            "error": "New password must be at least 10 characters long and include uppercase, lowercase, a digit and symbol"
+        }), 400
+        
+    # Check if new password is different from current
+    if current_user.check_password(new_password):
+        return jsonify({"error": "New password must be different from current password"}), 400
+        
+    # Update password
+    try:
+        current_user.set_password(new_password)
+        db.session.commit()
+        
+        logger.info(f"Password changed successfully for user: {current_user.username}")
+        return jsonify({
+            "message": "Password changed successfully",
+            "status": "success"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error changing password for user {current_user.username}: {e}")
+        db.session.rollback()
+        return jsonify({"error": "Failed to change password"}), 500
+
+
 @app.route("/", methods=["GET", "POST"])
 @login_required
 @limiter.limit(config.rate_limit.upload_limit, methods=["POST"] if limiter else None)
 @track_request_metrics
+@csp_nonce_required
 def index():
     result = None
     total = (
@@ -769,24 +815,47 @@ def index():
                     elif total + file_size > MAX_TOTAL_SIZE:
                         flash("Upload quota exceeded (10 GB total).")
                     else:
-                        data = file.read()
-                        pred = Prediction(
-                            user_id=current_user.id,
-                            filename=original_filename,
-                            result="PENDING",
-                            file_size=file_size,
-                        )
-                        db.session.add(pred)
-                        db.session.commit()
-                        from .tasks import run_prediction
-
-                        run_prediction.delay(
-                            pred.id,
-                            original_filename,
-                            data,
-                            PREDICT_API_URL,
-                        )
-                        total += file_size
+                        # Use streaming to save file temporarily
+                        from streaming_utils import StreamingFileHandler
+                        import tempfile
+                        import uuid
+                        
+                        handler = StreamingFileHandler()
+                        
+                        # Create unique temp file name
+                        temp_filename = f"upload_{uuid.uuid4().hex}_{secure_filename(original_filename)}"
+                        temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
+                        
+                        # Save file using streaming
+                        try:
+                            saved_size, file_hash = handler.save_file_streaming(
+                                file,
+                                Path(temp_path),
+                                max_size=MAX_FILE_SIZE
+                            )
+                            
+                            pred = Prediction(
+                                user_id=current_user.id,
+                                filename=original_filename,
+                                result="PENDING",
+                                file_size=saved_size,
+                            )
+                            db.session.add(pred)
+                            db.session.commit()
+                            
+                            from .tasks import run_prediction
+                            
+                            # Pass file path instead of content
+                            run_prediction.delay(
+                                pred.id,
+                                original_filename,
+                                temp_path,  # Pass path instead of data
+                                PREDICT_API_URL,
+                            )
+                        except ValueError as e:
+                            flash(str(e))
+                        else:
+                            total += file_size
                         remaining = MAX_TOTAL_SIZE - total
                         
                         # Record quota usage metrics
@@ -816,7 +885,7 @@ def index():
         .all()
     )
     return render_template(
-        "index.html",
+        "index_secure.html",
         result=result,
         predictions=predictions,
         remaining_bytes=remaining,
@@ -890,6 +959,7 @@ def readiness_check():
 @app.route("/dashboard")
 @login_required
 @track_request_metrics
+@csp_nonce_required
 def dashboard():
     """Live dashboard with real-time notifications."""
     return render_template("dashboard.html")
@@ -898,9 +968,35 @@ def dashboard():
 @app.route("/data-retention")
 @login_required
 @track_request_metrics
+@csp_nonce_required
 def data_retention():
     """Data retention management page."""
     return render_template("data_retention.html")
+
+
+@app.route("/api/csp-report", methods=["POST"])
+@csrf.exempt  # CSP reports don't include CSRF tokens
+def csp_report():
+    """Log CSP violations for monitoring and debugging."""
+    try:
+        report = request.get_json(force=True)
+        if report:
+            logger.warning(f"CSP Violation: {json.dumps(report, indent=2)}")
+            
+            # Extract key information from the report
+            violation = report.get('csp-report', {})
+            blocked_uri = violation.get('blocked-uri', 'unknown')
+            violated_directive = violation.get('violated-directive', 'unknown')
+            document_uri = violation.get('document-uri', 'unknown')
+            
+            logger.warning(
+                f"CSP blocked {blocked_uri} on {document_uri} "
+                f"(violated directive: {violated_directive})"
+            )
+    except Exception as e:
+        logger.error(f"Error processing CSP report: {e}")
+    
+    return '', 204  # No content response
 
 
 @app.route("/api/detections")
@@ -1007,6 +1103,9 @@ def simulate_detection():
     db.session.add(detection)
     db.session.commit()
     
+    # Invalidate analytics cache after new detection
+    invalidate_analytics_cache()
+    
     # Send real-time notification via WebSocket
     import asyncio
     try:
@@ -1066,17 +1165,32 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = config.database.uri
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_size": config.database.pool_size,
+        "max_overflow": config.database.max_overflow,
         "pool_timeout": config.database.pool_timeout,
         "pool_recycle": config.database.pool_recycle,
-        "echo": config.database.echo
+        "pool_pre_ping": config.database.pool_pre_ping,
+        "echo": config.database.echo,
+        "echo_pool": config.database.echo_pool
     }
     db.init_app(app)
     with app.app_context():
-        db.create_all()
+        # Database should be created using database/create_database.sql
+        # This just verifies the connection and tables exist
         try:
-            create_database_indexes()
+            # Test database connection
+            db.session.execute("SELECT 1")
+            logger.info("Database connection successful")
+            
+            # Verify critical tables exist
+            critical_tables = ['user', 'prediction', 'plan_features', 'user_plans']
+            for table in critical_tables:
+                db.session.execute(f"SELECT 1 FROM {table} LIMIT 1")
+            logger.info("All critical tables verified")
+            
         except Exception as e:
-            logger.warning(f"Failed to create some indexes: {e}")
+            logger.error(f"Database initialization error: {e}")
+            logger.error("Please run 'psql -U $DB_USER -d $DB_NAME -f database/create_database.sql' to create the database schema")
+            raise
     return app
 
 
@@ -1086,7 +1200,21 @@ application = create_app()
 with application.app_context():
     application.register_blueprint(api_v1)
     application.register_blueprint(analytics_bp)
+    application.register_blueprint(cache_monitor_bp)
+    application.register_blueprint(auth_bp)
+    application.register_blueprint(health_bp)
     create_openapi_endpoint(application)
+    
+    # Initialize Flask-Mail
+    from web.app_extensions import init_mail
+    init_mail(application)
+    
+    # Initialize Session-JWT Bridge
+    init_session_jwt_bridge(application)
+    
+    # Register password reset blueprint
+    from web.password_reset import password_reset_bp
+    application.register_blueprint(password_reset_bp)
     
     # Initialize WebSocket integration
     websocket_integration = FlaskWebSocketIntegration(application)

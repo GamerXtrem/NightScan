@@ -1,0 +1,44 @@
+{
+  "environment": "production",
+  "debug": false,
+  "database": {
+    "uri": "postgresql://user:password@localhost/nightscan",
+    "pool_size": 10,
+    "echo": false
+  },
+  "redis": {
+    "url": "redis://localhost:6379/0",
+    "enabled": true,
+    "default_ttl": 3600
+  },
+  "security": {
+    "secret_key": null,
+    "force_https": true,
+    "lockout_threshold": 5
+  },
+  "model": {
+    "audio_model_path": "/path/to/audio/model.pth",
+    "audio_csv_dir": "/path/to/audio/csv",
+    "photo_model_path": "/path/to/photo/model.pth",
+    "photo_data_dir": "/path/to/photo/data",
+    "batch_size": 32,
+    "device": "auto"
+  },
+  "ports": {
+    "web_app": 8000,
+    "api_v1": 8001,
+    "prediction_api": 8002
+  },
+  "api": {
+    "cors_origins": [
+      "https://your-frontend.com"
+    ],
+    "rate_limit": "60 per minute",
+    "base_url": "https://api.nightscan.com"
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "json",
+    "file": "/var/log/nightscan/app.log"
+  }
+}

@@ -22,8 +22,8 @@ from PIL import Image
 import torchvision.transforms as transforms
 
 # Add audio training path
-sys.path.append(str(Path(__file__).parent.parent / "Audio_Training_EfficientNet"))
-sys.path.append(str(Path(__file__).parent.parent / "Picture_Training_Enhanced"))
+sys.path.append(str(Path(__file__).parent.parent / "audio_training_efficientnet"))
+sys.path.append(str(Path(__file__).parent.parent / "picture_training_enhanced"))
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +217,7 @@ class UnifiedModelManager:
         # Configuration par défaut
         return {
             "audio_model": {
-                "model_path": "Audio_Training_EfficientNet/models/best_model.pth",
+                "model_path": "audio_training_efficientnet/models/best_model.pth",
                 "config": {
                     "model_name": "efficientnet-b1",
                     "num_classes": 6,
@@ -228,7 +228,7 @@ class UnifiedModelManager:
                               "amphibian_call", "environmental_sound", "unknown_species"]
             },
             "photo_model": {
-                "model_path": "Picture_Training_Enhanced/models/best_model.pth",
+                "model_path": "picture_training_enhanced/models/best_model.pth",
                 "config": {
                     "model_name": "efficientnet-b1",
                     "architecture": "efficientnet",

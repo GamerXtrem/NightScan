@@ -136,7 +136,7 @@ class WebSocketService {
   authenticate() {
     if (this.socket && this.isConnected && this.userToken && this.userId) {
       this.socket.emit('authenticate', {
-        user_id: this.userId,
+        userId: this.userId,
         token: this.userToken
       });
     }
@@ -173,17 +173,17 @@ class WebSocketService {
   }
 
   _handleNotification(data) {
-    const { event_type, data: notificationData, priority, timestamp } = data;
+    const { eventType, data: notificationData, priority, timestamp } = data;
 
     // Store notification locally
     this._storeNotification(data);
 
     // Emit to registered listeners
     this._emitToListeners('notification', data);
-    this._emitToListeners(`notification_${event_type}`, notificationData);
+    this._emitToListeners(`notification_${eventType}`, notificationData);
 
     // Handle different notification types
-    switch (event_type) {
+    switch (eventType) {
       case 'new_detection':
         this._handleNewDetection(notificationData);
         break;
@@ -292,7 +292,7 @@ class WebSocketService {
     // This would integrate with React Native's push notification system
     // For now, we'll just log it
     console.log('Local notification:', {
-      title: this._getNotificationTitle(data.event_type),
+      title: this._getNotificationTitle(data.eventType),
       body: this._getNotificationBody(data),
       data: data.data
     });
@@ -314,9 +314,9 @@ class WebSocketService {
   }
 
   _getNotificationBody(data) {
-    const { event_type, data: notificationData } = data;
+    const { eventType, data: notificationData } = data;
     
-    switch (event_type) {
+    switch (eventType) {
       case 'new_detection':
         return `${notificationData.species} detected at ${notificationData.zone || 'sensor location'}`;
       case 'prediction_complete':

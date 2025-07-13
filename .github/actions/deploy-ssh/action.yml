@@ -1,0 +1,126 @@
+name: 'Deploy via SSH'
+description: 'Deploy application to remote server via SSH'
+
+inputs:
+  host:
+    description: 'SSH host'
+    required: true
+  user:
+    description: 'SSH user'
+    required: true
+  ssh-key:
+    description: 'SSH private key'
+    required: true
+  deploy-path:
+    description: 'Deployment path on remote server'
+    required: true
+  compose-file:
+    description: 'Docker compose file to use'
+    required: false
+    default: 'docker-compose.yml'
+  environment:
+    description: 'Environment name'
+    required: true
+  pre-deploy-script:
+    description: 'Script to run before deployment'
+    required: false
+    default: ''
+  post-deploy-script:
+    description: 'Script to run after deployment'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ inputs.ssh-key }}
+    
+    - name: Add host to known hosts
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ inputs.host }} >> ~/.ssh/known_hosts
+    
+    - name: Create deployment directory
+      shell: bash
+      run: |
+        ssh ${{ inputs.user }}@${{ inputs.host }} "
+          mkdir -p ${{ inputs.deploy-path }}
+          cd ${{ inputs.deploy-path }}
+        "
+    
+    - name: Copy compose file
+      shell: bash
+      run: |
+        scp ${{ inputs.compose-file }} \
+          ${{ inputs.user }}@${{ inputs.host }}:${{ inputs.deploy-path }}/docker-compose.yml
+    
+    - name: Copy environment file
+      shell: bash
+      run: |
+        if [ -f ".env.${{ inputs.environment }}" ]; then
+          scp .env.${{ inputs.environment }} \
+            ${{ inputs.user }}@${{ inputs.host }}:${{ inputs.deploy-path }}/.env
+        elif [ -f ".env.example" ]; then
+          scp .env.example \
+            ${{ inputs.user }}@${{ inputs.host }}:${{ inputs.deploy-path }}/.env
+        fi
+    
+    - name: Run pre-deploy script
+      if: inputs.pre-deploy-script != ''
+      shell: bash
+      run: |
+        ssh ${{ inputs.user }}@${{ inputs.host }} "
+          cd ${{ inputs.deploy-path }}
+          ${{ inputs.pre-deploy-script }}
+        "
+    
+    - name: Deploy application
+      shell: bash
+      run: |
+        ssh ${{ inputs.user }}@${{ inputs.host }} "
+          cd ${{ inputs.deploy-path }}
+          
+          # Pull latest images
+          docker-compose pull
+          
+          # Run migrations
+          docker-compose run --rm web python manage.py migrate --no-input || true
+          
+          # Collect static files
+          docker-compose run --rm web python manage.py collectstatic --no-input || true
+          
+          # Start services
+          docker-compose up -d
+          
+          # Wait for services to be ready
+          sleep 30
+          
+          # Show status
+          docker-compose ps
+        "
+    
+    - name: Run post-deploy script
+      if: inputs.post-deploy-script != ''
+      shell: bash
+      run: |
+        ssh ${{ inputs.user }}@${{ inputs.host }} "
+          cd ${{ inputs.deploy-path }}
+          ${{ inputs.post-deploy-script }}
+        "
+    
+    - name: Health check
+      shell: bash
+      run: |
+        ssh ${{ inputs.user }}@${{ inputs.host }} "
+          # Check web app health
+          curl -f http://localhost:8000/health || exit 1
+          
+          # Check API health
+          curl -f http://localhost:8001/health || exit 1
+          
+          echo '✅ Deployment successful!'
+        "

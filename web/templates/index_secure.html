@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NightScan - Wildlife Detection Platform</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-moon"></i>
+                <h1>NightScan</h1>
+            </div>
+            
+            {% if current_user.is_authenticated %}
+            <div class="user-nav">
+                <div class="user-info">
+                    <i class="fas fa-user-circle" style="font-size: 24px; color: #4CAF50;"></i>
+                    <span>Welcome, <strong>{{ current_user.username }}</strong></span>
+                </div>
+                <div class="nav-links">
+                    <a href="{{ url_for('dashboard') }}" class="dashboard-link">
+                        <i class="fas fa-tachometer-alt"></i> Live Dashboard
+                    </a>
+                    <a href="{{ url_for('logout') }}">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </header>
+
+        {% if current_user.is_authenticated %}
+        <div class="main-content">
+            <!-- Upload Section -->
+            <div class="upload-section">
+                <div class="section-title">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    Upload Audio File
+                </div>
+                
+                <form action="/" method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+                    {{ csrf_token() }}
+                    
+                    <div class="file-upload-area">
+                        <div class="upload-icon">
+                            <i class="fas fa-file-audio"></i>
+                        </div>
+                        <div class="upload-text">
+                            <strong>Click to upload</strong> or drag and drop
+                        </div>
+                        <div class="upload-hint">
+                            WAV files only, max 100 MB per file
+                        </div>
+                    </div>
+                    
+                    <input type="file" name="file" id="file" accept="audio/wav" required>
+                    
+                    <div class="quota-info">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fas fa-database"></i> Storage Used</span>
+                            <span><strong>{{ '%.2f' | format((10*1024*1024*1024 - remaining_bytes) / (1024*1024*1024)) }} GB / 10 GB</strong></span>
+                        </div>
+                        <div class="quota-bar">
+                            <div class="quota-fill" style="width: {{ ((10*1024*1024*1024 - remaining_bytes) / (10*1024*1024*1024) * 100) | round(1) }}%"></div>
+                        </div>
+                        <div style="margin-top: 5px; font-size: 12px;">
+                            Remaining: <strong>{{ '%.2f' | format(remaining_bytes / (1024*1024*1024)) }} GB</strong>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <i class="fas fa-magic"></i>
+                        Analyze Audio
+                    </button>
+                </form>
+            </div>
+
+            <!-- Predictions Section -->
+            <div class="predictions-section">
+                <div class="section-title">
+                    <i class="fas fa-history"></i>
+                    Recent Predictions
+                    <span style="background: #4CAF50; color: white; font-size: 12px; padding: 4px 8px; border-radius: 12px; margin-left: auto;">
+                        {{ predictions|length }}
+                    </span>
+                </div>
+                
+                <div class="predictions-list" id="predictionsList">
+                    {% if predictions %}
+                        {% for p in predictions %}
+                        <div class="prediction-item">
+                            <div class="prediction-icon">
+                                {% if p.result == 'PENDING' %}
+                                    <i class="fas fa-clock"></i>
+                                {% elif 'error' in p.result.lower() or 'failed' in p.result.lower() %}
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                {% else %}
+                                    <i class="fas fa-check"></i>
+                                {% endif %}
+                            </div>
+                            <div class="prediction-info" style="flex: 1;">
+                                <h4>{{ p.filename }}</h4>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                                    <span class="prediction-status {% if p.result == 'PENDING' %}status-pending{% elif 'error' in p.result.lower() or 'failed' in p.result.lower() %}status-error{% else %}status-completed{% endif %}">
+                                        {{ p.result[:50] }}{% if p.result|length > 50 %}...{% endif %}
+                                    </span>
+                                    <small style="color: #666;">{{ '%.1f' | format(p.file_size / (1024*1024)) }} MB</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align: center; color: #666; padding: 40px;">
+                            <i class="fas fa-file-audio" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+                            <p>No predictions yet. Upload an audio file to get started!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Hidden data for JavaScript -->
+        <div id="currentUserData" data-user-id="{{ current_user.id }}" style="display: none;"></div>
+        
+        {% else %}
+        <!-- Login Section -->
+        <div class="login-section">
+            <div style="font-size: 48px; color: #4CAF50; margin-bottom: 20px;">
+                <i class="fas fa-paw"></i>
+            </div>
+            <h2 style="color: #2a5298; margin-bottom: 15px;">Welcome to NightScan</h2>
+            <p style="color: #666; margin-bottom: 30px; line-height: 1.6;">
+                Advanced wildlife detection using AI-powered audio analysis. 
+                Discover what nocturnal animals are active in your area.
+            </p>
+            
+            <div class="login-links">
+                <a href="{{ url_for('login') }}">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </a>
+                <a href="{{ url_for('register') }}">
+                    <i class="fas fa-user-plus"></i> Register
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Messages -->
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="message {% if 'error' in message.lower() or 'failed' in message.lower() %}error{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Connection Indicator -->
+    {% if current_user.is_authenticated %}
+    <div class="connection-indicator" id="connectionIndicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="connectionText">Connecting...</span>
+    </div>
+    {% endif %}
+
+    <!-- Scripts -->
+    {% if current_user.is_authenticated %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% endif %}
+</body>
+</html>

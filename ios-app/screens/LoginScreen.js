@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { login as loginRequest } from '../services/api';
+import { View, TextInput, Button, StyleSheet, Alert, TouchableOpacity, Text } from 'react-native';
+import { login as loginRequest, requestPasswordReset } from '../services/api';
 
 export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
@@ -13,6 +13,38 @@ export default function LoginScreen({ navigation }) {
     } catch {
       Alert.alert('Login failed');
     }
+  };
+
+  const handleForgotPassword = () => {
+    Alert.prompt(
+      'Mot de passe oublié',
+      'Entrez votre adresse email pour recevoir les instructions de réinitialisation :',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Envoyer',
+          onPress: async (email) => {
+            if (!email || !email.includes('@')) {
+              Alert.alert('Erreur', 'Veuillez entrer une adresse email valide');
+              return;
+            }
+            
+            try {
+              await requestPasswordReset(email);
+              Alert.alert(
+                'Email envoyé',
+                'Si un compte existe avec cette adresse email, vous recevrez les instructions de réinitialisation.'
+              );
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible d\'envoyer l\'email de réinitialisation');
+            }
+          }
+        }
+      ],
+      'plain-text',
+      '',
+      'email-address'
+    );
   };
 
   return (
@@ -32,6 +64,11 @@ export default function LoginScreen({ navigation }) {
         secureTextEntry
       />
       <Button title="Login" onPress={handleLogin} />
+      
+      <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPassword}>
+        <Text style={styles.forgotPasswordText}>Mot de passe oublié ?</Text>
+      </TouchableOpacity>
+      
       <View style={styles.spacing} />
       <Button title="Register" onPress={() => navigation.navigate('Register')} />
     </View>
@@ -53,5 +90,14 @@ const styles = StyleSheet.create({
   },
   spacing: {
     height: 12,
+  },
+  forgotPassword: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  forgotPasswordText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
 });

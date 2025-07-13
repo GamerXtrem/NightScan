@@ -190,6 +190,52 @@ class ApiService {
     }
   }
 
+  async changePassword(currentPassword, newPassword) {
+    if (!this.isOnline) {
+      throw new Error('Password change requires internet connection');
+    }
+
+    const resp = await fetch(`${API_BASE_URL}/user/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword
+      }),
+      credentials: 'include',
+    });
+    
+    if (!resp.ok) {
+      const error = await resp.json();
+      throw new Error(error.error || 'Password change failed');
+    }
+
+    return await resp.json();
+  }
+
+  async requestPasswordReset(email) {
+    if (!this.isOnline) {
+      throw new Error('Password reset requires internet connection');
+    }
+
+    const resp = await fetch(`${API_BASE_URL}/password-reset/request`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+    
+    if (!resp.ok) {
+      const error = await resp.json();
+      throw new Error(error.error || 'Password reset request failed');
+    }
+
+    return await resp.json();
+  }
+
   async fetchDetections(page = 1, species = null) {
     const cacheKey = `detections_${page}_${species || 'all'}`;
     
@@ -592,6 +638,14 @@ export async function register(username, password) {
   return apiService.register(username, password);
 }
 
+export async function changePassword(currentPassword, newPassword) {
+  return apiService.changePassword(currentPassword, newPassword);
+}
+
+export async function requestPasswordReset(email) {
+  return apiService.requestPasswordReset(email);
+}
+
 export async function fetchDetections(page, species) {
   return apiService.fetchDetections(page, species);
 }
@@ -897,6 +951,8 @@ export const api = {
   // Existing functions
   login: apiService.login.bind(apiService),
   register: apiService.register.bind(apiService),
+  changePassword: apiService.changePassword.bind(apiService),
+  requestPasswordReset: apiService.requestPasswordReset.bind(apiService),
   fetchDetections: apiService.fetchDetections.bind(apiService),
   uploadMedia: apiService.uploadMedia.bind(apiService),
   getHealth: apiService.getHealth.bind(apiService),

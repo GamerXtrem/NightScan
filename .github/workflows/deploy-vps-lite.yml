@@ -1,0 +1,360 @@
+name: Deploy - VPS Lite
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_host:
+        description: 'Target VPS hostname or IP'
+        required: true
+      deploy_branch:
+        description: 'Branch to deploy'
+        required: false
+        default: 'main'
+      resource_mode:
+        description: 'Resource optimization level'
+        required: false
+        default: 'balanced'
+        type: choice
+        options:
+          - minimal     # 2GB RAM
+          - balanced    # 4GB RAM
+          - performance # 8GB+ RAM
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/nightscan
+
+jobs:
+  # Check VPS resources
+  check-resources:
+    name: Check VPS Resources
+    runs-on: ubuntu-latest
+    outputs:
+      memory_gb: ${{ steps.check.outputs.memory_gb }}
+      disk_free_gb: ${{ steps.check.outputs.disk_free_gb }}
+      cpu_cores: ${{ steps.check.outputs.cpu_cores }}
+    
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+      
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ github.event.inputs.target_host }} >> ~/.ssh/known_hosts
+      
+      - name: Check system resources
+        id: check
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }} "
+            # Get memory in GB
+            MEMORY_GB=\$(free -g | awk '/^Mem:/{print \$2}')
+            echo \"memory_gb=\$MEMORY_GB\" >> \$GITHUB_OUTPUT
+            
+            # Get disk space in GB
+            DISK_FREE_GB=\$(df -BG / | awk 'NR==2 {print \$4}' | sed 's/G//')
+            echo \"disk_free_gb=\$DISK_FREE_GB\" >> \$GITHUB_OUTPUT
+            
+            # Get CPU cores
+            CPU_CORES=\$(nproc)
+            echo \"cpu_cores=\$CPU_CORES\" >> \$GITHUB_OUTPUT
+            
+            echo \"System resources:\"
+            echo \"  Memory: \${MEMORY_GB}GB\"
+            echo \"  Free disk: \${DISK_FREE_GB}GB\"
+            echo \"  CPU cores: \$CPU_CORES\"
+          "
+
+  # Deploy VPS Lite
+  deploy-vps-lite:
+    name: Deploy to VPS Lite
+    runs-on: ubuntu-latest
+    needs: [check-resources]
+    environment:
+      name: vps-lite
+      url: http://${{ github.event.inputs.target_host }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.deploy_branch }}
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+      
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ github.event.inputs.target_host }} >> ~/.ssh/known_hosts
+      
+      - name: Prepare VPS
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }} "
+            # Install Docker if not present
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com | sh
+              sudo usermod -aG docker \$USER
+            fi
+            
+            # Install Docker Compose
+            if ! command -v docker-compose &> /dev/null; then
+              sudo curl -L \"https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)\" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+            fi
+            
+            # Create deployment directory
+            mkdir -p /opt/nightscan/vps-lite
+            cd /opt/nightscan/vps-lite
+            
+            # Clean up old containers/images to save space
+            docker system prune -af --volumes
+          "
+      
+      - name: Generate optimized configuration
+        run: |
+          MEMORY_GB=${{ needs.check-resources.outputs.memory_gb }}
+          RESOURCE_MODE=${{ github.event.inputs.resource_mode }}
+          
+          # Create optimized docker-compose
+          cat > docker-compose.vps-lite.yml << EOF
+          version: '3.8'
+          
+          services:
+            web:
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-web:${{ github.event.inputs.deploy_branch }}
+              restart: unless-stopped
+              ports:
+                - "80:8000"
+              environment:
+                - ENVIRONMENT=production
+                - DATABASE_URL=sqlite:///data/nightscan.db
+                - REDIS_URL=redis://redis:6379/0
+                - WORKERS=2
+                - THREADS=2
+              volumes:
+                - ./data:/app/data
+                - ./uploads:/app/uploads
+                - ./logs:/app/logs
+              depends_on:
+                - redis
+              mem_limit: ${MEMORY_GB}g
+              cpus: '0.5'
+            
+            prediction:
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-prediction:${{ github.event.inputs.deploy_branch }}
+              restart: unless-stopped
+              ports:
+                - "8001:8001"
+              environment:
+                - ENVIRONMENT=production
+                - MODEL_CACHE_DIR=/models
+                - MAX_WORKERS=1
+              volumes:
+                - ./models:/models
+                - ./data:/app/data
+              mem_limit: ${MEMORY_GB}g
+              cpus: '1.0'
+            
+            redis:
+              image: redis:7-alpine
+              restart: unless-stopped
+              command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+              volumes:
+                - redis_data:/data
+              mem_limit: 512m
+              cpus: '0.25'
+            
+            # Minimal monitoring
+            prometheus:
+              image: prom/prometheus:latest
+              restart: unless-stopped
+              command:
+                - '--config.file=/etc/prometheus/prometheus.yml'
+                - '--storage.tsdb.retention.time=7d'
+                - '--storage.tsdb.retention.size=1GB'
+              volumes:
+                - ./prometheus.yml:/etc/prometheus/prometheus.yml
+                - prometheus_data:/prometheus
+              mem_limit: 512m
+              cpus: '0.25'
+          
+          volumes:
+            redis_data:
+            prometheus_data:
+          
+          networks:
+            default:
+              driver: bridge
+          EOF
+      
+      - name: Copy configuration files
+        run: |
+          # Copy docker-compose
+          scp docker-compose.vps-lite.yml \
+            ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }}:/opt/nightscan/vps-lite/
+          
+          # Copy environment template
+          scp .env.example \
+            ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }}:/opt/nightscan/vps-lite/.env
+          
+          # Copy monitoring config
+          cat > prometheus.yml << EOF
+          global:
+            scrape_interval: 30s
+            evaluation_interval: 30s
+          
+          scrape_configs:
+            - job_name: 'nightscan'
+              static_configs:
+                - targets: ['web:8000', 'prediction:8001']
+          EOF
+          
+          scp prometheus.yml \
+            ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }}:/opt/nightscan/vps-lite/
+      
+      - name: Configure environment
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }} "
+            cd /opt/nightscan/vps-lite
+            
+            # Basic configuration
+            sed -i 's/^ENVIRONMENT=.*/ENVIRONMENT=production/' .env
+            sed -i 's/^DEBUG=.*/DEBUG=false/' .env
+            sed -i 's/^SECRET_KEY=.*/SECRET_KEY=${{ secrets.VPS_SECRET_KEY }}/' .env
+            sed -i 's/^ALLOWED_HOSTS=.*/ALLOWED_HOSTS=${{ github.event.inputs.target_host }}/' .env
+            
+            # Resource optimization
+            echo 'OPTIMIZE_FOR_MEMORY=true' >> .env
+            echo 'USE_SQLITE=true' >> .env
+            echo 'DISABLE_UNNECESSARY_FEATURES=true' >> .env
+            
+            # Create required directories
+            mkdir -p data uploads logs models
+            chmod 755 data uploads logs models
+          "
+      
+      - name: Deploy services
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }} "
+            cd /opt/nightscan/vps-lite
+            
+            # Login to registry
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+            
+            # Pull images
+            docker-compose -f docker-compose.vps-lite.yml pull
+            
+            # Start services
+            docker-compose -f docker-compose.vps-lite.yml up -d
+            
+            # Wait for services
+            sleep 30
+            
+            # Initialize database if needed
+            docker-compose -f docker-compose.vps-lite.yml exec -T web python manage.py migrate --no-input
+            docker-compose -f docker-compose.vps-lite.yml exec -T web python manage.py collectstatic --no-input
+            
+            # Show status
+            docker-compose -f docker-compose.vps-lite.yml ps
+          "
+      
+      - name: Configure firewall
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }} "
+            # Configure UFW if available
+            if command -v ufw &> /dev/null; then
+              sudo ufw allow 22/tcp
+              sudo ufw allow 80/tcp
+              sudo ufw allow 8001/tcp
+              sudo ufw --force enable
+            fi
+          "
+      
+      - name: Setup basic monitoring
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }} "
+            cd /opt/nightscan/vps-lite
+            
+            # Create monitoring script
+            cat > monitor.sh << 'MONITOR'
+            #!/bin/bash
+            echo \"=== NightScan VPS Lite Status ==="
+            echo \"Timestamp: \$(date)\"
+            echo \"\"
+            echo \"=== Resource Usage ==="
+            free -h
+            df -h /
+            echo \"\"
+            echo \"=== Docker Status ==="
+            docker-compose -f docker-compose.vps-lite.yml ps
+            echo \"\"
+            echo \"=== Service Health ==="
+            curl -s http://localhost/health || echo \"Web: Unhealthy\"
+            curl -s http://localhost:8001/health || echo \"API: Unhealthy\"
+            MONITOR
+            
+            chmod +x monitor.sh
+            
+            # Add to crontab for regular monitoring
+            (crontab -l 2>/dev/null; echo \"*/5 * * * * /opt/nightscan/vps-lite/monitor.sh > /opt/nightscan/vps-lite/logs/monitor.log 2>&1\") | crontab -
+          "
+      
+      - name: Verify deployment
+        run: |
+          # Wait for services to stabilize
+          sleep 30
+          
+          # Check services
+          ssh ${{ secrets.VPS_USER }}@${{ github.event.inputs.target_host }} "
+            cd /opt/nightscan/vps-lite
+            
+            # Check web app
+            if curl -f http://localhost/health; then
+              echo \"✓ Web app is healthy\"
+            else
+              echo \"✗ Web app health check failed\"
+              exit 1
+            fi
+            
+            # Check prediction API
+            if curl -f http://localhost:8001/health; then
+              echo \"✓ Prediction API is healthy\"
+            else
+              echo \"✗ Prediction API health check failed\"
+              exit 1
+            fi
+            
+            # Check Redis
+            if docker-compose -f docker-compose.vps-lite.yml exec -T redis redis-cli ping; then
+              echo \"✓ Redis is healthy\"
+            else
+              echo \"✗ Redis health check failed\"
+              exit 1
+            fi
+            
+            echo \"\"
+            echo \"Deployment successful!\"
+            echo \"Access the application at: http://${{ github.event.inputs.target_host }}\"
+          "
+      
+      - name: Generate deployment summary
+        if: always()
+        run: |
+          echo "## VPS Lite Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Host**: ${{ github.event.inputs.target_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.event.inputs.deploy_branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resource Mode**: ${{ github.event.inputs.resource_mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **System Resources**:" >> $GITHUB_STEP_SUMMARY
+          echo "  - Memory: ${{ needs.check-resources.outputs.memory_gb }}GB" >> $GITHUB_STEP_SUMMARY
+          echo "  - Free Disk: ${{ needs.check-resources.outputs.disk_free_gb }}GB" >> $GITHUB_STEP_SUMMARY
+          echo "  - CPU Cores: ${{ needs.check-resources.outputs.cpu_cores }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Access URLs" >> $GITHUB_STEP_SUMMARY
+          echo "- Web App: http://${{ github.event.inputs.target_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Prediction API: http://${{ github.event.inputs.target_host }}:8001" >> $GITHUB_STEP_SUMMARY

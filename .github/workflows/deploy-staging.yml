@@ -1,0 +1,202 @@
+name: Deploy - Staging
+
+on:
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Staging environment'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - staging-2
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/nightscan
+  DEPLOY_TIMEOUT: '600'
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.nightscan.app
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+      
+      - name: Add staging server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Create deployment directory
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            mkdir -p /opt/nightscan/staging
+            cd /opt/nightscan/staging
+          "
+      
+      - name: Copy docker-compose file
+        run: |
+          scp docker-compose.staging.yml \
+            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/nightscan/staging/
+      
+      - name: Copy environment template
+        run: |
+          scp .env.example \
+            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/nightscan/staging/.env
+      
+      - name: Configure environment
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            cd /opt/nightscan/staging
+            
+            # Set environment variables
+            sed -i 's/^ENVIRONMENT=.*/ENVIRONMENT=staging/' .env
+            sed -i 's/^DEBUG=.*/DEBUG=false/' .env
+            sed -i 's/^DATABASE_URL=.*/DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}/' .env
+            sed -i 's/^SECRET_KEY=.*/SECRET_KEY=${{ secrets.STAGING_SECRET_KEY }}/' .env
+            sed -i 's/^ALLOWED_HOSTS=.*/ALLOWED_HOSTS=staging.nightscan.app/' .env
+            
+            # Configure Redis
+            echo 'REDIS_URL=redis://redis:6379/0' >> .env
+            
+            # Configure monitoring
+            echo 'PROMETHEUS_ENABLED=true' >> .env
+            echo 'GRAFANA_ENABLED=true' >> .env
+            
+            # Configure backups
+            echo 'BACKUP_ENABLED=true' >> .env
+            echo 'BACKUP_RETENTION_DAYS=7' >> .env
+          "
+      
+      - name: Login to container registry
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          "
+      
+      - name: Pull latest images
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            cd /opt/nightscan/staging
+            docker-compose pull
+          "
+      
+      - name: Run database migrations
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            cd /opt/nightscan/staging
+            docker-compose run --rm web python manage.py migrate --no-input
+          "
+      
+      - name: Collect static files
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            cd /opt/nightscan/staging
+            docker-compose run --rm web python manage.py collectstatic --no-input
+          "
+      
+      - name: Deploy services
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            cd /opt/nightscan/staging
+            
+            # Stop existing services
+            docker-compose down
+            
+            # Start new services
+            docker-compose up -d
+            
+            # Wait for services to be healthy
+            sleep 30
+            
+            # Check service health
+            docker-compose ps
+          "
+      
+      - name: Run health checks
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            # Check web app
+            curl -f http://localhost:8000/health || exit 1
+            
+            # Check prediction API
+            curl -f http://localhost:8001/health || exit 1
+            
+            # Check Redis
+            docker-compose exec -T redis redis-cli ping || exit 1
+            
+            # Check database
+            docker-compose exec -T db pg_isready || exit 1
+          "
+      
+      - name: Run smoke tests
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            cd /opt/nightscan/staging
+            
+            # Run basic smoke tests
+            docker-compose exec -T web python manage.py test tests.smoke --no-input
+          "
+      
+      - name: Setup monitoring alerts
+        run: |
+          # Configure Prometheus alerts for staging
+          curl -X POST ${{ secrets.STAGING_PROMETHEUS_URL }}/api/v1/admin/tsdb/snapshot
+      
+      - name: Notify deployment status
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const color = status === 'success' ? '28a745' : 'dc3545';
+            const emoji = status === 'success' ? '✅' : '❌';
+            
+            // Create deployment status
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment?.id || 0,
+              state: status,
+              environment_url: 'https://staging.nightscan.app',
+              description: `Staging deployment ${status}`
+            });
+            
+            // Post comment on PR if exists
+            if (context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: `${emoji} Staging deployment **${status}**\n\nEnvironment: https://staging.nightscan.app`
+              });
+            }
+      
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            cd /opt/nightscan/staging
+            
+            # Save logs
+            docker-compose logs > deployment-failure-$(date +%Y%m%d-%H%M%S).log
+            
+            # Rollback to previous version if needed
+            # docker-compose down
+            # git checkout HEAD~1
+            # docker-compose up -d
+          "

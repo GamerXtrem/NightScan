@@ -1,4 +1,0 @@
-2025-07-08 21:13:39,323 - scripts.train_efficientnet - INFO - Loaded 8 samples from /var/folders/9l/vpmq_l1j1m16mrmrh0bj027m0000gn/T/tmpwh43omc8/train.csv
-2025-07-08 21:13:39,328 - scripts.train_efficientnet - INFO - Loaded 8 samples from /var/folders/9l/vpmq_l1j1m16mrmrh0bj027m0000gn/T/tmpwh43omc8/train.csv
-2025-07-08 21:13:39,328 - scripts.train_efficientnet - INFO - Loaded 2 samples from /var/folders/9l/vpmq_l1j1m16mrmrh0bj027m0000gn/T/tmpwh43omc8/val.csv
-2025-07-08 21:13:55,928 - scripts.train_efficientnet - INFO - Loaded 8 samples from /var/folders/9l/vpmq_l1j1m16mrmrh0bj027m0000gn/T/tmpp4obggci/train.csv

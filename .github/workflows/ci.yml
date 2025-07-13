@@ -1,0 +1,271 @@
+name: CI - Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  PYTHON_VERSION: '3.9'
+  NODE_VERSION: '18'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # Lint Python code
+  lint-python:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort mypy
+      
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Check formatting with black
+        run: black --check .
+      
+      - name: Check import sorting with isort
+        run: isort --check-only .
+      
+      - name: Type checking with mypy
+        run: mypy . --ignore-missing-imports || true
+
+  # Test Python code
+  test-python:
+    name: Test Python
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10']
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1 portaudio19-dev
+      
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-mock
+          # Install main requirements
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Install test requirements
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
+      
+      - name: Run NightScanPi tests
+        run: |
+          cd NightScanPi && pytest tests/ -v --cov=. --cov-report=xml
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # Test JavaScript/Frontend
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    if: false  # Enable when frontend tests are added
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'web_app/static/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: web_app/static
+        run: npm ci
+      
+      - name: Run linting
+        working-directory: web_app/static
+        run: npm run lint
+      
+      - name: Run tests
+        working-directory: web_app/static
+        run: npm test
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit
+      
+      - name: Check for known vulnerabilities
+        run: |
+          # Check dependencies for known vulnerabilities
+          pip install -r requirements.txt
+          safety check --json || true
+      
+      - name: Security scan with bandit
+        run: |
+          # Scan for common security issues
+          bandit -r . -f json -o bandit-report.json || true
+          # Display results
+          bandit -r . || true
+
+  # Build Docker images
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build web app image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.web
+          push: false
+          tags: nightscan-web:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build prediction API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.prediction
+          push: false
+          tags: nightscan-prediction:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.worker
+          push: false
+          tags: nightscan-worker:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Integration tests
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-docker]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Start services
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          # Wait for services to be ready
+          sleep 30
+      
+      - name: Check service health
+        run: |
+          docker-compose -f docker-compose.test.yml ps
+          # Check web app
+          curl -f http://localhost:8000/health || exit 1
+          # Check prediction API
+          curl -f http://localhost:8001/health || exit 1
+      
+      - name: Run integration tests
+        run: |
+          docker-compose -f docker-compose.test.yml exec -T web pytest tests/integration/ -v
+      
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          docker-compose -f docker-compose.test.yml logs
+      
+      - name: Stop services
+        if: always()
+        run: |
+          docker-compose -f docker-compose.test.yml down -v
+
+  # All tests passed
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint-python, test-python, security-scan, build-docker]
+    if: success()
+    
+    steps:
+      - name: CI Passed
+        run: echo "All CI checks passed successfully!"
+      
+      - name: Set commit status
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'success',
+              description: 'All CI checks passed',
+              context: 'ci/nightscan'
+            })

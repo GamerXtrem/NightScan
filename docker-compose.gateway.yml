@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # Kong API Gateway
+  kong:
+    image: kong:3.4-alpine
+    container_name: nightscan-gateway
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong-config/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+      KONG_LOG_LEVEL: info
+      KONG_PLUGINS: bundled,jwt,cors,rate-limiting,prometheus,correlation-id,http-log,request-transformer,response-transformer
+    ports:
+      - "8080:8000"    # HTTP proxy
+      - "8443:8443"    # HTTPS proxy
+      - "8081:8001"    # Admin API HTTP
+      - "8444:8444"    # Admin API HTTPS
+    volumes:
+      - ./gateway/kong.yml:/kong-config/kong.yml:ro
+      - ./gateway/plugins:/kong/plugins:ro
+    networks:
+      - nightscan-network
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - kong-migrations
+
+  # Kong database migrations (even in DB-less mode, useful for future)
+  kong-migrations:
+    image: kong:3.4-alpine
+    container_name: nightscan-kong-migrations
+    command: kong migrations bootstrap
+    environment:
+      KONG_DATABASE: "off"
+    networks:
+      - nightscan-network
+    restart: on-failure
+
+  # Optional: Kong Manager UI (Enterprise feature, but included for reference)
+  kong-manager:
+    image: kong:3.4-alpine
+    container_name: nightscan-kong-manager
+    environment:
+      KONG_DATABASE: "off"
+      KONG_ADMIN_GUI_URL: http://localhost:8002
+      KONG_ADMIN_GUI_PATH: /manager
+      KONG_ADMIN_GUI_API_URL: http://kong:8001
+    ports:
+      - "8002:8002"
+    networks:
+      - nightscan-network
+    depends_on:
+      - kong
+
+  # Optional: Konga - Open source Kong Admin UI
+  konga:
+    image: pantsel/konga:latest
+    container_name: nightscan-konga
+    environment:
+      NODE_ENV: production
+      TOKEN_SECRET: ${KONGA_TOKEN_SECRET:-some-secret-token}
+    ports:
+      - "1337:1337"
+    networks:
+      - nightscan-network
+    depends_on:
+      - kong
+
+networks:
+  nightscan-network:
+    external: true
+    name: nightscan_default

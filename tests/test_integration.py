@@ -8,7 +8,7 @@ from pathlib import Path
 from io import BytesIO
 
 from web.app import create_app, db
-from Audio_Training.scripts.api_server import create_app as create_api_app
+from audio_training.scripts.api_server import create_app as create_api_app
 from config import get_config
 
 

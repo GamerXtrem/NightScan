@@ -84,6 +84,26 @@ class PredictionCache:
             logger.warning(f"Cache retrieval failed: {e}")
             return None
     
+    def get_prediction_by_hash(self, audio_hash: str) -> Optional[List[Dict]]:
+        """Get cached prediction result by pre-computed hash."""
+        if not self.cache_enabled:
+            return None
+        
+        try:
+            key = f"prediction:{audio_hash}"
+            cached_data = self.redis_client.get(key)
+            
+            if cached_data:
+                logger.info(f"Cache hit for audio hash {key}")
+                return self._deserialize_result(cached_data)
+            else:
+                logger.debug(f"Cache miss for audio hash {key}")
+                return None
+                
+        except (RedisError, json.JSONDecodeError) as e:
+            logger.warning(f"Cache retrieval failed: {e}")
+            return None
+    
     def cache_prediction(self, audio_data: bytes, result: List[Dict], ttl: Optional[int] = None) -> bool:
         """Cache prediction result for audio data."""
         if not self.cache_enabled:
@@ -91,6 +111,24 @@ class PredictionCache:
         
         try:
             key = self._generate_key(audio_data)
+            serialized_result = self._serialize_result(result)
+            ttl = ttl or self.default_ttl
+            
+            success = self.redis_client.set(key, serialized_result, ex=ttl)
+            if success:
+                logger.info(f"Cached prediction for audio hash {key} (TTL: {ttl}s)")
+            return success
+        except Exception as e:
+            logger.error(f"Error caching prediction: {e}")
+            return False
+    
+    def cache_prediction_by_hash(self, audio_hash: str, result: List[Dict], ttl: Optional[int] = None) -> bool:
+        """Cache prediction result by pre-computed hash."""
+        if not self.cache_enabled:
+            return False
+        
+        try:
+            key = f"prediction:{audio_hash}"
             serialized_result = self._serialize_result(result)
             ttl = ttl or self.default_ttl
             

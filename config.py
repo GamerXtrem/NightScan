@@ -21,12 +21,15 @@ except ImportError:
 
 @dataclass
 class DatabaseConfig:
-    """Database configuration."""
+    """Database configuration with optimized connection pooling."""
     uri: str = "sqlite:///nightscan.db"
-    pool_size: int = 10
-    pool_timeout: int = 30
-    pool_recycle: int = 3600
-    echo: bool = False
+    pool_size: int = 10  # Number of persistent connections
+    max_overflow: int = 5  # Maximum overflow connections above pool_size
+    pool_timeout: int = 30  # Seconds to wait before timing out
+    pool_recycle: int = 1800  # Recycle connections after 30 minutes
+    pool_pre_ping: bool = True  # Test connections before using them
+    echo: bool = False  # Log all SQL statements
+    echo_pool: bool = False  # Log connection pool events
 
 
 @dataclass 
@@ -48,6 +51,19 @@ class SecurityConfig:
     lockout_window: int = 1800  # 30 minutes
     lockout_file: str = "failed_logins.json"
     force_https: bool = True
+    
+    # Session configuration
+    session_backend: str = "redis"  # Options: redis, filesystem, memory - Changed to Redis for better performance
+    session_lifetime: int = 3600  # 1 hour in seconds
+    session_cookie_secure: bool = True
+    session_cookie_httponly: bool = True
+    session_cookie_samesite: str = "Lax"  # Lax, Strict, or None
+    
+    # JWT configuration
+    jwt_secret_key: Optional[str] = None  # Will generate if not provided
+    jwt_access_token_expires: int = 3600  # 1 hour in seconds
+    jwt_refresh_token_expires: int = 2592000  # 30 days in seconds
+    jwt_algorithm: str = "HS256"
 
 
 @dataclass
@@ -61,13 +77,38 @@ class RateLimitConfig:
 
 
 @dataclass
+class PortConfig:
+    """Port configuration for all services."""
+    web_app: int = 8000
+    api_v1: int = 8001
+    prediction_api: int = 8002
+    ml_service: int = 8003
+    audio_training: int = 8004
+    picture_training: int = 8005
+    analytics_dashboard: int = 8008
+    websocket: int = 8012
+    metrics: int = 9090
+    redis: int = 6379
+    postgres: int = 5432
+
+
+@dataclass
 class ModelConfig:
     """ML model configuration."""
-    model_path: str = "models/best_model.pth"
-    csv_dir: str = "data/processed/csv"
-    batch_size: int = 1
+    # Audio model settings
+    audio_model_path: str = "models/audio/best_model.pth"
+    audio_csv_dir: str = "data/processed/audio/csv"
+    
+    # Photo model settings
+    photo_model_path: str = "models/photo/best_model.pth"
+    photo_data_dir: str = "data/processed/photo"
+    
+    # Common settings
+    batch_size: int = 32
+    device: str = "auto"  # auto, cpu, cuda, mps
     max_audio_duration: int = 600  # 10 minutes
-    supported_formats: List[str] = field(default_factory=lambda: ["wav"])
+    supported_audio_formats: List[str] = field(default_factory=lambda: ["wav", "mp3", "flac"])
+    supported_image_formats: List[str] = field(default_factory=lambda: ["jpg", "jpeg", "png"])
 
 
 @dataclass
@@ -164,6 +205,9 @@ if PYDANTIC_AVAILABLE:
         # Security
         security: SecurityConfig = SecurityConfig()
         
+        # Ports
+        ports: PortConfig = PortConfig()
+        
         # Rate limiting
         rate_limit: RateLimitConfig = RateLimitConfig()
         
@@ -204,14 +248,20 @@ if PYDANTIC_AVAILABLE:
         
         @validator('model')
         def validate_model_paths(cls, v):
-            model_path = Path(v.model_path)
-            csv_dir = Path(v.csv_dir)
-            
-            if not model_path.exists() and os.getenv("NIGHTSCAN_ENV") == "production":
-                raise ValueError(f"Model file not found: {model_path}")
-            
-            if not csv_dir.exists() and os.getenv("NIGHTSCAN_ENV") == "production":
-                raise ValueError(f"CSV directory not found: {csv_dir}")
+            if os.getenv("NIGHTSCAN_ENV") == "production":
+                # Check audio model
+                audio_path = Path(v.audio_model_path)
+                if not audio_path.exists():
+                    raise ValueError(f"Audio model file not found: {audio_path}")
+                
+                audio_csv = Path(v.audio_csv_dir)
+                if not audio_csv.exists():
+                    raise ValueError(f"Audio CSV directory not found: {audio_csv}")
+                
+                # Check photo model
+                photo_path = Path(v.photo_model_path)
+                if not photo_path.exists():
+                    raise ValueError(f"Photo model file not found: {photo_path}")
             
             return v
         
@@ -245,6 +295,7 @@ else:
             self.database = DatabaseConfig()
             self.redis = RedisConfig()
             self.security = SecurityConfig()
+            self.ports = PortConfig()
             self.rate_limit = RateLimitConfig()
             self.model = ModelConfig()
             self.logging = LoggingConfig()
@@ -271,10 +322,14 @@ else:
                 self.security.secret_key = os.getenv("SECRET_KEY")
             
             # Model
-            if os.getenv("MODEL_PATH"):
-                self.model.model_path = os.getenv("MODEL_PATH")
-            if os.getenv("CSV_DIR"):
-                self.model.csv_dir = os.getenv("CSV_DIR")
+            if os.getenv("AUDIO_MODEL_PATH"):
+                self.model.audio_model_path = os.getenv("AUDIO_MODEL_PATH")
+            if os.getenv("AUDIO_CSV_DIR"):
+                self.model.audio_csv_dir = os.getenv("AUDIO_CSV_DIR")
+            if os.getenv("PHOTO_MODEL_PATH"):
+                self.model.photo_model_path = os.getenv("PHOTO_MODEL_PATH")
+            if os.getenv("PHOTO_DATA_DIR"):
+                self.model.photo_data_dir = os.getenv("PHOTO_DATA_DIR")
 
 
 # Global configuration instance
@@ -335,13 +390,17 @@ def validate_config(config: NightScanConfig) -> List[str]:
     
     # Check required paths exist in production
     if config.environment == "production":
-        model_path = Path(config.model.model_path)
-        if not model_path.exists():
-            errors.append(f"Model file not found: {model_path}")
+        audio_path = Path(config.model.audio_model_path)
+        if not audio_path.exists():
+            errors.append(f"Audio model file not found: {audio_path}")
         
-        csv_dir = Path(config.model.csv_dir)
-        if not csv_dir.exists():
-            errors.append(f"CSV directory not found: {csv_dir}")
+        audio_csv = Path(config.model.audio_csv_dir)
+        if not audio_csv.exists():
+            errors.append(f"Audio CSV directory not found: {audio_csv}")
+        
+        photo_path = Path(config.model.photo_model_path)
+        if not photo_path.exists():
+            errors.append(f"Photo model file not found: {photo_path}")
     
     # Check database URI
     if not config.database.uri:
@@ -381,9 +440,17 @@ def create_example_config(output_file: str = "config/example.json"):
             "lockout_threshold": 5
         },
         "model": {
-            "model_path": "/path/to/best_model.pth",
-            "csv_dir": "/path/to/csv/files",
-            "batch_size": 4
+            "audio_model_path": "/path/to/audio/model.pth",
+            "audio_csv_dir": "/path/to/audio/csv",
+            "photo_model_path": "/path/to/photo/model.pth",
+            "photo_data_dir": "/path/to/photo/data",
+            "batch_size": 32,
+            "device": "auto"
+        },
+        "ports": {
+            "web_app": 8000,
+            "api_v1": 8001,
+            "prediction_api": 8002
         },
         "api": {
             "cors_origins": ["https://your-frontend.com"],
@@ -424,4 +491,5 @@ if __name__ == "__main__":
     print(f"Environment: {config.environment}")
     print(f"Database: {config.database.uri}")
     print(f"Redis enabled: {config.redis.enabled}")
-    print(f"Model path: {config.model.model_path}")
+    print(f"Audio model path: {config.model.audio_model_path}")
+    print(f"Web port: {config.ports.web_app}")

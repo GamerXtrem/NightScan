@@ -1,67 +1,67 @@
-# Liste de tâches NightScanPi
+# NightScanPi Task List
 
-Cette liste regroupe les actions à mettre en œuvre pour les scripts de `NightScanPi` d'après la documentation du dossier.
+This list groups the actions to implement for the `NightScanPi` scripts according to the folder documentation.
 
-## 1. Installation et configuration
-- [x] Flasher **Raspberry Pi OS Lite** sur la carte SD.
-- [x] Activer **SSH** et préparer `wifi_config.py` pour recevoir SSID et mot de passe depuis l'application mobile.
-- [x] Installer les paquets système requis : `python3-pip`, `ffmpeg`, `sox`, `libatlas-base-dev`.
-- [x] Installer les modules Python : `numpy`, `opencv-python`, `soundfile`, `flask`.
+## 1. Installation and Configuration
+- [x] Flash **Raspberry Pi OS Lite** on the SD card.
+- [x] Enable **SSH** and prepare `wifi_config.py` to receive SSID and password from the mobile application.
+- [x] Install required system packages: `python3-pip`, `ffmpeg`, `sox`, `libatlas-base-dev`.
+- [x] Install Python modules: `numpy`, `opencv-python`, `soundfile`, `flask`.
 
-## 2. Scripts principaux
-- [x] **main.py** : orchestrer le fonctionnement global (capture sur détection, horaires d'activité, appel des autres scripts).
-- [x] **audio_capture.py** : enregistrer 8 s de son à chaque détection (PIR ou seuil audio) et sauvegarder en `.wav`.
-- [x] **camera_trigger.py** : prendre une photo infrarouge lors de la détection (PIR ou audio).
-- [x] **spectrogram_gen.py** : après 12 h, convertir les `.wav` en spectrogrammes `.npy` et supprimer les `.wav` si la carte SD dépasse 70 % de remplissage.
-- [x] **wifi_config.py** : récupérer les paramètres Wi-Fi envoyés par l'application mobile et les appliquer.
-- [x] **sync.py** : envoyer automatiquement spectrogrammes et photos via Wi-Fi ou module SIM ; prévoir un mode déconnexion permettant la copie manuelle via la carte SD.
-- [x] **utils/energy_manager.py** : contrôler l'alimentation à l'aide du TPL5110 pour que le Pi fonctionne uniquement de 18 h à 10 h.
-- [x] Ajouter des tests unitaires pour `camera_trigger.py`.
+## 2. Main Scripts
+- [x] **main.py**: orchestrate global operation (capture on detection, activity schedules, calling other scripts).
+- [x] **audio_capture.py**: record 8s of sound at each detection (PIR or audio threshold) and save as `.wav`.
+- [x] **camera_trigger.py**: take an infrared photo during detection (PIR or audio).
+- [x] **spectrogram_gen.py**: after 12 PM, convert `.wav` files to `.npy` spectrograms and delete `.wav` files if SD card exceeds 70% capacity.
+- [x] **wifi_config.py**: retrieve Wi-Fi parameters sent by the mobile application and apply them.
+- [x] **sync.py**: automatically send spectrograms and photos via Wi-Fi or SIM module; provide disconnected mode allowing manual copy via SD card.
+- [x] **utils/energy_manager.py**: control power supply using TPL5110 so the Pi only operates from 6 PM to 10 AM.
+- [x] Add unit tests for `camera_trigger.py`.
 
-## 3. Gestion énergétique
-- [x] Implémenter la planification d'arrêt/démarrage dans `energy_manager.py` pour limiter la consommation.
-- [x] Veiller à ce que la génération des spectrogrammes s'effectue après midi pour ne pas gêner les captures nocturnes.
+## 3. Energy Management
+- [x] Implement shutdown/startup scheduling in `energy_manager.py` to limit power consumption.
+- [x] Ensure spectrogram generation occurs after noon to avoid interfering with nighttime captures.
 
-Cette liste pourra être complétée au fur et à mesure de l'avancement du projet.
+This list can be completed as the project progresses.
 
-## 4. Tâches complémentaires
-- [x] Documenter le câblage et les caractéristiques dans le dossier `Hardware/`.
-- [x] Intégrer la détection par capteur PIR et seuil audio dans `main.py`.
-- [x] Créer un service pour recevoir les identifiants Wi-Fi depuis l'application mobile et appliquer `wifi_config.py`.
-- [x] Ajouter la prise en charge du module SIM pour le transfert des données lorsque le Wi-Fi est indisponible.
-- [x] Écrire un script d'installation automatisée pour le Raspberry Pi (packages et configuration).
-- [x] Ajouter des tests unitaires pour `audio_capture.py` et `main.py`.
-- [x] Fournir un exemple de fichier de configuration et activer un journal des erreurs.
+## 4. Additional Tasks
+- [x] Document wiring and specifications in the `Hardware/` folder.
+- [x] Integrate PIR sensor and audio threshold detection in `main.py`.
+- [x] Create a service to receive Wi-Fi credentials from the mobile application and apply `wifi_config.py`.
+- [x] Add SIM module support for data transfer when Wi-Fi is unavailable.
+- [x] Write an automated installation script for Raspberry Pi (packages and configuration).
+- [x] Add unit tests for `audio_capture.py` and `main.py`.
+- [x] Provide a configuration file example and enable error logging.
 
-## 5. Synchronisation horaire
-- [x] Écrire un script `time_config.py` pour saisir l'heure actuelle et la position GPS lors de la première configuration.
-- [x] Si aucune position n'est fournie, utiliser par défaut les coordonnées de Berne (46.9480 N, 7.4474 E).
-- [x] Déterminer le fuseau horaire à partir de la position avec `timezonefinder` et l'appliquer via `timedatectl`.
-- [x] Installer et configurer `chrony` pour maintenir l'heure synchronisée via Wi‑Fi ou module SIM.
-- [x] Documenter la procédure dans `NightScanPi/README.md`.
+## 5. Time Synchronization
+- [x] Write a `time_config.py` script to input current time and GPS position during initial configuration.
+- [x] If no position is provided, use Bern coordinates by default (46.9480 N, 7.4474 E).
+- [x] Determine timezone from position using `timezonefinder` and apply it via `timedatectl`.
+- [x] Install and configure `chrony` to maintain synchronized time via Wi-Fi or SIM module.
+- [x] Document the procedure in `NightScanPi/README.md`.
 
-## 6. Cycle jour/nuit automatique
-- [x] Ajouter un module `sun_times.py` calculant les heures de lever et coucher du soleil en fonction de la date et des coordonnées GPS (par exemple via `suntime`).
-- [x] Conserver ces horaires dans un fichier de référence mis à jour quotidiennement.
-- [x] Adapter `energy_manager.py` et `main.py` pour n'activer l'enregistrement que 30 min avant le coucher du soleil jusqu'à 30 min après le lever.
-- [x] Écrire des tests unitaires pour vérifier le calcul des horaires et le respect de la fenêtre d'activité.
-- [x] Mettre à jour la documentation pour décrire la configuration du système basé sur le cycle solaire.
+## 6. Automatic Day/Night Cycle
+- [x] Add a `sun_times.py` module calculating sunrise and sunset times based on date and GPS coordinates (e.g., via `suntime`).
+- [x] Store these times in a reference file updated daily.
+- [x] Adapt `energy_manager.py` and `main.py` to only activate recording from 30 min before sunset until 30 min after sunrise.
+- [x] Write unit tests to verify time calculations and activity window compliance.
+- [x] Update documentation to describe the solar cycle-based system configuration.
 
-## 7. Interface de transfert manuel
-- [x] Générer une mini page web accessible en local via Flask ou FastAPI.
-- [x] Ajouter un bouton **Transférer les données** déclenchant l'envoi des fichiers.
-- [x] Vérifier la connexion réseau (ping ou DNS) avant le transfert.
-- [x] Envoyer les spectrogrammes `.npy` et les photos du dossier `/data/exports/` vers le VPS.
-- [x] Supprimer les fichiers locaux une fois l'envoi confirmé.
-- [x] Envoyer une notification à l'app mobile NightScan pour signaler la fin du transfert.
+## 7. Manual Transfer Interface
+- [x] Generate a mini web page accessible locally via Flask or FastAPI.
+- [x] Add a **Transfer Data** button triggering file upload.
+- [x] Check network connection (ping or DNS) before transfer.
+- [x] Send `.npy` spectrograms and photos from `/data/exports/` folder to the VPS.
+- [x] Delete local files once upload is confirmed.
+- [x] Send a notification to NightScan mobile app to signal transfer completion.
 
-## 8. Réveil Wi-Fi par signal sonore
-- [x] Installer `sounddevice`, `numpy`, `scipy` ou `aubio` sur le Pi.
-- [x] Écrire un script `wifi_wakeup.py` analysant le flux micro en temps réel (FFT) et activant le Wi-Fi avec `sudo ifconfig wlan0 up` à la détection de 2100 Hz.
-- [x] Journaliser chaque détection pour faciliter le debug.
-- [x] Générer un son déclencheur `.wav` d'une seconde à 2100 Hz (ou DTMF) et l'intégrer dans l'application iOS.
-- [x] Ajouter dans l'app iOS un bouton **Réveiller NightScanPi** jouant ce son à plein volume et affichant « Envoi du signal sonore… ».
-- [x] Conserver un état `wifi_awake` dans un fichier `.status` et couper automatiquement le Wi-Fi après 10 min sans connexion.
-- [x] Journaliser la durée d'activation du Wi-Fi.
-- [ ] Tester différentes fréquences, la distance et le volume nécessaires pour éviter les faux positifs et valider le fonctionnement.
-- [x] Vérifier que la détection sonore ne consomme pas trop d’énergie (benchmark).
+## 8. Wi-Fi Wake-up by Sound Signal
+- [x] Install `sounddevice`, `numpy`, `scipy` or `aubio` on the Pi.
+- [x] Write a `wifi_wakeup.py` script analyzing microphone stream in real-time (FFT) and activating Wi-Fi with `sudo ifconfig wlan0 up` upon detecting 2100 Hz.
+- [x] Log each detection to facilitate debugging.
+- [x] Generate a one-second trigger sound `.wav` at 2100 Hz (or DTMF) and integrate it into the iOS application.
+- [x] Add a **Wake NightScanPi** button in the iOS app playing this sound at full volume and displaying "Sending sound signal...".
+- [x] Maintain a `wifi_awake` state in a `.status` file and automatically turn off Wi-Fi after 10 min without connection.
+- [x] Log Wi-Fi activation duration.
+- [ ] Test different frequencies, distance and volume needed to avoid false positives and validate operation.
+- [x] Verify that sound detection doesn't consume too much energy (benchmark).

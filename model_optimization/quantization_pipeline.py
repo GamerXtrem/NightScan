@@ -75,7 +75,7 @@ class ModelQuantizationPipeline:
         default_config = {
             'output_directory': 'mobile_models',
             'audio_model': {
-                'input_path': 'Audio_Training_EfficientNet/models/best_model.pth',
+                'input_path': 'audio_training_efficientnet/models/best_model.pth',
                 'model_name': 'efficientnet-b1',
                 'num_classes': 6,
                 'class_names': ['bird_song', 'mammal_call', 'insect_sound', 
@@ -84,7 +84,7 @@ class ModelQuantizationPipeline:
                 'quantization_mode': 'dynamic'
             },
             'photo_model': {
-                'input_path': 'Picture_Training_Enhanced/models/best_model.pth',
+                'input_path': 'picture_training_enhanced/models/best_model.pth',
                 'model_name': 'efficientnet-b1',
                 'num_classes': 8,
                 'class_names': ['bat', 'owl', 'raccoon', 'opossum', 'deer', 'fox', 'coyote', 'unknown'],
@@ -212,14 +212,14 @@ class ModelQuantizationPipeline:
         try:
             # Importer le modèle approprié
             if 'audio' in str(model_path):
-                from Audio_Training_EfficientNet.models.efficientnet_config import EfficientNetConfig, create_model
+                from audio_training_efficientnet.models.efficientnet_config import EfficientNetConfig, create_model
                 model_config = EfficientNetConfig(
                     model_name=config['model_name'],
                     num_classes=config['num_classes'],
                     pretrained=False
                 )
             else:
-                from Picture_Training_Enhanced.models.photo_config import PhotoConfig, create_model
+                from picture_training_enhanced.models.photo_config import PhotoConfig, create_model
                 model_config = PhotoConfig(
                     model_name=config['model_name'],
                     num_classes=config['num_classes'],

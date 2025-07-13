@@ -16,6 +16,7 @@ import psycopg2
 import psycopg2.extras
 from flask import current_app
 from sqlalchemy import text
+from cache_manager import cache_user_data, invalidate_user_cache
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,7 @@ class QuotaManager:
         self._cache_expiry = datetime.now() + self.cache_duration
         logger.info(f"Refreshed plans cache: {list(self._plans_cache.keys())}")
     
+    @cache_user_data(ttl=60)  # Cache for 1 minute
     def get_user_quota_status(self, user_id: int) -> QuotaStatus:
         """Get current quota status for user"""
         query = """
@@ -246,6 +248,9 @@ class QuotaManager:
         try:
             result = self._execute_query(query, (user_id, file_size_bytes), fetch_one=True)
             quota_result = list(result.values())[0]  # Get the JSON result
+            
+            # Invalidate user cache after quota update
+            invalidate_user_cache(user_id)
             
             # Record detailed transaction if prediction_id provided
             if prediction_id and quota_result.get('allowed'):
@@ -471,6 +476,9 @@ class QuotaManager:
             """
             
             rows_affected = self._execute_query(query, (user_id,))
+            
+            # Invalidate user cache after quota reset
+            invalidate_user_cache(user_id)
             
             # Record admin transaction
             if rows_affected > 0:

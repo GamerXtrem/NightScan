@@ -1,0 +1,184 @@
+_format_version: "3.0"
+_transform: true
+
+# JWT Configuration for authenticated routes
+services:
+  # Protected API endpoints
+  - name: protected-api
+    url: http://web:8000
+    routes:
+      - name: protected-routes
+        paths:
+          - /api/v1/predict
+          - /api/v1/detections
+          - /api/v1/analytics
+          - /api/v1/user
+          - /api/analytics
+        strip_path: false
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+            - nbf
+          maximum_expiration: 31536000  # 1 year
+          header_names:
+            - Authorization
+          cookie_names:
+            - jwt_token
+          uri_param_names:
+            - jwt
+
+  # Public auth endpoints (no JWT required)
+  - name: auth-service
+    url: http://web:8000
+    routes:
+      - name: auth-routes
+        paths:
+          - /api/auth/login
+          - /api/auth/register
+          - /api/auth/refresh
+          - /api/auth/forgot-password
+          - /api/auth/reset-password
+          - /api/auth/verify-email
+        strip_path: false
+        methods:
+          - POST
+          - OPTIONS
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20  # Prevent brute force
+          policy: local
+          fault_tolerant: true
+
+  # Health check endpoints (no auth)
+  - name: health-service
+    url: http://web:8000
+    routes:
+      - name: health-routes
+        paths:
+          - /health
+          - /api/health
+          - /api/status
+        strip_path: false
+        methods:
+          - GET
+
+# JWT consumers (users)
+consumers:
+  - username: default-user
+    jwt_secrets:
+      - key: ${JWT_SECRET_KEY}
+        algorithm: HS256
+        
+  # Additional consumers can be added dynamically
+
+# Plugin configurations
+plugins:
+  # Global CORS (applies to all services)
+  - name: cors
+    config:
+      origins:
+        - "http://localhost:3000"      # React dev
+        - "http://localhost:8000"      # Flask dev
+        - "https://nightscan.com"      # Production
+        - "https://api.nightscan.com"  # Production API
+        - "capacitor://localhost"      # iOS app
+        - "http://localhost"           # iOS simulator
+      credentials: true
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-Type
+        - Date
+        - Authorization
+        - X-Auth-Token
+        - X-Requested-With
+        - X-User-Id
+        - X-Request-Id
+      exposed_headers:
+        - X-Auth-Token
+        - X-Request-Id
+        - X-RateLimit-Limit
+        - X-RateLimit-Remaining
+        - X-RateLimit-Reset
+      max_age: 3600
+      preflight_continue: false
+
+  # Request transformer to add user info from JWT
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          - X-Consumer-Username:$(consumer.username)
+          - X-Consumer-ID:$(consumer.id)
+          - X-Authenticated-Scope:$(authenticated_credential.scope)
+      remove:
+        headers:
+          - Authorization  # Remove JWT from backend requests
+        
+  # Response transformer for consistent API responses
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - X-API-Version:v1
+          - X-Powered-By:NightScan-Gateway
+      remove:
+        headers:
+          - Server
+          - X-Powered-By
+
+  # Rate limiting by consumer
+  - name: rate-limiting
+    config:
+      minute: 100    # Free tier default
+      hour: 1000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+      limit_by: consumer
+      error_message: "API rate limit exceeded"
+      error_code: 429
+
+  # JWT validation errors handler
+  - name: request-termination
+    config:
+      status_code: 401
+      message: "Unauthorized: Invalid or missing JWT token"
+      content_type: "application/json"
+    route: jwt-error-route
+    enabled: false  # Will be enabled per route
+
+# ACL groups for role-based access
+acls:
+  - group: free-users
+    consumers:
+      - default-user
+  - group: premium-users
+    consumers: []
+  - group: admin-users
+    consumers: []
+
+# Rate limit overrides by group
+rate_limits:
+  free-users:
+    minute: 60
+    hour: 600
+    day: 5000
+  premium-users:
+    minute: 600
+    hour: 6000
+    day: 50000
+  admin-users:
+    minute: 6000
+    hour: 60000
+    day: 500000

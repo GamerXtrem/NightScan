@@ -1,0 +1,73 @@
+name: Reusable Test Workflow
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: 'Python version to test'
+        required: false
+        type: string
+        default: '3.9'
+      test-directory:
+        description: 'Directory containing tests'
+        required: false
+        type: string
+        default: 'tests'
+      coverage-threshold:
+        description: 'Minimum coverage percentage'
+        required: false
+        type: number
+        default: 80
+    secrets:
+      codecov-token:
+        description: 'Codecov token'
+        required: false
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
+        with:
+          python-version: ${{ inputs.python-version }}
+          install-deps: 'true'
+      
+      - name: Install test dependencies
+        run: |
+          pip install pytest pytest-cov pytest-mock pytest-asyncio
+      
+      - name: Run tests with coverage
+        run: |
+          pytest ${{ inputs.test-directory }} \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term \
+            --cov-report=html \
+            -v
+      
+      - name: Check coverage threshold
+        run: |
+          coverage report --fail-under=${{ inputs.coverage-threshold }}
+      
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report-${{ inputs.python-version }}
+          path: |
+            coverage.xml
+            htmlcov/
+      
+      - name: Upload to Codecov
+        if: secrets.codecov-token != ''
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.codecov-token }}
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-${{ inputs.python-version }}

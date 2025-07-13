@@ -198,7 +198,7 @@ class AudioTrainer(BaseTrainer):
     def prepare_data(self, data_path: str):
         """Prepare audio training data."""
         # Audio-specific data preparation
-        from Audio_Training.scripts.preprocess import preprocess_audio_data
+        from audio_training.scripts.preprocess import preprocess_audio_data
         return preprocess_audio_data(data_path)
 
 
@@ -208,7 +208,7 @@ class ImageTrainer(BaseTrainer):
     def prepare_data(self, data_path: str):
         """Prepare image training data."""
         # Image-specific data preparation
-        from Picture_Training.scripts.prepare_csv import prepare_image_data
+        from picture_training.scripts.prepare_csv import prepare_image_data
         return prepare_image_data(data_path)
 '''
         

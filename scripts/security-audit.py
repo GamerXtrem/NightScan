@@ -89,8 +89,8 @@ class SecurityAuditor:
             r'ios-app/',
             r'VPS_lite/',
             r'models/',
-            r'Audio_Training/',
-            r'Picture_Training/',
+            r'audio_training/',
+            r'picture_training/',
             r'PRODUCTION_.*\.md$',
             r'TODO_.*\.md$'
         ]

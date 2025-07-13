@@ -62,8 +62,8 @@ def check_dependencies():
 
 def check_models():
     """Vérifie la présence des modèles requis."""
-    audio_model_path = Path("Audio_Training_EfficientNet/models/best_model.pth")
-    photo_model_path = Path("Picture_Training_Enhanced/models/best_model.pth")
+    audio_model_path = Path("audio_training_efficientnet/models/best_model.pth")
+    photo_model_path = Path("picture_training_enhanced/models/best_model.pth")
     
     models_status = {
         "audio": audio_model_path.exists(),

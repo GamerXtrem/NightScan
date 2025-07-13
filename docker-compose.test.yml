@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Test database
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: nightscan_test
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching/queues
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Web application
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    image: nightscan-web:test
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=true
+      - DATABASE_URL=postgresql://test:test@db:5432/nightscan_test
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=test-secret-key-for-ci-only
+      - ALLOWED_HOSTS=*
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./tests:/app/tests
+
+  # Prediction API
+  prediction:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.prediction
+    image: nightscan-prediction:test
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=true
+      - DATABASE_URL=postgresql://test:test@db:5432/nightscan_test
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8001:8001"
+    depends_on:
+      - db
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Worker for background tasks
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    image: nightscan-worker:test
+    environment:
+      - ENVIRONMENT=test
+      - DEBUG=true
+      - DATABASE_URL=postgresql://test:test@db:5432/nightscan_test
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
+  redis_data:

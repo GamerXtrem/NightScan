@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 
 def create_test_app(log_file=None):
-    path = Path(__file__).resolve().parents[1] / 'Audio_Training' / 'scripts' / 'api_server.py'
+    path = Path(__file__).resolve().parents[1] / 'audio_training' / 'scripts' / 'api_server.py'
     source = path.read_text().replace('application = create_app()', '# application = create_app()')
     module = types.ModuleType('api_server_test')
     module.__file__ = str(path)

@@ -4,7 +4,7 @@ import sys
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from Audio_Training.scripts.preprocess import split_and_save
+from audio_training.scripts.preprocess import split_and_save
 
 
 def test_split_and_save(tmp_path):

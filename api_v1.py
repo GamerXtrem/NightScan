@@ -14,6 +14,7 @@ from log_utils import log_prediction
 from cache_utils import get_cache
 from websocket_service import get_websocket_manager
 from push_notifications import get_push_service
+from cache_middleware import cache_for_user_data, cache_for_static_api
 
 # Create API v1 blueprint
 api_v1 = Blueprint('api_v1', __name__, url_prefix='/api/v1')
@@ -229,7 +230,7 @@ def predict_audio():
             schema: ErrorSchema
     """
     # Import here to avoid circular imports
-    from Audio_Training.scripts.api_server import (
+    from audio_training.scripts.api_server import (
         sanitize_filename, validate_wav_signature, predict_file, MAX_FILE_SIZE
     )
     import tempfile
@@ -284,24 +285,29 @@ def predict_audio():
     with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
         total = 0
         chunk_size = 64 * 1024
+        
+        # Calculate hash while streaming
+        import hashlib
+        hasher = hashlib.sha256()
+        
         while True:
             chunk = file.stream.read(chunk_size)
             if not chunk:
                 break
             tmp.write(chunk)
+            hasher.update(chunk)  # Update hash while streaming
             total += len(chunk)
             if total > MAX_FILE_SIZE:
                 return jsonify({"error": "File exceeds 100 MB limit", "code": "FILE_TOO_LARGE"}), 400
         
         tmp.flush()
         
-        # Read file data for caching
-        with open(tmp.name, 'rb') as f:
-            audio_data = f.read()
+        # Get file hash without reloading
+        file_hash = hasher.hexdigest()
         
-        # Check cache first
+        # Check cache using hash
         cache = get_cache()
-        cached_result = cache.get_prediction(audio_data)
+        cached_result = cache.get_prediction_by_hash(file_hash)
         if cached_result is not None:
             processing_time = time.time() - start_time
             response_data = {
@@ -353,8 +359,39 @@ def predict_audio():
         except Exception as exc:
             return jsonify({"error": "Failed to process file", "code": "PROCESSING_ERROR"}), 500
         
-        # Run prediction
-        try:
+        # Check if async mode is enabled
+        async_mode = current_app.config.get("ASYNC_PREDICTIONS", True)
+        
+        if async_mode:
+            # Queue the prediction task
+            from prediction_queue import get_prediction_queue
+            from web.tasks import process_prediction
+            
+            queue = get_prediction_queue()
+            
+            # Create task in queue
+            task_id = queue.create_task(
+                file_path=tmp.name,
+                file_hash=file_hash,
+                filename=sanitized_filename,
+                user_id=getattr(current_user, 'id', None) if 'current_user' in globals() else None,
+                priority=0  # Default priority
+            )
+            
+            # Dispatch to Celery worker
+            process_prediction.delay(task_id)
+            
+            # Return immediately with task ID
+            return jsonify({
+                "task_id": task_id,
+                "status": "processing",
+                "status_url": f"/api/v1/status/{task_id}",
+                "result_url": f"/api/v1/result/{task_id}",
+                "message": "Prediction queued for processing"
+            }), 202  # 202 Accepted
+            
+        else:
+            # Fallback to synchronous mode (for compatibility)
             results = predict_file(
                 Path(tmp.name),
                 model=current_app.config["MODEL"],
@@ -381,8 +418,8 @@ def predict_audio():
                 audio_duration=audio_duration
             )
             
-            # Cache the result
-            cache.cache_prediction(audio_data, results)
+            # Cache the result using the pre-computed hash
+            cache.cache_prediction_by_hash(file_hash, results)
             
             # Send real-time notifications
             try:
@@ -443,11 +480,6 @@ def predict_audio():
                 return jsonify(result), 200
             except ValidationError as err:
                 return jsonify({"error": "Response validation failed", "details": err.messages}), 500
-            
-        except Exception as exc:
-            processing_time = time.time() - start_time
-            record_prediction_metrics(duration=processing_time, success=False)
-            return jsonify({"error": "Prediction failed", "code": "PREDICTION_ERROR"}), 500
 
 
 # ===== QUOTA MANAGEMENT ENDPOINTS =====
@@ -780,6 +812,7 @@ def check_quota():
 @api_v1.route('/detections', methods=['GET'])
 @login_required
 @track_request_metrics
+@cache_for_user_data(ttl=60)  # Cache for 1 minute
 def get_detections():
     """
     Get Wildlife Detections
@@ -1290,6 +1323,156 @@ def get_user_predictions():
             "error": "Failed to get predictions",
             "code": "PREDICTIONS_ERROR"
         }), 500
+
+
+@api_v1.route("/status/<task_id>", methods=["GET"])
+@limiter.limit(config.rate_limit.status_check_limit if limiter else None)
+@track_request_metrics
+def get_task_status(task_id):
+    """
+    Get prediction task status.
+    
+    Returns task status including progress and completion state.
+    """
+    from prediction_queue import get_prediction_queue
+    
+    queue = get_prediction_queue()
+    status = queue.get_task_status(task_id)
+    
+    if not status:
+        return jsonify({
+            "error": "Task not found",
+            "code": "TASK_NOT_FOUND"
+        }), 404
+    
+    return jsonify(status)
+
+
+@api_v1.route("/result/<task_id>", methods=["GET"])
+@limiter.limit(config.rate_limit.default_limit if limiter else None)
+@track_request_metrics
+def get_task_result(task_id):
+    """
+    Get prediction task results.
+    
+    Returns results if task is completed, error if not ready.
+    """
+    from prediction_queue import get_prediction_queue
+    
+    queue = get_prediction_queue()
+    
+    # First check status
+    status = queue.get_task_status(task_id)
+    if not status:
+        return jsonify({
+            "error": "Task not found",
+            "code": "TASK_NOT_FOUND"
+        }), 404
+    
+    if status['status'] == 'pending':
+        return jsonify({
+            "error": "Task is still pending",
+            "code": "TASK_PENDING",
+            "status": status
+        }), 202
+    
+    if status['status'] == 'processing':
+        return jsonify({
+            "error": "Task is still processing",
+            "code": "TASK_PROCESSING",
+            "status": status
+        }), 202
+    
+    if status['status'] == 'failed':
+        return jsonify({
+            "error": "Task failed",
+            "code": "TASK_FAILED",
+            "status": status
+        }), 500
+    
+    if status['status'] == 'cancelled':
+        return jsonify({
+            "error": "Task was cancelled",
+            "code": "TASK_CANCELLED",
+            "status": status
+        }), 410  # Gone
+    
+    # Get results
+    results = queue.get_task_result(task_id)
+    if not results:
+        return jsonify({
+            "error": "Results not available",
+            "code": "RESULTS_NOT_AVAILABLE"
+        }), 404
+    
+    return jsonify({
+        "task_id": task_id,
+        "status": "completed",
+        "results": results,
+        "metadata": {
+            "created_at": status['created_at'],
+            "completed_at": status['completed_at'],
+            "filename": status['filename']
+        }
+    })
+
+
+@api_v1.route("/tasks", methods=["GET"])
+@limiter.limit(config.rate_limit.default_limit if limiter else None)
+@login_required
+@track_request_metrics
+def get_user_tasks():
+    """
+    Get all tasks for the current user.
+    
+    Query parameters:
+    - include_completed: Include completed tasks (default: true)
+    """
+    from prediction_queue import get_prediction_queue
+    
+    include_completed = request.args.get('include_completed', 'true').lower() == 'true'
+    
+    queue = get_prediction_queue()
+    tasks = queue.get_user_tasks(current_user.id, include_completed=include_completed)
+    
+    return jsonify({
+        "tasks": tasks,
+        "count": len(tasks)
+    })
+
+
+@api_v1.route("/cancel/<task_id>", methods=["POST"])
+@limiter.limit(config.rate_limit.default_limit if limiter else None)
+@login_required
+@track_request_metrics
+def cancel_task(task_id):
+    """Cancel a pending prediction task."""
+    from prediction_queue import get_prediction_queue
+    
+    queue = get_prediction_queue()
+    
+    # Verify task belongs to user
+    status = queue.get_task_status(task_id)
+    if not status:
+        return jsonify({
+            "error": "Task not found",
+            "code": "TASK_NOT_FOUND"
+        }), 404
+    
+    # Check permissions (if user tracking is implemented)
+    # For now, allow cancellation
+    
+    success = queue.cancel_task(task_id)
+    if success:
+        return jsonify({
+            "message": "Task cancelled successfully",
+            "task_id": task_id
+        })
+    else:
+        return jsonify({
+            "error": "Cannot cancel task in current state",
+            "code": "CANCEL_FAILED"
+        }), 400
 
 
 @api_v1.errorhandler(404)

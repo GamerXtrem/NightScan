@@ -7,8 +7,10 @@ and the existing Flask API, enabling seamless migration to high-performance serv
 import asyncio
 import logging
 import time
+import os
 from typing import Dict, Any, Optional
 from functools import wraps
+from pathlib import Path
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
@@ -84,7 +86,7 @@ class OptimizedAPIIntegration:
                     # Import existing prediction utilities
                     import sys
                     from pathlib import Path
-                    sys.path.append(str(Path("Audio_Training/scripts").resolve()))
+                    sys.path.append(str(Path("audio_training/scripts").resolve()))
                     import predict
                     
                     # Load labels to determine number of classes
@@ -357,14 +359,37 @@ def register_optimized_endpoints(app):
             if not file.filename.lower().endswith(".wav"):
                 return jsonify({"error": "WAV file required"}), 400
             
-            # Read audio data
-            audio_bytes = file.read()
+            # Save file temporarily using streaming
+            from streaming_utils import StreamingFileHandler
+            import tempfile
             
-            # Convert to numpy array (simplified - in production you'd use proper audio processing)
-            # For now, we'll create dummy audio data for demonstration
-            audio_data = np.frombuffer(audio_bytes[:1000], dtype=np.float32)
-            if len(audio_data) == 0:
-                audio_data = np.random.randn(1000).astype(np.float32)
+            handler = StreamingFileHandler()
+            
+            # Create temp file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+                temp_path = tmp.name
+            
+            try:
+                # Stream file to disk
+                file_size, file_hash = handler.save_file_streaming(
+                    file,
+                    Path(temp_path),
+                    max_size=100 * 1024 * 1024  # 100MB limit
+                )
+                
+                # Process audio file from disk (avoiding loading entire file)
+                # In production, use proper audio processing library that supports streaming
+                with open(temp_path, 'rb') as f:
+                    # Read only first 1000 bytes for demo
+                    audio_sample = f.read(1000)
+                    audio_data = np.frombuffer(audio_sample, dtype=np.float32)
+                    if len(audio_data) == 0:
+                        audio_data = np.random.randn(1000).astype(np.float32)
+            
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
             
             # Run optimized prediction
             result = api_integration.optimized_predict(

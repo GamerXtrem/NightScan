@@ -277,9 +277,9 @@ export function checkForNewDetections(detections) {
 
 // Enhanced notification handling for WebSocket events
 export function handleWebSocketNotification(notification) {
-  const { event_type, data, priority } = notification;
+  const { eventType, data, priority } = notification;
   
-  switch (event_type) {
+  switch (eventType) {
     case 'new_detection':
       if (shouldShowDetectionNotification(data)) {
         sendDetectionNotification(data);

@@ -1,2 +1,51 @@
 [flake8]
-ignore = E501,E402,W503
+# Compatible with Black
+max-line-length = 120
+extend-ignore = E203, W503
+
+# Exclude directories
+exclude = 
+    .git,
+    __pycache__,
+    docs/source/conf.py,
+    old,
+    build,
+    dist,
+    venv,
+    env,
+    .venv,
+    node_modules,
+    wp-plugin,
+    ios-app,
+    migrations,
+    .mypy_cache,
+    .pytest_cache,
+    .ruff_cache
+
+# Per-file ignores
+per-file-ignores =
+    # Ignore import not used in __init__.py files
+    __init__.py:F401
+    # Allow assert in tests
+    test_*.py:S101
+    tests/*.py:S101
+
+# McCabe complexity
+max-complexity = 10
+
+# Naming conventions (pep8-naming)
+# N803: argument name should be lowercase
+# N806: variable in function should be lowercase
+# N802: function name should be lowercase
+ignore-names = 
+    # Common ML conventions
+    X,Y,X_train,X_test,Y_train,Y_test,
+    # Common abbreviations
+    N,M,K,C,H,W
+
+# Count
+count = True
+statistics = True
+
+# Format
+format = %(path)s:%(row)d:%(col)d: %(code)s %(text)s

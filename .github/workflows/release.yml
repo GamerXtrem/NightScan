@@ -1,0 +1,303 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.2.3)'
+        required: true
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+          - prerelease
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      previous_version: ${{ steps.version.outputs.previous_version }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Validate and determine version
+        id: version
+        run: |
+          # Get the latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "previous_version=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          
+          # Determine new version
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            VERSION="v${{ github.event.inputs.version }}"
+          else
+            # Auto-increment based on release type
+            CURRENT_VERSION=${LATEST_TAG#v}
+            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+            MAJOR=${VERSION_PARTS[0]:-0}
+            MINOR=${VERSION_PARTS[1]:-0}
+            PATCH=${VERSION_PARTS[2]:-0}
+            
+            case "${{ github.event.inputs.release_type }}" in
+              major)
+                VERSION="v$((MAJOR + 1)).0.0"
+                ;;
+              minor)
+                VERSION="v${MAJOR}.$((MINOR + 1)).0"
+                ;;
+              patch)
+                VERSION="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+                ;;
+              prerelease)
+                VERSION="v${MAJOR}.${MINOR}.${PATCH}-rc.${{ github.run_number }}"
+                ;;
+            esac
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "New version: ${VERSION}"
+      
+      - name: Update version files
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          VERSION_NO_V=${VERSION#v}
+          
+          # Update Python version
+          if [ -f "_version.py" ]; then
+            echo "__version__ = '${VERSION_NO_V}'" > _version.py
+          fi
+          
+          # Update package.json if exists
+          if [ -f "package.json" ]; then
+            npm version ${VERSION_NO_V} --no-git-tag-version
+          fi
+          
+          # Update docker-compose files
+          find . -name "docker-compose*.yml" -exec sed -i "s/nightscan:.*$/nightscan:${VERSION}/g" {} \;
+          
+          # Update Kubernetes manifests
+          find k8s -name "*.yaml" -exec sed -i "s/nightscan:.*$/nightscan:${VERSION}/g" {} \;
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          PREVIOUS_VERSION=${{ steps.version.outputs.previous_version }}
+          
+          # Generate changelog
+          echo "## What's Changed" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          # Get commit messages since last tag
+          git log ${PREVIOUS_VERSION}..HEAD --pretty=format:"- %s (%an)" >> RELEASE_NOTES.md
+          
+          echo "" >> RELEASE_NOTES.md
+          echo "## Statistics" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          # Get statistics
+          COMMITS=$(git rev-list ${PREVIOUS_VERSION}..HEAD --count)
+          FILES_CHANGED=$(git diff --name-only ${PREVIOUS_VERSION}..HEAD | wc -l)
+          ADDITIONS=$(git diff --numstat ${PREVIOUS_VERSION}..HEAD | awk '{ additions += $1 } END { print additions }')
+          DELETIONS=$(git diff --numstat ${PREVIOUS_VERSION}..HEAD | awk '{ deletions += $2 } END { print deletions }')
+          
+          echo "- Commits: ${COMMITS}" >> RELEASE_NOTES.md
+          echo "- Files changed: ${FILES_CHANGED}" >> RELEASE_NOTES.md
+          echo "- Lines added: ${ADDITIONS}" >> RELEASE_NOTES.md
+          echo "- Lines deleted: ${DELETIONS}" >> RELEASE_NOTES.md
+          
+          # Update CHANGELOG.md
+          if [ -f "CHANGELOG.md" ]; then
+            echo "" > CHANGELOG.tmp.md
+            echo "# Changelog" >> CHANGELOG.tmp.md
+            echo "" >> CHANGELOG.tmp.md
+            echo "## [${VERSION}] - $(date +%Y-%m-%d)" >> CHANGELOG.tmp.md
+            cat RELEASE_NOTES.md >> CHANGELOG.tmp.md
+            echo "" >> CHANGELOG.tmp.md
+            tail -n +2 CHANGELOG.md >> CHANGELOG.tmp.md
+            mv CHANGELOG.tmp.md CHANGELOG.md
+          fi
+      
+      - name: Commit changes
+        run: |
+          git add -A
+          git commit -m "chore: prepare release ${{ steps.version.outputs.version }}" || echo "No changes to commit"
+      
+      - name: Create tag
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          git tag -a ${VERSION} -m "Release ${VERSION}"
+      
+      - name: Push changes
+        run: |
+          git push origin HEAD:main
+          git push origin ${{ steps.version.outputs.version }}
+
+  build-release-artifacts:
+    name: Build Release Artifacts
+    needs: [prepare-release]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.version }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Build Python package
+        run: |
+          pip install build twine
+          python -m build
+      
+      - name: Build documentation
+        run: |
+          pip install -r docs/requirements.txt || echo "No docs requirements"
+          # Build docs if they exist
+          if [ -d "docs" ]; then
+            cd docs && make html && cd ..
+            tar -czf docs-${{ needs.prepare-release.outputs.version }}.tar.gz -C docs/_build/html .
+          fi
+      
+      - name: Create source archive
+        run: |
+          git archive --format=tar.gz --prefix=nightscan-${{ needs.prepare-release.outputs.version }}/ \
+            -o nightscan-${{ needs.prepare-release.outputs.version }}.tar.gz HEAD
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts
+          path: |
+            dist/*
+            *.tar.gz
+
+  create-github-release:
+    name: Create GitHub Release
+    needs: [prepare-release, build-release-artifacts]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.version }}
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-artifacts
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          name: Release ${{ needs.prepare-release.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(needs.prepare-release.outputs.version, 'rc') }}
+          files: |
+            dist/*
+            *.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trigger-deployments:
+    name: Trigger Deployments
+    needs: [prepare-release, create-github-release]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(needs.prepare-release.outputs.version, 'rc') }}
+    
+    steps:
+      - name: Trigger Docker builds
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'docker-build.yml',
+              ref: '${{ needs.prepare-release.outputs.version }}'
+            });
+      
+      - name: Trigger staging deployment
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy-staging.yml',
+              ref: 'main'
+            });
+      
+      - name: Create production deployment issue
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const version = '${{ needs.prepare-release.outputs.version }}';
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Deploy ${version} to production`,
+              body: `## Production Deployment Checklist\n\n- [ ] Staging deployment verified\n- [ ] Release notes reviewed\n- [ ] Database migrations tested\n- [ ] Monitoring alerts configured\n- [ ] Rollback plan documented\n\n### Deployment Command\n\`\`\`\ngh workflow run deploy-production.yml -f version=${version}\n\`\`\``,
+              labels: ['deployment', 'production']
+            });
+            
+            console.log(`Created deployment issue: ${issue.data.html_url}`);
+
+  notify-release:
+    name: Notify Release
+    needs: [prepare-release, create-github-release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Send notification
+        run: |
+          VERSION=${{ needs.prepare-release.outputs.version }}
+          STATUS=${{ job.status }}
+          
+          # Send webhook notification (Discord, Slack, etc.)
+          if [ -n "${{ secrets.DISCORD_WEBHOOK }}" ]; then
+            curl -H "Content-Type: application/json" \
+              -d "{\"content\": \"🚀 NightScan ${VERSION} has been released! Status: ${STATUS}\"}" \
+              ${{ secrets.DISCORD_WEBHOOK }}
+          fi
+      
+      - name: Update project board
+        uses: actions/github-script@v6
+        with:
+          script: |
+            // Move completed issues to "Released" column
+            console.log('Updating project board for release');
+      
+      - name: Generate release summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.prepare-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous Version**: ${{ needs.prepare-release.outputs.previous_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Type**: ${{ github.event.inputs.release_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release URL**: https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY

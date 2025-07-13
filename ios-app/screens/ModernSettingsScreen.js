@@ -14,10 +14,12 @@ import GlassButton from '../components/ui/GlassButton';
 import Typography, { Heading, Body, Label } from '../components/ui/Typography';
 import Theme from '../theme/DesignSystem';
 import authService from '../services/auth';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 
 export default function ModernSettingsScreen({ navigation }) {
   const [userInfo, setUserInfo] = useState(null);
   const [appVersion] = useState('1.0.0');
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     loadUserInfo();
@@ -154,13 +156,24 @@ export default function ModernSettingsScreen({ navigation }) {
             </Label>
           </View>
           
-          <GlassButton
-            title="Déconnexion"
-            variant="danger"
-            size="medium"
-            onPress={handleLogout}
-            style={styles.logoutButton}
-          />
+          <View style={styles.accountActions}>
+            <GlassButton
+              title="Changer mot de passe"
+              variant="glass"
+              size="small"
+              onPress={() => setShowChangePassword(true)}
+              style={styles.changePasswordButton}
+              icon="key"
+            />
+            
+            <GlassButton
+              title="Déconnexion"
+              variant="danger"
+              size="medium"
+              onPress={handleLogout}
+              style={styles.logoutButton}
+            />
+          </View>
         </View>
       ) : (
         <View style={styles.authButtons}>
@@ -394,6 +407,14 @@ export default function ModernSettingsScreen({ navigation }) {
           {renderDataSection()}
           {renderAppSection()}
         </ScrollView>
+        
+        <ChangePasswordModal
+          visible={showChangePassword}
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={() => {
+            Alert.alert('Succès', 'Votre mot de passe a été modifié avec succès.');
+          }}
+        />
       </LinearGradient>
     </ImageBackground>
   );
@@ -442,8 +463,17 @@ const styles = StyleSheet.create({
   userDetails: {
     flex: 1,
   },
+  accountActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Theme.spacing[2],
+  },
+  changePasswordButton: {
+    paddingHorizontal: Theme.spacing[3],
+    paddingVertical: Theme.spacing[2],
+  },
   logoutButton: {
-    marginLeft: Theme.spacing[3],
+    marginLeft: Theme.spacing[2],
   },
   authButtons: {
     flexDirection: 'row',

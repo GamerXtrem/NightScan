@@ -1,0 +1,316 @@
+name: Build - Raspberry Pi Image
+
+on:
+  push:
+    paths:
+      - 'NightScanPi/**'
+      - '.github/workflows/build-pi-image.yml'
+  workflow_dispatch:
+    inputs:
+      pi_version:
+        description: 'Target Raspberry Pi version'
+        required: false
+        default: 'pi-zero-2w'
+        type: choice
+        options:
+          - pi-zero-2w
+          - pi-4
+          - pi-3
+      include_models:
+        description: 'Include ML models in image'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  IMAGE_NAME: nightscan-pi
+  BASE_IMAGE: raspios-bullseye-arm64-lite
+
+jobs:
+  build-pi-image:
+    name: Build Raspberry Pi Image
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/arm64,linux/arm/v7
+      
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qemu-user-static \
+            binfmt-support \
+            parted \
+            kpartx \
+            rsync \
+            zip
+      
+      - name: Download base image
+        run: |
+          # Download Raspberry Pi OS Lite
+          wget -q https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2023-05-03/2023-05-03-raspios-bullseye-arm64-lite.img.xz
+          xz -d 2023-05-03-raspios-bullseye-arm64-lite.img.xz
+          mv 2023-05-03-raspios-bullseye-arm64-lite.img base.img
+      
+      - name: Mount image
+        id: mount
+        run: |
+          # Create loop device
+          sudo losetup -P /dev/loop0 base.img
+          
+          # Get partition info
+          sudo fdisk -l /dev/loop0
+          
+          # Mount partitions
+          sudo mkdir -p /mnt/pi/boot /mnt/pi/root
+          sudo mount /dev/loop0p1 /mnt/pi/boot
+          sudo mount /dev/loop0p2 /mnt/pi/root
+          
+          # Enable QEMU for ARM
+          sudo cp /usr/bin/qemu-aarch64-static /mnt/pi/root/usr/bin/
+      
+      - name: Configure base system
+        run: |
+          # Copy NightScanPi files
+          sudo cp -r NightScanPi /mnt/pi/root/opt/nightscan
+          
+          # Create firstboot script
+          sudo tee /mnt/pi/boot/firstrun.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          # Enable SSH
+          systemctl enable ssh
+          systemctl start ssh
+          
+          # Set hostname
+          hostnamectl set-hostname nightscan-pi
+          
+          # Update system
+          apt-get update
+          apt-get upgrade -y
+          
+          # Install dependencies
+          apt-get install -y \
+            python3-pip \
+            python3-venv \
+            python3-dev \
+            git \
+            ffmpeg \
+            portaudio19-dev \
+            i2c-tools \
+            libatlas-base-dev \
+            libopenjp2-7 \
+            libtiff5
+          
+          # Enable I2C and Camera
+          raspi-config nonint do_camera 0
+          raspi-config nonint do_i2c 0
+          raspi-config nonint do_spi 0
+          
+          # Install NightScanPi
+          cd /opt/nightscan
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip wheel
+          pip install -r requirements.txt
+          
+          # Setup services
+          cp /opt/nightscan/systemd/*.service /etc/systemd/system/
+          systemctl daemon-reload
+          systemctl enable nightscan-capture.service
+          systemctl enable nightscan-sync.service
+          
+          # Configure audio
+          /opt/nightscan/Hardware/configure_respeaker_audio.sh
+          
+          # Configure camera
+          /opt/nightscan/Hardware/configure_camera_boot.sh
+          
+          # Clean up
+          rm -f /boot/firstrun.sh
+          sed -i 's| systemd.run_success_action=none||' /boot/cmdline.txt
+          EOF
+          
+          sudo chmod +x /mnt/pi/boot/firstrun.sh
+      
+      - name: Configure boot settings
+        run: |
+          # Enable camera and I2C in config.txt
+          echo "" | sudo tee -a /mnt/pi/boot/config.txt
+          echo "# NightScan Configuration" | sudo tee -a /mnt/pi/boot/config.txt
+          echo "start_x=1" | sudo tee -a /mnt/pi/boot/config.txt
+          echo "gpu_mem=128" | sudo tee -a /mnt/pi/boot/config.txt
+          echo "dtparam=i2c_arm=on" | sudo tee -a /mnt/pi/boot/config.txt
+          echo "dtparam=spi=on" | sudo tee -a /mnt/pi/boot/config.txt
+          echo "enable_uart=1" | sudo tee -a /mnt/pi/boot/config.txt
+          
+          # Add firstrun to cmdline.txt
+          sudo sed -i 's|$| systemd.run_success_action=none systemd.unit=kernel-command-line.target quiet init=/boot/firstrun.sh|' /mnt/pi/boot/cmdline.txt
+          
+          # Enable SSH by default
+          sudo touch /mnt/pi/boot/ssh
+          
+          # Create wpa_supplicant template
+          sudo tee /mnt/pi/boot/wpa_supplicant.conf.template << 'EOF'
+          country=US
+          ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+          update_config=1
+          
+          network={
+              ssid="YOUR_WIFI_SSID"
+              psk="YOUR_WIFI_PASSWORD"
+              key_mgmt=WPA-PSK
+          }
+          EOF
+      
+      - name: Install ML models
+        if: github.event.inputs.include_models == 'true' || github.event_name == 'push'
+        run: |
+          # Create models directory
+          sudo mkdir -p /mnt/pi/root/opt/nightscan/models/audio
+          sudo mkdir -p /mnt/pi/root/opt/nightscan/models/photo
+          
+          # Download model artifacts (if available)
+          # This would normally download from releases or model registry
+          echo "Model installation placeholder"
+      
+      - name: Optimize for Pi version
+        run: |
+          PI_VERSION=${{ github.event.inputs.pi_version || 'pi-zero-2w' }}
+          
+          case $PI_VERSION in
+            pi-zero-2w)
+              # Optimize for Pi Zero 2W (512MB RAM)
+              echo "vm.swappiness=60" | sudo tee -a /mnt/pi/root/etc/sysctl.conf
+              echo "vm.vfs_cache_pressure=50" | sudo tee -a /mnt/pi/root/etc/sysctl.conf
+              
+              # Create larger swap
+              sudo tee /mnt/pi/root/etc/dphys-swapfile << EOF
+          CONF_SWAPSIZE=1024
+          CONF_SWAPFACTOR=2
+          CONF_MAXSWAP=2048
+          EOF
+              ;;
+            pi-4)
+              # Optimize for Pi 4 (2GB+ RAM)
+              echo "gpu_mem=256" | sudo tee -a /mnt/pi/boot/config.txt
+              ;;
+          esac
+      
+      - name: Create system info
+        run: |
+          # Create build info
+          sudo tee /mnt/pi/root/opt/nightscan/build-info.json << EOF
+          {
+            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_commit": "${{ github.sha }}",
+            "git_branch": "${{ github.ref_name }}",
+            "pi_version": "${{ github.event.inputs.pi_version || 'pi-zero-2w' }}",
+            "models_included": ${{ github.event.inputs.include_models || 'true' }}
+          }
+          EOF
+      
+      - name: Cleanup and unmount
+        run: |
+          # Remove QEMU binary
+          sudo rm -f /mnt/pi/root/usr/bin/qemu-aarch64-static
+          
+          # Unmount
+          sudo umount /mnt/pi/boot
+          sudo umount /mnt/pi/root
+          sudo losetup -d /dev/loop0
+          
+          # Rename image
+          mv base.img nightscan-pi-${{ github.event.inputs.pi_version || 'pi-zero-2w' }}.img
+      
+      - name: Compress image
+        run: |
+          # Compress with zip for better compatibility
+          zip -9 nightscan-pi-${{ github.event.inputs.pi_version || 'pi-zero-2w' }}.zip \
+            nightscan-pi-${{ github.event.inputs.pi_version || 'pi-zero-2w' }}.img
+          
+          # Generate checksum
+          sha256sum nightscan-pi-${{ github.event.inputs.pi_version || 'pi-zero-2w' }}.zip > \
+            nightscan-pi-${{ github.event.inputs.pi_version || 'pi-zero-2w' }}.zip.sha256
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: nightscan-pi-image-${{ github.event.inputs.pi_version || 'pi-zero-2w' }}
+          path: |
+            nightscan-pi-*.zip
+            nightscan-pi-*.zip.sha256
+          retention-days: 30
+      
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            nightscan-pi-*.zip
+            nightscan-pi-*.zip.sha256
+          body: |
+            ## Raspberry Pi Image
+            
+            This image includes:
+            - NightScan Pi software
+            - All required dependencies
+            - Automatic setup on first boot
+            - Pre-configured services
+            
+            ### Installation
+            1. Download the image for your Pi model
+            2. Write to SD card using Raspberry Pi Imager or balenaEtcher
+            3. (Optional) Add your WiFi credentials to `wpa_supplicant.conf`
+            4. Boot your Raspberry Pi
+            5. SSH will be enabled by default (user: pi, password: raspberry)
+            
+            ### Supported Models
+            - Raspberry Pi Zero 2 W (recommended)
+            - Raspberry Pi 4
+            - Raspberry Pi 3
+
+  # Build Docker image for Pi
+  build-pi-docker:
+    name: Build Pi Docker Image
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./NightScanPi
+          file: ./NightScanPi/Dockerfile
+          platforms: linux/arm64,linux/arm/v7
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/nightscan-pi:latest
+            ghcr.io/${{ github.repository_owner }}/nightscan-pi:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
