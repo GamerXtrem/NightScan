@@ -67,9 +67,9 @@ API_VERSIONS: Dict[str, APIVersionConfig] = {
 
 # Legacy route mappings for backward compatibility
 LEGACY_ROUTE_MAPPINGS = {
-    # Authentication routes
+    # Authentication routes - old legacy mappings
     "/api/auth/login": "/api/v1/auth/login",
-    "/api/auth/register": "/api/v1/auth/register",
+    "/api/auth/register": "/api/v1/auth/register", 
     "/api/auth/refresh": "/api/v1/auth/refresh",
     "/api/auth/logout": "/api/v1/auth/logout",
     "/api/auth/verify": "/api/v1/auth/verify",
@@ -107,6 +107,27 @@ LEGACY_ROUTE_MAPPINGS = {
 }
 
 
+# RESTful route redirections for better API design
+# These handle redirections from non-RESTful endpoints to RESTful ones
+RESTFUL_REDIRECTIONS = {
+    # Authentication - redirect verbs to RESTful resources
+    "/api/v1/auth/login": ("/api/v1/sessions", "POST"),
+    "/api/v1/auth/logout": ("/api/v1/sessions", "DELETE"), 
+    "/api/v1/auth/register": ("/api/v1/users", "POST"),
+    "/api/v1/auth/refresh": ("/api/v1/tokens", "POST"),
+    "/api/v1/auth/verify": ("/api/v1/tokens/current", "GET"),
+    # Analytics - redirect to proper exports with query params
+    "/api/v1/analytics/export/csv": ("/api/v1/analytics/exports?format=csv", "GET"),
+    "/api/v1/analytics/export/pdf": ("/api/v1/analytics/exports?format=pdf", "GET"),
+    # Cache - redirect clear verb to DELETE method
+    "/api/v1/cache/clear": ("/api/v1/cache", "DELETE"),
+    # Files - redirect upload verb to POST resource
+    "/api/v1/files/upload": ("/api/v1/files", "POST"),
+    # Predictions - redirect analyze verb to POST resource
+    "/api/v1/predictions/analyze": ("/api/v1/predictions", "POST"),
+}
+
+
 # Feature flags per version
 VERSION_FEATURES = {
     "v1": {
@@ -138,6 +159,7 @@ class APIVersionManager:
     def __init__(self):
         self.versions = API_VERSIONS
         self.legacy_mappings = LEGACY_ROUTE_MAPPINGS
+        self.restful_redirections = RESTFUL_REDIRECTIONS
         self.feature_flags = VERSION_FEATURES
 
     def get_version_config(self, version: str) -> Optional[APIVersionConfig]:
@@ -193,6 +215,19 @@ class APIVersionManager:
                 # Replace the prefix
                 return path.replace(legacy[:-1], versioned[:-1])
 
+        return None
+
+    def get_restful_redirection(self, path: str, method: str) -> Optional[tuple]:
+        """Get RESTful redirection for a non-RESTful endpoint.
+        
+        Returns:
+            Tuple of (new_path, new_method) if redirection exists, None otherwise
+        """
+        if path in self.restful_redirections:
+            target_path, target_method = self.restful_redirections[path]
+            # Only redirect if the method matches or if target method is different
+            if target_method != method:
+                return (target_path, target_method)
         return None
 
     def is_feature_enabled(self, version: str, feature: str) -> bool:

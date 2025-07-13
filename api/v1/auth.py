@@ -19,37 +19,68 @@ def create_auth_blueprint() -> Blueprint:
     """Create auth blueprint for API v1."""
     auth_bp = Blueprint("auth_v1", __name__)
 
-    # Register endpoints in the registry
+    # Register RESTful endpoints in the registry
     endpoints = [
+        {
+            "path": "/api/v1/sessions",
+            "methods": ["POST"],
+            "description": "Create new user session (login)",
+            "tags": ["auth", "sessions"],
+        },
+        {
+            "path": "/api/v1/sessions",
+            "methods": ["DELETE"],
+            "description": "Destroy user session (logout)",
+            "tags": ["auth", "sessions"],
+        },
+        {
+            "path": "/api/v1/users",
+            "methods": ["POST"],
+            "description": "Create new user account (register)",
+            "tags": ["auth", "users"],
+        },
+        {
+            "path": "/api/v1/tokens",
+            "methods": ["POST"],
+            "description": "Create new access token (refresh)",
+            "tags": ["auth", "tokens"],
+        },
+        {
+            "path": "/api/v1/tokens/current",
+            "methods": ["GET"],
+            "description": "Get current token information (verify)",
+            "tags": ["auth", "tokens"],
+        },
+        # Legacy endpoints for backward compatibility
         {
             "path": "/api/v1/auth/login",
             "methods": ["POST"],
-            "description": "Authenticate user and return JWT tokens",
-            "tags": ["auth", "authentication"],
-        },
-        {
-            "path": "/api/v1/auth/register",
-            "methods": ["POST"],
-            "description": "Register new user and return JWT tokens",
-            "tags": ["auth", "registration"],
-        },
-        {
-            "path": "/api/v1/auth/refresh",
-            "methods": ["POST"],
-            "description": "Refresh access token using refresh token",
-            "tags": ["auth", "token"],
+            "description": "[DEPRECATED] Use POST /api/v1/sessions instead",
+            "tags": ["auth", "deprecated"],
         },
         {
             "path": "/api/v1/auth/logout",
             "methods": ["POST"],
-            "description": "Logout user and revoke tokens",
-            "tags": ["auth", "logout"],
+            "description": "[DEPRECATED] Use DELETE /api/v1/sessions instead",
+            "tags": ["auth", "deprecated"],
+        },
+        {
+            "path": "/api/v1/auth/register",
+            "methods": ["POST"],
+            "description": "[DEPRECATED] Use POST /api/v1/users instead",
+            "tags": ["auth", "deprecated"],
+        },
+        {
+            "path": "/api/v1/auth/refresh",
+            "methods": ["POST"],
+            "description": "[DEPRECATED] Use POST /api/v1/tokens instead",
+            "tags": ["auth", "deprecated"],
         },
         {
             "path": "/api/v1/auth/verify",
             "methods": ["GET"],
-            "description": "Verify if current token is valid",
-            "tags": ["auth", "token"],
+            "description": "[DEPRECATED] Use GET /api/v1/tokens/current instead",
+            "tags": ["auth", "deprecated"],
         },
     ]
 
@@ -60,46 +91,105 @@ def create_auth_blueprint() -> Blueprint:
             version="v1",
             description=endpoint["description"],
             tags=endpoint["tags"],
-            requires_auth=endpoint["path"] not in ["/api/v1/auth/login", "/api/v1/auth/register"],
+            requires_auth=endpoint["path"] not in ["/api/v1/sessions", "/api/v1/users", "/api/v1/auth/login", "/api/v1/auth/register"],
         )
 
-    # Routes with versioning decorators
+    # RESTful routes with proper HTTP methods
 
-    @auth_bp.route("/login", methods=["POST"])
-    @api_version("v1", description="User login", tags=["auth"])
-    def login_v1():
-        """Login endpoint for API v1."""
+    @auth_bp.route("/sessions", methods=["POST"])
+    @api_version("v1", description="Create user session", tags=["auth", "sessions"])
+    def create_session():
+        """Create new user session (RESTful login)."""
         # Use the original login logic
         return original_login()
 
-    @auth_bp.route("/register", methods=["POST"])
-    @api_version("v1", description="User registration", tags=["auth"])
-    def register_v1():
-        """Register endpoint for API v1."""
-        # Use the original register logic
-        return original_register()
-
-    @auth_bp.route("/refresh", methods=["POST"])
-    @api_version("v1", description="Token refresh", tags=["auth"])
-    def refresh_v1():
-        """Refresh token endpoint for API v1."""
-        # Use the original refresh logic
-        return original_refresh()
-
-    @auth_bp.route("/logout", methods=["POST"])
-    @api_version("v1", description="User logout", tags=["auth"])
+    @auth_bp.route("/sessions", methods=["DELETE"])
+    @api_version("v1", description="Destroy user session", tags=["auth", "sessions"])
     @version_required(min_version="v1")
-    def logout_v1():
-        """Logout endpoint for API v1."""
+    def destroy_session():
+        """Destroy user session (RESTful logout)."""
         # Use the original logout logic
         return original_logout()
 
-    @auth_bp.route("/verify", methods=["GET"])
-    @api_version("v1", description="Token verification", tags=["auth"])
-    def verify_v1():
-        """Verify token endpoint for API v1."""
+    @auth_bp.route("/users", methods=["POST"])
+    @api_version("v1", description="Create user account", tags=["auth", "users"])
+    def create_user():
+        """Create new user account (RESTful register)."""
+        # Use the original register logic
+        return original_register()
+
+    @auth_bp.route("/tokens", methods=["POST"])
+    @api_version("v1", description="Create access token", tags=["auth", "tokens"])
+    def create_token():
+        """Create new access token (RESTful refresh)."""
+        # Use the original refresh logic
+        return original_refresh()
+
+    @auth_bp.route("/tokens/current", methods=["GET"])
+    @api_version("v1", description="Get current token info", tags=["auth", "tokens"])
+    def get_current_token():
+        """Get current token information (RESTful verify)."""
         # Use the original verify logic
         return original_verify()
+
+    # Legacy routes for backward compatibility (deprecated)
+
+    @auth_bp.route("/login", methods=["POST"])
+    @api_version("v1", description="[DEPRECATED] Use POST /sessions", tags=["auth", "deprecated"])
+    def login_v1():
+        """Login endpoint for API v1 (deprecated)."""
+        # Add deprecation header and use the original login logic
+        response = original_login()
+        if hasattr(response, 'headers'):
+            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use POST /api/v1/sessions instead.'
+            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/login'
+            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/sessions'
+        return response
+
+    @auth_bp.route("/register", methods=["POST"])
+    @api_version("v1", description="[DEPRECATED] Use POST /users", tags=["auth", "deprecated"])
+    def register_v1():
+        """Register endpoint for API v1 (deprecated)."""
+        response = original_register()
+        if hasattr(response, 'headers'):
+            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use POST /api/v1/users instead.'
+            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/register'
+            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/users'
+        return response
+
+    @auth_bp.route("/refresh", methods=["POST"])
+    @api_version("v1", description="[DEPRECATED] Use POST /tokens", tags=["auth", "deprecated"])
+    def refresh_v1():
+        """Refresh token endpoint for API v1 (deprecated)."""
+        response = original_refresh()
+        if hasattr(response, 'headers'):
+            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use POST /api/v1/tokens instead.'
+            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/refresh'
+            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/tokens'
+        return response
+
+    @auth_bp.route("/logout", methods=["POST"])
+    @api_version("v1", description="[DEPRECATED] Use DELETE /sessions", tags=["auth", "deprecated"])
+    @version_required(min_version="v1")
+    def logout_v1():
+        """Logout endpoint for API v1 (deprecated)."""
+        response = original_logout()
+        if hasattr(response, 'headers'):
+            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use DELETE /api/v1/sessions instead.'
+            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/logout'
+            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/sessions'
+        return response
+
+    @auth_bp.route("/verify", methods=["GET"])
+    @api_version("v1", description="[DEPRECATED] Use GET /tokens/current", tags=["auth", "deprecated"])
+    def verify_v1():
+        """Verify token endpoint for API v1 (deprecated)."""
+        response = original_verify()
+        if hasattr(response, 'headers'):
+            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use GET /api/v1/tokens/current instead.'
+            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/verify'
+            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/tokens/current'
+        return response
 
     # Additional v1-specific auth endpoints
 

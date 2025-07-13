@@ -29,8 +29,9 @@ def create_analytics_blueprint() -> Blueprint:
         logger.warning("Analytics dashboard module not available, using placeholder endpoints")
         analytics_available = False
 
-    # Register endpoints in the registry
+    # Register RESTful endpoints in the registry
     endpoints = [
+        # RESTful endpoints
         {
             "path": "/api/v1/analytics/metrics",
             "methods": ["GET"],
@@ -56,22 +57,29 @@ def create_analytics_blueprint() -> Blueprint:
             "tags": ["analytics", "zones"],
         },
         {
-            "path": "/api/v1/analytics/export/csv",
+            "path": "/api/v1/analytics/exports",
             "methods": ["GET"],
-            "description": "Export analytics data as CSV",
-            "tags": ["analytics", "export"],
-        },
-        {
-            "path": "/api/v1/analytics/export/pdf",
-            "methods": ["GET"],
-            "description": "Export analytics report as PDF",
-            "tags": ["analytics", "export"],
+            "description": "Export analytics data (use ?format=csv or ?format=pdf)",
+            "tags": ["analytics", "exports"],
         },
         {
             "path": "/api/v1/analytics/dashboard",
             "methods": ["GET"],
             "description": "Get dashboard summary data",
             "tags": ["analytics", "dashboard"],
+        },
+        # Legacy endpoints for backward compatibility
+        {
+            "path": "/api/v1/analytics/export/csv",
+            "methods": ["GET"],
+            "description": "[DEPRECATED] Use GET /api/v1/analytics/exports?format=csv instead",
+            "tags": ["analytics", "deprecated"],
+        },
+        {
+            "path": "/api/v1/analytics/export/pdf",
+            "methods": ["GET"],
+            "description": "[DEPRECATED] Use GET /api/v1/analytics/exports?format=pdf instead",
+            "tags": ["analytics", "deprecated"],
         },
     ]
 
@@ -208,47 +216,136 @@ def create_analytics_blueprint() -> Blueprint:
                 200,
             )
 
+    # RESTful export endpoint 
+    @analytics_bp.route("/exports", methods=["GET"])
+    @api_version("v1", description="Export analytics data", tags=["analytics", "exports"])
+    @version_required(min_version="v1", features=["data_export"])
+    def get_exports_v1():
+        """Export analytics data in various formats (RESTful)."""
+        format_type = request.args.get("format", "json").lower()
+        
+        if format_type == "csv":
+            if analytics_available:
+                try:
+                    return export_csv()
+                except Exception as e:
+                    logger.error(f"Error exporting CSV: {e}")
+                    return jsonify({"error": "Failed to export CSV"}), 500
+            else:
+                # Return sample CSV
+                csv_data = "Date,Species,Zone,Count\n"
+                csv_data += "2024-01-01,Deer,Zone A,5\n"
+                csv_data += "2024-01-01,Fox,Zone B,3\n"
+                return (
+                    csv_data,
+                    200,
+                    {"Content-Type": "text/csv", "Content-Disposition": "attachment; filename=analytics_export.csv"},
+                )
+        
+        elif format_type == "pdf":
+            if analytics_available:
+                try:
+                    return export_pdf()
+                except Exception as e:
+                    logger.error(f"Error exporting PDF: {e}")
+                    return jsonify({"error": "Failed to export PDF"}), 500
+            else:
+                return (
+                    jsonify(
+                        {"error": "PDF export not available", "message": "PDF export functionality is being implemented"}
+                    ),
+                    501,
+                )
+        
+        elif format_type == "json":
+            # Return analytics data as JSON
+            if analytics_available:
+                try:
+                    metrics = get_detection_metrics()
+                    species = get_species_statistics()
+                    zones = get_zone_analytics()
+                    
+                    return jsonify({
+                        "export_format": "json",
+                        "timestamp": "2024-01-15T10:30:00Z",
+                        "metrics": metrics,
+                        "species": species,
+                        "zones": zones
+                    }), 200
+                except Exception as e:
+                    logger.error(f"Error exporting JSON: {e}")
+                    return jsonify({"error": "Failed to export data"}), 500
+            else:
+                return jsonify({
+                    "export_format": "json",
+                    "timestamp": "2024-01-15T10:30:00Z",
+                    "metrics": {"total_detections": 1234, "unique_species": 15},
+                    "species": [{"name": "Deer", "count": 234}],
+                    "zones": [{"name": "Zone A", "detections": 456}]
+                }), 200
+        
+        else:
+            return jsonify({
+                "error": "Invalid format",
+                "message": "Supported formats: csv, pdf, json",
+                "supported_formats": ["csv", "pdf", "json"]
+            }), 400
+
+    # Legacy export endpoints (deprecated)
     @analytics_bp.route("/export/csv", methods=["GET"])
-    @api_version("v1", description="Export CSV", tags=["analytics", "export"])
+    @api_version("v1", description="[DEPRECATED] Export CSV", tags=["analytics", "deprecated"])
     @version_required(min_version="v1", features=["data_export"])
     def export_csv_v1():
-        """Export analytics data as CSV."""
+        """Export analytics data as CSV (deprecated)."""
         if analytics_available:
             try:
-                return export_csv()
+                response = export_csv()
             except Exception as e:
                 logger.error(f"Error exporting CSV: {e}")
-                return jsonify({"error": "Failed to export CSV"}), 500
+                response = jsonify({"error": "Failed to export CSV"}), 500
         else:
             # Return sample CSV
             csv_data = "Date,Species,Zone,Count\n"
             csv_data += "2024-01-01,Deer,Zone A,5\n"
             csv_data += "2024-01-01,Fox,Zone B,3\n"
-
-            return (
+            response = (
                 csv_data,
                 200,
                 {"Content-Type": "text/csv", "Content-Disposition": "attachment; filename=analytics_export.csv"},
             )
+        
+        # Add deprecation headers
+        if hasattr(response, 'headers'):
+            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use GET /api/v1/analytics/exports?format=csv instead.'
+            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/analytics/export/csv'
+            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/analytics/exports?format=csv'
+        return response
 
     @analytics_bp.route("/export/pdf", methods=["GET"])
-    @api_version("v1", description="Export PDF report", tags=["analytics", "export"])
+    @api_version("v1", description="[DEPRECATED] Export PDF", tags=["analytics", "deprecated"])
     @version_required(min_version="v1", features=["data_export"])
     def export_pdf_v1():
-        """Export analytics report as PDF."""
+        """Export analytics report as PDF (deprecated)."""
         if analytics_available:
             try:
-                return export_pdf()
+                response = export_pdf()
             except Exception as e:
                 logger.error(f"Error exporting PDF: {e}")
-                return jsonify({"error": "Failed to export PDF"}), 500
+                response = jsonify({"error": "Failed to export PDF"}), 500
         else:
-            return (
+            response = (
                 jsonify(
                     {"error": "PDF export not available", "message": "PDF export functionality is being implemented"}
                 ),
                 501,
             )
+        
+        # Add deprecation headers
+        if hasattr(response, 'headers'):
+            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use GET /api/v1/analytics/exports?format=pdf instead.'
+            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/analytics/export/pdf'  
+            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/analytics/exports?format=pdf'
+        return response
 
     @analytics_bp.route("/dashboard", methods=["GET"])
     @api_version("v1", description="Dashboard summary", tags=["analytics", "dashboard"])

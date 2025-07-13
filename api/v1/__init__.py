@@ -64,6 +64,16 @@ def create_v1_blueprint() -> Blueprint:
         logger.warning(f"Could not import files blueprint: {e}")
 
     try:
+        # Predictions API
+        from .predictions import create_predictions_blueprint
+
+        predictions_bp = create_predictions_blueprint()
+        v1_bp.register_blueprint(predictions_bp, url_prefix="/predictions")
+        logger.info("Registered v1 predictions blueprint")
+    except ImportError as e:
+        logger.warning(f"Could not import predictions blueprint: {e}")
+
+    try:
         # Password Reset API
         from .password_reset import create_password_reset_blueprint
 
