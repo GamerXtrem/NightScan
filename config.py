@@ -113,12 +113,99 @@ class ModelConfig:
 
 @dataclass
 class LoggingConfig:
-    """Logging configuration."""
+    """Enhanced logging configuration with rotation support."""
     level: str = "INFO"
     format: str = "json"  # json or text
     file: Optional[str] = None
+    
+    # Log rotation settings
+    log_dir: str = "logs"
     max_file_size: int = 10485760  # 10MB
     backup_count: int = 5
+    compress_backups: bool = True
+    enable_console: bool = True
+    rotation_time: str = "midnight"  # for TimedRotatingFileHandler
+    retention_days: int = 30
+    
+    # Environment-specific settings
+    environment_configs: Dict[str, Dict[str, Any]] = field(default_factory=lambda: {
+        "development": {
+            "log_dir": "logs",
+            "max_file_size": 10 * 1024 * 1024,  # 10MB
+            "backup_count": 5,
+            "level": "DEBUG",
+            "enable_console": True,
+            "compress_backups": False,
+            "retention_days": 7
+        },
+        "staging": {
+            "log_dir": "/var/log/nightscan",
+            "max_file_size": 50 * 1024 * 1024,  # 50MB
+            "backup_count": 10,
+            "level": "INFO",
+            "enable_console": True,
+            "compress_backups": True,
+            "retention_days": 30
+        },
+        "production": {
+            "log_dir": "/var/log/nightscan",
+            "max_file_size": 100 * 1024 * 1024,  # 100MB
+            "backup_count": 20,
+            "level": "INFO",
+            "enable_console": False,
+            "compress_backups": True,
+            "retention_days": 90
+        },
+        "raspberry_pi": {
+            "log_dir": "/home/pi/nightscan/logs",
+            "max_file_size": 20 * 1024 * 1024,  # 20MB
+            "backup_count": 7,
+            "level": "INFO",
+            "enable_console": True,
+            "compress_backups": True,
+            "retention_days": 14
+        }
+    })
+    
+    # Specialized logging settings
+    specialized_loggers: Dict[str, str] = field(default_factory=lambda: {
+        'security': 'security.log',
+        'audit': 'audit.log',
+        'access': 'access.log',
+        'performance': 'performance.log',
+        'prediction': 'prediction.log',
+        'circuit_breaker': 'circuit_breaker.log',
+        'celery': 'celery.log',
+        'api': 'api.log'
+    })
+    
+    def get_environment_config(self, environment: str) -> Dict[str, Any]:
+        """Get configuration for specific environment."""
+        return self.environment_configs.get(environment, self.environment_configs["development"])
+    
+    def get_log_rotation_config(self, environment: str = None):
+        """Get LogRotationConfig object for the specified environment."""
+        from log_utils import LogRotationConfig
+        
+        if environment is None:
+            environment = os.environ.get('NIGHTSCAN_ENV', 'development')
+        
+        env_config = self.get_environment_config(environment)
+        
+        # Override with environment variables if provided
+        log_dir = os.environ.get('NIGHTSCAN_LOG_DIR', env_config.get('log_dir', self.log_dir))
+        
+        return LogRotationConfig(
+            log_dir=log_dir,
+            max_file_size=env_config.get('max_file_size', self.max_file_size),
+            backup_count=env_config.get('backup_count', self.backup_count),
+            compress_backups=env_config.get('compress_backups', self.compress_backups),
+            use_json=(self.format == "json"),
+            level=env_config.get('level', self.level),
+            enable_console=env_config.get('enable_console', self.enable_console),
+            rotation_time=self.rotation_time,
+            retention_days=env_config.get('retention_days', self.retention_days)
+        )
 
 
 @dataclass
@@ -384,6 +471,44 @@ def load_config_for_environment(env: str) -> NightScanConfig:
         return load_config()
 
 
+def initialize_logging_from_config(config: NightScanConfig) -> None:
+    """Initialize logging system using configuration."""
+    from log_utils import setup_logging, setup_specialized_loggers
+    
+    # Get log rotation config for current environment
+    log_rotation_config = config.logging.get_log_rotation_config(config.environment)
+    
+    # Determine log file path
+    log_file = config.logging.file
+    if not log_file:
+        if config.environment == 'development':
+            log_file = "logs/dev.log"
+        elif config.environment == 'staging':
+            log_file = "/var/log/nightscan/staging.log"
+        elif config.environment == 'production':
+            log_file = "/var/log/nightscan/app.log"
+        else:  # raspberry_pi or custom
+            log_file = os.path.join(log_rotation_config.log_dir, "nightscan.log")
+    
+    # Override with environment variable if provided
+    log_file = os.environ.get('NIGHTSCAN_LOG_FILE', log_file)
+    
+    # Setup main logging
+    setup_logging(config=log_rotation_config, log_file=log_file)
+    
+    # Setup specialized loggers
+    specialized_loggers = setup_specialized_loggers(log_rotation_config)
+    
+    # Log initialization
+    logger = logging.getLogger('nightscan.config')
+    logger.info(f"Logging initialized from configuration for environment: {config.environment}")
+    logger.info(f"Main log file: {log_file}")
+    logger.info(f"Log directory: {log_rotation_config.log_dir}")
+    logger.info(f"Specialized loggers: {list(specialized_loggers.keys())}")
+    
+    return specialized_loggers
+
+
 def validate_config(config: NightScanConfig) -> List[str]:
     """Validate configuration and return list of errors."""
     errors = []
@@ -460,7 +585,13 @@ def create_example_config(output_file: str = "config/example.json"):
         "logging": {
             "level": "INFO",
             "format": "json",
-            "file": "/var/log/nightscan/app.log"
+            "file": "/var/log/nightscan/app.log",
+            "log_dir": "/var/log/nightscan",
+            "max_file_size": 104857600,  # 100MB
+            "backup_count": 20,
+            "compress_backups": True,
+            "enable_console": False,
+            "retention_days": 90
         }
     }
     

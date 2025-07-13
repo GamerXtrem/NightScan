@@ -88,7 +88,7 @@ export async function registerForPushNotificationsAsync() {
     // Store token locally
     await AsyncStorage.setItem('pushToken', pushToken);
     
-    console.log('Push token:', pushToken);
+    console.log('Push token registered successfully:', pushToken ? `${pushToken.substring(0, 8)}***` : 'none');
     return pushToken;
   } catch (error) {
     console.error('Error getting push token:', error);

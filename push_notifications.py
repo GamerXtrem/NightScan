@@ -152,7 +152,7 @@ class APNSService:
             )
             
             await self.client.send_notification(request)
-            logger.debug(f"APNs notification sent to {device_token}")
+            logger.debug(f"APNs notification sent to device {str(device_token)[:8]}***")
             return True
             
         except Exception as e:
@@ -192,7 +192,7 @@ class FCMService:
             )
             
             if result and result.get('success'):
-                logger.debug(f"FCM notification sent to {device_token}")
+                logger.debug(f"FCM notification sent to device {str(device_token)[:8]}***")
                 return True
             else:
                 logger.error(f"FCM notification failed: {result}")
@@ -320,7 +320,7 @@ class PushNotificationService:
                 if isinstance(result, Exception):
                     results['failed'] += 1
                     results['errors'].append(str(result))
-                    logger.error(f"Failed to send to {device_token.token}: {result}")
+                    logger.error(f"Failed to send to device {device_token.token[:8]}***: {result}")
                 elif result:
                     results['sent'] += 1
                     results['platforms'][platform] += 1
