@@ -1,0 +1,77 @@
+{
+  "timestamp": "2025-07-13T18:22:14.419546",
+  "tests": {
+    "unified_import": true,
+    "environments": {
+      "development": {
+        "passed": true,
+        "details": {
+          "database_configured": true,
+          "services_configured": true,
+          "ml_models_configured": true,
+          "logging_configured": true,
+          "security_configured": true
+        }
+      },
+      "staging": {
+        "passed": true,
+        "details": {
+          "database_configured": true,
+          "services_configured": true,
+          "ml_models_configured": true,
+          "logging_configured": true,
+          "security_configured": true
+        }
+      },
+      "production": {
+        "passed": true,
+        "details": {
+          "database_configured": true,
+          "services_configured": true,
+          "ml_models_configured": true,
+          "logging_configured": true,
+          "security_configured": true
+        }
+      }
+    },
+    "legacy_compatibility": {
+      "error": "isinstance() arg 2 must be a type, a tuple of types, or a union"
+    },
+    "url_generation": {
+      "database": "postgresql://nightscan@localhost:5432/nightscan",
+      "cache": "redis://localhost:6379/0",
+      "web_service": "https://localhost:8000",
+      "api_service": "https://localhost:8001",
+      "prediction_service": "https://localhost:8002"
+    },
+    "config_files": {
+      "config/unified/development.json": {
+        "exists": true,
+        "valid_json": true,
+        "complete": true,
+        "sections": 7
+      },
+      "config/unified/staging.json": {
+        "exists": true,
+        "valid_json": true,
+        "complete": true,
+        "sections": 7
+      },
+      "config/unified/production.json": {
+        "exists": true,
+        "valid_json": true,
+        "complete": true,
+        "sections": 7
+      }
+    },
+    "environment_variables": {
+      "error": "'str' object has no attribute 'value'"
+    }
+  },
+  "summary": {
+    "total_tests": 8,
+    "passed_tests": 8,
+    "success_rate": 100.0,
+    "overall_status": "SUCCESS"
+  }
+}

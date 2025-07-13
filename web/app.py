@@ -13,6 +13,23 @@ from pathlib import Path
 import psutil
 
 from log_utils import setup_logging
+from exceptions import (
+    AuthenticationError, InvalidCredentialsError, AccountLockedError,
+    SessionExpiredError, InsufficientPermissionsError, CaptchaValidationError,
+    FileError, UnsupportedFileTypeError, FileTooBigError, InvalidFileFormatError,
+    FileProcessingError, QuotaExceededError, RateLimitExceededError,
+    PredictionError, ModelNotAvailableError, PredictionFailedError,
+    DatabaseError, RecordNotFoundError, DuplicateRecordError,
+    ConfigurationError, MissingConfigError, ExternalServiceError,
+    ValidationError, InvalidInputError, RequiredFieldError,
+    StorageError, convert_exception, CircuitBreakerOpenException
+)
+
+# Circuit breaker imports - using centralized configuration
+from circuit_breaker_config import (
+    get_database_circuit_breaker, get_cache_circuit_breaker,
+    get_http_circuit_breaker, initialize_circuit_breakers
+)
 
 from flask import (
     Flask,
@@ -62,11 +79,23 @@ setup_logging()
 # Load configuration
 config = get_config()
 
+def get_or_create_web_circuit_breakers():
+    """Get circuit breakers for web application operations using centralized configuration."""
+    # Get circuit breakers from centralized manager
+    db_circuit = get_database_circuit_breaker("web_app", db_session=db.session)
+    cache_circuit = get_cache_circuit_breaker("web_app")
+    notification_circuit = get_http_circuit_breaker("web_app", service_type="notification")
+    
+    return db_circuit, cache_circuit, notification_circuit
+
 app = Flask(__name__)
 app.secret_key = config.security.secret_key
 app.config["WTF_CSRF_SECRET_KEY"] = config.security.csrf_secret_key or config.security.secret_key
 csrf = CSRFProtect(app)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Initialize circuit breakers with configuration
+initialize_circuit_breakers(config_file="config/circuit_breakers.json")
 
 db = SQLAlchemy()
 
@@ -143,8 +172,12 @@ def save_failed_logins(failed_logins: dict) -> None:
     try:
         with open(LOCKOUT_FILE, 'w') as f:
             json.dump(failed_logins, f)
-    except Exception as e:
+    except (OSError, IOError, PermissionError) as e:
         logger.error(f"Failed to save lockout file: {e}")
+        raise StorageError(operation='write', path=str(LOCKOUT_FILE), reason=str(e))
+    except (TypeError, ValueError) as e:
+        logger.error(f"Failed to serialize lockout data: {e}")
+        raise ValidationError(f"Invalid lockout data format: {e}")
 
 def cleanup_old_failed_logins() -> None:
     """Clean up old failed login entries."""
@@ -701,12 +734,41 @@ def login():
             question = generate_captcha()
             return render_template("login.html", captcha_question=question)
         
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            login_user(user)
-            clear_failed_logins(ip)
-            session.pop("captcha_answer", None)
-            return redirect(url_for("index"))
+        # Protected user lookup with circuit breaker
+        db_circuit, cache_circuit, notification_circuit = get_or_create_web_circuit_breakers()
+        
+        try:
+            def get_user_by_username():
+                return User.query.filter_by(username=username).first()
+            
+            user = db_circuit.execute_query(
+                User.query.filter_by(username=username),
+                read_only=True,
+                timeout=2.0
+            ).first()
+            
+            if user and user.check_password(password):
+                login_user(user)
+                clear_failed_logins(ip)
+                session.pop("captcha_answer", None)
+                logger.info(f"Successful login for user: {username}")
+                return redirect(url_for("index"))
+                
+        except CircuitBreakerOpenException as e:
+            logger.error(f"Database circuit breaker open during login for {username}: {e}")
+            flash("Authentication service temporarily unavailable. Please try again later.")
+            question = generate_captcha()
+            return render_template("login.html", captcha_question=question)
+        except DatabaseError as e:
+            logger.error(f"Database error during login for {username}: {e}")
+            flash("Authentication service error. Please try again.")
+            question = generate_captcha()
+            return render_template("login.html", captcha_question=question)
+        except Exception as e:
+            logger.error(f"Unexpected error during login for {username}: {e}")
+            flash("Authentication error. Please try again.")
+            question = generate_captcha()
+            return render_template("login.html", captcha_question=question)
         record_failed_login(ip)
         record_failed_login('invalid_credentials')
         flash("Invalid credentials")
@@ -754,10 +816,13 @@ def change_password():
     if current_user.check_password(new_password):
         return jsonify({"error": "New password must be different from current password"}), 400
         
-    # Update password
+    # Protected password update with circuit breaker
+    db_circuit, cache_circuit, notification_circuit = get_or_create_web_circuit_breakers()
+    
     try:
-        current_user.set_password(new_password)
-        db.session.commit()
+        with db_circuit.transaction(timeout=5.0):
+            current_user.set_password(new_password)
+            # Transaction is automatically committed by circuit breaker context manager
         
         logger.info(f"Password changed successfully for user: {current_user.username}")
         return jsonify({
@@ -765,10 +830,24 @@ def change_password():
             "status": "success"
         }), 200
         
+    except CircuitBreakerOpenException as e:
+        logger.error(f"Database circuit breaker open during password change for user {current_user.username}: {e}")
+        return jsonify({
+            "error": "Database service temporarily unavailable",
+            "code": "DATABASE_SERVICE_UNAVAILABLE",
+            "details": "Unable to update password at this time. Please try again later.",
+            "circuit_open": True
+        }), 503
+    except DatabaseError as e:
+        logger.error(f"Database error changing password for user {current_user.username}: {e}")
+        return jsonify(e.to_dict()), 500
+    except ValidationError as e:
+        logger.error(f"Validation error changing password for user {current_user.username}: {e}")
+        return jsonify(e.to_dict()), 400
     except Exception as e:
-        logger.error(f"Error changing password for user {current_user.username}: {e}")
-        db.session.rollback()
-        return jsonify({"error": "Failed to change password"}), 500
+        logger.error(f"Unexpected error changing password for user {current_user.username}: {e}")
+        error = convert_exception(e, operation='password_change', user=current_user.username)
+        return jsonify(error.to_dict()), 500
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -778,12 +857,38 @@ def change_password():
 @csp_nonce_required
 def index():
     result = None
-    total = (
-        db.session.query(db.func.coalesce(db.func.sum(Prediction.file_size), 0))
-        .filter_by(user_id=current_user.id)
-        .scalar()
-        or 0
-    )
+    db_circuit, cache_circuit, notification_circuit = get_or_create_web_circuit_breakers()
+    
+    # Protected total file size calculation with circuit breaker
+    try:
+        def get_user_file_total():
+            return (
+                db.session.query(db.func.coalesce(db.func.sum(Prediction.file_size), 0))
+                .filter_by(user_id=current_user.id)
+                .scalar()
+                or 0
+            )
+        
+        total = db_circuit.execute_query(
+            db.session.query(db.func.coalesce(db.func.sum(Prediction.file_size), 0))
+            .filter_by(user_id=current_user.id),
+            read_only=True,
+            timeout=2.0
+        ).scalar() or 0
+        
+    except CircuitBreakerOpenException as e:
+        logger.warning(f"Database circuit breaker open for file size calculation - user {current_user.id}: {e}")
+        # Use fallback value
+        total = 0
+    except DatabaseError as e:
+        logger.error(f"Database error calculating file size - user {current_user.id}: {e}")
+        # Use fallback value
+        total = 0
+    except Exception as e:
+        logger.error(f"Unexpected error calculating file size - user {current_user.id}: {e}")
+        # Use fallback value
+        total = 0
+        
     remaining = MAX_TOTAL_SIZE - total
     if request.method == "POST":
         file = request.files.get("file")
@@ -834,14 +939,36 @@ def index():
                                 max_size=MAX_FILE_SIZE
                             )
                             
-                            pred = Prediction(
-                                user_id=current_user.id,
-                                filename=original_filename,
-                                result="PENDING",
-                                file_size=saved_size,
-                            )
-                            db.session.add(pred)
-                            db.session.commit()
+                            # Protected prediction insertion with circuit breaker
+                            try:
+                                with db_circuit.transaction(timeout=5.0):
+                                    pred = Prediction(
+                                        user_id=current_user.id,
+                                        filename=original_filename,
+                                        result="PENDING",
+                                        file_size=saved_size,
+                                    )
+                                    db.session.add(pred)
+                                    # Transaction is automatically committed by circuit breaker context manager
+                                    
+                            except CircuitBreakerOpenException as e:
+                                logger.error(f"Database circuit breaker open during prediction creation - user {current_user.id}: {e}")
+                                flash("Database service temporarily unavailable. Please try again later.")
+                                return render_template(
+                                    "index_secure.html",
+                                    result=result,
+                                    predictions=[],  # Empty fallback
+                                    remaining_bytes=remaining,
+                                )
+                            except DatabaseError as e:
+                                logger.error(f"Database error creating prediction - user {current_user.id}: {e}")
+                                flash("Unable to create prediction record. Please try again.")
+                                return render_template(
+                                    "index_secure.html",
+                                    result=result,
+                                    predictions=[],  # Empty fallback
+                                    remaining_bytes=remaining,
+                                )
                             
                             from .tasks import run_prediction
                             
@@ -852,8 +979,24 @@ def index():
                                 temp_path,  # Pass path instead of data
                                 PREDICT_API_URL,
                             )
+                        except FileTooBigError as e:
+                            flash(e.user_message)
+                            logger.warning(f"File too big for user {current_user.username}: {e}")
+                        except (OSError, IOError, PermissionError) as e:
+                            flash("Unable to save file. Please try again.")
+                            logger.error(f"File save error for user {current_user.username}: {e}")
                         except ValueError as e:
                             flash(str(e))
+                            logger.warning(f"File validation error for user {current_user.username}: {e}")
+                        except DatabaseError as e:
+                            flash("Unable to create prediction record. Please try again.")
+                            logger.error(f"Database error for user {current_user.username}: {e}")
+                            db.session.rollback()
+                        except Exception as e:
+                            error = convert_exception(e, file_name=original_filename, operation='file_upload')
+                            flash(error.user_message)
+                            logger.error(f"Unexpected upload error for user {current_user.username}: {error}")
+                            db.session.rollback()
                         else:
                             total += file_size
                         remaining = MAX_TOTAL_SIZE - total
@@ -879,11 +1022,30 @@ def index():
                                 'user_id': current_user.id,
                                 'file_size': file_size
                             }, current_user.id))
-    predictions = (
-        Prediction.query.filter_by(user_id=current_user.id)
-        .order_by(Prediction.id.desc())
-        .all()
-    )
+    # Protected predictions retrieval with circuit breaker
+    try:
+        predictions = db_circuit.execute_query(
+            Prediction.query.filter_by(user_id=current_user.id)
+            .order_by(Prediction.id.desc()),
+            read_only=True,
+            timeout=3.0
+        ).all()
+        
+    except CircuitBreakerOpenException as e:
+        logger.warning(f"Database circuit breaker open for predictions retrieval - user {current_user.id}: {e}")
+        # Use empty fallback
+        predictions = []
+        flash("Unable to load prediction history at this time.")
+    except DatabaseError as e:
+        logger.error(f"Database error retrieving predictions - user {current_user.id}: {e}")
+        # Use empty fallback
+        predictions = []
+        flash("Unable to load prediction history.")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving predictions - user {current_user.id}: {e}")
+        # Use empty fallback
+        predictions = []
+        
     return render_template(
         "index_secure.html",
         result=result,
@@ -896,6 +1058,56 @@ def index():
 def metrics_endpoint():
     """Prometheus metrics endpoint."""
     return get_metrics(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+
+@app.route("/circuit-breakers/metrics")
+@track_request_metrics
+def circuit_breaker_metrics():
+    """Circuit breaker metrics endpoint."""
+    from circuit_breaker_config import circuit_breaker_metrics_endpoint
+    return jsonify(circuit_breaker_metrics_endpoint()), 200
+
+
+@app.route("/circuit-breakers/health")
+@track_request_metrics  
+def circuit_breaker_health():
+    """Circuit breaker health check endpoint."""
+    from circuit_breaker_config import circuit_breaker_health_endpoint
+    health_status = circuit_breaker_health_endpoint()
+    
+    status_code = 200
+    if health_status['overall_status'] == 'unhealthy':
+        status_code = 503
+    elif health_status['overall_status'] == 'degraded':
+        status_code = 206  # Partial Content
+    
+    return jsonify(health_status), status_code
+
+
+@app.route("/circuit-breakers/reset", methods=["POST"])
+@login_required
+@track_request_metrics
+def reset_circuit_breakers():
+    """Reset all circuit breakers (admin only)."""
+    # Check if user has admin permissions (implement based on your auth system)
+    if not hasattr(current_user, 'is_admin') or not current_user.is_admin:
+        return jsonify({"error": "Admin access required"}), 403
+    
+    try:
+        from circuit_breaker_config import get_circuit_breaker_manager
+        manager = get_circuit_breaker_manager()
+        manager.reset_all_circuits()
+        
+        logger.info(f"All circuit breakers reset by admin user: {current_user.username}")
+        return jsonify({
+            "message": "All circuit breakers have been reset",
+            "timestamp": datetime.utcnow().isoformat(),
+            "reset_by": current_user.username
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Failed to reset circuit breakers: {e}")
+        return jsonify({"error": "Failed to reset circuit breakers"}), 500
 
 
 @app.route("/health")
@@ -923,23 +1135,35 @@ def readiness_check():
     try:
         db.session.execute("SELECT 1")
         checks["database"] = True
-    except Exception as e:
+    except DatabaseError as e:
         logger.error(f"Database check failed: {e}")
+        checks["database"] = False
+    except Exception as e:
+        logger.error(f"Unexpected database check error: {e}")
+        checks["database"] = False
     
     # Check disk space (> 1GB free)
     try:
         disk_usage = psutil.disk_usage('/')
         free_gb = disk_usage.free / (1024**3)
         checks["disk_space"] = free_gb > 1.0
+    except (OSError, IOError, PermissionError) as e:
+        logger.error(f"Disk space check failed - file system error: {e}")
+        checks["disk_space"] = False
     except Exception as e:
-        logger.error(f"Disk space check failed: {e}")
+        logger.error(f"Unexpected disk space check error: {e}")
+        checks["disk_space"] = False
     
     # Check memory usage (< 90%)
     try:
         memory = psutil.virtual_memory()
         checks["memory"] = memory.percent < 90.0
+    except (OSError, RuntimeError) as e:
+        logger.error(f"Memory check failed - system error: {e}")
+        checks["memory"] = False
     except Exception as e:
-        logger.error(f"Memory check failed: {e}")
+        logger.error(f"Unexpected memory check error: {e}")
+        checks["memory"] = False
     
     all_healthy = all(checks.values())
     status_code = 200 if all_healthy else 503
@@ -993,8 +1217,10 @@ def csp_report():
                 f"CSP blocked {blocked_uri} on {document_uri} "
                 f"(violated directive: {violated_directive})"
             )
+    except (ValueError, TypeError, KeyError) as e:
+        logger.error(f"Invalid CSP report format: {e}")
     except Exception as e:
-        logger.error(f"Error processing CSP report: {e}")
+        logger.error(f"Unexpected error processing CSP report: {e}")
     
     return '', 204  # No content response
 
@@ -1187,10 +1413,18 @@ def create_app():
                 db.session.execute(f"SELECT 1 FROM {table} LIMIT 1")
             logger.info("All critical tables verified")
             
-        except Exception as e:
+        except DatabaseError as e:
             logger.error(f"Database initialization error: {e}")
             logger.error("Please run 'psql -U $DB_USER -d $DB_NAME -f database/create_database.sql' to create the database schema")
-            raise
+            raise ConfigurationError(
+                message=f"Database not properly configured: {e}",
+                config_key="SQLALCHEMY_DATABASE_URI",
+                user_message="Database configuration error. Please contact support."
+            )
+        except Exception as e:
+            logger.error(f"Unexpected database initialization error: {e}")
+            error = convert_exception(e, operation='database_initialization')
+            raise error
     return app
 
 

@@ -1,0 +1,113 @@
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "nightscan",
+    "username": "nightscan",
+    "password": "",
+    "pool_size": 20,
+    "max_overflow": 0,
+    "pool_timeout": 30,
+    "pool_recycle": 3600,
+    "sslmode": "prefer",
+    "sslcert": null,
+    "sslkey": null,
+    "sslrootcert": null
+  },
+  "cache": {
+    "host": "localhost",
+    "port": 6379,
+    "database": 0,
+    "username": null,
+    "password": null,
+    "socket_timeout": 5,
+    "socket_connect_timeout": 5,
+    "max_connections": 50,
+    "ssl": false,
+    "ssl_cert_reqs": null
+  },
+  "services": {
+    "web_host": "localhost",
+    "web_port": 8000,
+    "api_v1_port": 8001,
+    "prediction_port": 8002,
+    "ml_service_port": 8003,
+    "analytics_port": 8008,
+    "websocket_port": 8012,
+    "nginx_port": 80,
+    "nginx_ssl_port": 443,
+    "request_timeout": 30,
+    "upload_timeout": 300,
+    "max_file_size": 104857600
+  },
+  "security": {
+    "secret_key": "***masked***",
+    "jwt_secret": "***masked***",
+    "encryption_key": "***masked***",
+    "session_timeout": 3600,
+    "session_cookie_name": "nightscan_session",
+    "session_cookie_secure": false,
+    "session_cookie_httponly": true,
+    "password_min_length": 8,
+    "password_require_special": true,
+    "max_login_attempts": 5,
+    "account_lockout_duration": 900,
+    "csrf_enabled": true,
+    "cors_enabled": false,
+    "allowed_origins": [],
+    "rate_limit_enabled": true,
+    "rate_limit_requests": 100,
+    "rate_limit_window": 3600
+  },
+  "ml": {
+    "models_directory": "models",
+    "cache_directory": "cache",
+    "data_directory": "data",
+    "audio_heavy_model": "audio_training_efficientnet/models/best_model.pth",
+    "audio_light_model": "mobile_models/audio_light_model.pth",
+    "audio_model_classes": 6,
+    "audio_input_size": [
+      128,
+      128
+    ],
+    "photo_heavy_model": "picture_training_enhanced/models/best_model.pth",
+    "photo_light_model": "mobile_models/photo_light_model.pth",
+    "photo_model_classes": 8,
+    "photo_input_size": [
+      224,
+      224
+    ],
+    "batch_size": 32,
+    "max_workers": 4,
+    "inference_timeout": 30,
+    "use_gpu": true,
+    "gpu_memory_fraction": 0.8
+  },
+  "logging": {
+    "level": "DEBUG",
+    "format": "json",
+    "enable_file_logging": true,
+    "log_directory": "logs",
+    "log_filename": "nightscan.log",
+    "max_file_size": 10485760,
+    "backup_count": 5,
+    "compress_backups": true,
+    "enable_console_logging": true,
+    "console_level": "INFO",
+    "enable_audit_logging": true,
+    "enable_security_logging": true,
+    "enable_performance_logging": true
+  },
+  "monitoring": {
+    "enable_metrics": true,
+    "metrics_port": 9090,
+    "prometheus_enabled": false,
+    "health_check_enabled": true,
+    "health_check_interval": 30,
+    "circuit_breaker_enabled": true,
+    "circuit_breaker_config_file": "config/circuit_breakers.json",
+    "alerts_enabled": false,
+    "alert_email": null,
+    "alert_webhook": null
+  }
+}
