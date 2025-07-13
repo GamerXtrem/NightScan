@@ -1,0 +1,24 @@
+{
+  "output_directory": "mobile_models",
+  "audio_model": {
+    "input_path": "models/resnet18/best_model.pth",
+    "model_name": "resnet18",
+    "num_classes": 6,
+    "class_names": ["bird_song", "mammal_call", "insect_sound", "amphibian_call", "environmental_sound", "unknown_species"],
+    "input_size": [128, 128],
+    "quantization_mode": "dynamic"
+  },
+  "photo_model": {
+    "input_path": "models/resnet18/best_model.pth",
+    "model_name": "resnet18",
+    "num_classes": 8,
+    "class_names": ["bat", "owl", "raccoon", "opossum", "deer", "fox", "coyote", "unknown"],
+    "input_size": [224, 224],
+    "quantization_mode": "int8"
+  },
+  "optimization": {
+    "target_accuracy_loss": 0.05,
+    "target_size_reduction": 0.75,
+    "calibration_samples": 100
+  }
+}

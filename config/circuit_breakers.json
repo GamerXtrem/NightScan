@@ -1,0 +1,155 @@
+{
+  "settings": {
+    "enabled": true,
+    "monitoring_enabled": true,
+    "metrics_port": 9090,
+    "health_check_port": 8080,
+    "auto_recovery": true,
+    "cleanup_on_shutdown": true,
+    "default_failure_threshold": 5,
+    "default_timeout": 60.0,
+    "default_success_threshold": 3,
+    "environment": "production"
+  },
+  "services": {
+    "web_app": {
+      "enabled": true,
+      "database": {
+        "read_timeout": 2.0,
+        "write_timeout": 5.0,
+        "failure_threshold": 3,
+        "timeout": 120.0,
+        "success_threshold": 2,
+        "enable_read_only_fallback": true,
+        "enable_cache_fallback": true
+      },
+      "cache": {
+        "redis_host": "localhost",
+        "redis_port": 6379,
+        "failure_threshold": 3,
+        "timeout": 60.0,
+        "enable_memory_fallback": true,
+        "enable_disk_fallback": true,
+        "memory_cache_size": 1000
+      },
+      "http": {
+        "connect_timeout": 2.0,
+        "read_timeout": 8.0,
+        "total_timeout": 30.0,
+        "failure_threshold": 3,
+        "timeout": 60.0,
+        "max_retries": 2
+      }
+    },
+    "api_v1": {
+      "enabled": true,
+      "database": {
+        "read_timeout": 2.0,
+        "write_timeout": 5.0,
+        "failure_threshold": 3,
+        "timeout": 120.0,
+        "success_threshold": 2
+      },
+      "cache": {
+        "redis_host": "localhost", 
+        "redis_port": 6379,
+        "failure_threshold": 3,
+        "timeout": 60.0,
+        "enable_memory_fallback": true,
+        "enable_disk_fallback": true
+      },
+      "ml": {
+        "failure_threshold": 2,
+        "timeout": 180.0,
+        "inference_timeout": 30.0,
+        "enable_lightweight_fallback": true,
+        "enable_cached_fallback": true,
+        "cache_predictions": true
+      },
+      "http": {
+        "connect_timeout": 1.0,
+        "read_timeout": 5.0,
+        "total_timeout": 15.0,
+        "failure_threshold": 3,
+        "timeout": 60.0,
+        "max_retries": 2
+      }
+    },
+    "celery_workers": {
+      "enabled": true,
+      "database": {
+        "read_timeout": 3.0,
+        "write_timeout": 10.0,
+        "failure_threshold": 3,
+        "timeout": 120.0
+      },
+      "cache": {
+        "redis_host": "localhost",
+        "redis_port": 6379,
+        "failure_threshold": 3,
+        "timeout": 60.0,
+        "enable_memory_fallback": true,
+        "enable_disk_fallback": true
+      },
+      "http": {
+        "connect_timeout": 3.0,
+        "read_timeout": 30.0,
+        "total_timeout": 60.0,
+        "failure_threshold": 3,
+        "timeout": 180.0,
+        "max_retries": 3
+      },
+      "ml": {
+        "failure_threshold": 2,
+        "timeout": 300.0,
+        "inference_timeout": 30.0,
+        "batch_inference_timeout": 120.0,
+        "enable_lightweight_fallback": true,
+        "enable_cached_fallback": true
+      }
+    },
+    "ml_prediction": {
+      "enabled": true,
+      "ml": {
+        "failure_threshold": 2,
+        "timeout": 300.0,
+        "inference_timeout": 30.0,
+        "batch_inference_timeout": 120.0,
+        "max_batch_size": 32,
+        "max_model_memory_mb": 2048,
+        "max_cpu_usage": 90.0,
+        "max_memory_usage": 85.0,
+        "max_gpu_memory_usage": 90.0,
+        "enable_lightweight_fallback": true,
+        "enable_cached_fallback": true,
+        "cache_predictions": true,
+        "warmup_on_start": true
+      },
+      "cache": {
+        "redis_host": "localhost",
+        "redis_port": 6379,
+        "failure_threshold": 2,
+        "timeout": 60.0,
+        "enable_memory_fallback": true,
+        "memory_cache_size": 500
+      }
+    },
+    "notification_service": {
+      "enabled": true,
+      "http": {
+        "connect_timeout": 1.0,
+        "read_timeout": 5.0,
+        "total_timeout": 10.0,
+        "failure_threshold": 5,
+        "timeout": 60.0,
+        "max_retries": 2
+      },
+      "database": {
+        "read_timeout": 2.0,
+        "write_timeout": 5.0,
+        "failure_threshold": 3,
+        "timeout": 60.0
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "edge_models": {
+    "audio": "audio_light_v1",
+    "photo": "photo_light_v1"
+  },
+  "cloud_models": {
+    "audio": "audio_heavy_v1",
+    "photo": "photo_heavy_v1"
+  },
+  "edge_predictions": [
+    {
+      "type": "audio",
+      "model": "light",
+      "prediction": "bird_song",
+      "confidence": 0.34619396924972534,
+      "processing_time": 0.4170660972595215,
+      "status": "success"
+    },
+    {
+      "type": "photo",
+      "model": "light",
+      "prediction": "raccoon",
+      "confidence": 0.24502158164978027,
+      "processing_time": 0.2994861602783203,
+      "status": "success"
+    }
+  ],
+  "cloud_predictions": [
+    {
+      "type": "audio",
+      "model": "heavy",
+      "prediction": "bird_song",
+      "confidence": 0.33720988035202026,
+      "processing_time": 0.008291959762573242,
+      "status": "success"
+    },
+    {
+      "type": "photo",
+      "model": "heavy",
+      "prediction": "raccoon",
+      "confidence": 0.2437494546175003,
+      "processing_time": 0.012681245803833008,
+      "status": "success"
+    }
+  ],
+  "performance_metrics": {},
+  "fallback_logic": [
+    {
+      "trigger": "low_confidence",
+      "description": "Confiance edge < seuil \u2192 cloud",
+      "edge_confidence": 0.65,
+      "should_fallback": true
+    },
+    {
+      "trigger": "high_confidence",
+      "description": "Confiance edge > seuil \u2192 edge seulement",
+      "edge_confidence": 0.92,
+      "should_fallback": false
+    }
+  ]
+}
