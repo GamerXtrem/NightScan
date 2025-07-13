@@ -53,19 +53,6 @@ def create_files_blueprint() -> Blueprint:
             "description": "Get file storage statistics",
             "tags": ["files", "statistics"],
         },
-        # Legacy endpoints for backward compatibility
-        {
-            "path": "/api/v1/files/upload",
-            "methods": ["POST"],
-            "description": "[DEPRECATED] Use POST /api/v1/files instead",
-            "tags": ["files", "deprecated"],
-        },
-        {
-            "path": "/api/v1/files/download/<file_id>",
-            "methods": ["GET"],
-            "description": "[DEPRECATED] Use GET /api/v1/files/<file_id> instead",
-            "tags": ["files", "deprecated"],
-        },
     ]
 
     for endpoint in endpoints:
@@ -283,30 +270,5 @@ def create_files_blueprint() -> Blueprint:
             "api_version": "v1"
         }), 200
 
-    # Legacy endpoints (deprecated)
-
-    @files_bp.route("/upload", methods=["POST"])
-    @api_version("v1", description="[DEPRECATED] Upload file", tags=["files", "deprecated"])
-    @version_required(min_version="v1")
-    def upload_file_legacy():
-        """Upload file (deprecated)."""
-        response = create_file()
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use POST /api/v1/files instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/files/upload'
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/files'
-        return response
-
-    @files_bp.route("/download/<file_id>", methods=["GET"])
-    @api_version("v1", description="[DEPRECATED] Download file", tags=["files", "deprecated"])
-    @version_required(min_version="v1")
-    def download_file_legacy(file_id: str):
-        """Download file (deprecated)."""
-        response = get_file(file_id)
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use GET /api/v1/files/{file_id}?action=download instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = f'/api/v1/files/download/{file_id}'
-            response.headers['X-API-Replacement-Endpoint'] = f'/api/v1/files/{file_id}?action=download'
-        return response
 
     return files_bp

@@ -68,19 +68,6 @@ def create_analytics_blueprint() -> Blueprint:
             "description": "Get dashboard summary data",
             "tags": ["analytics", "dashboard"],
         },
-        # Legacy endpoints for backward compatibility
-        {
-            "path": "/api/v1/analytics/export/csv",
-            "methods": ["GET"],
-            "description": "[DEPRECATED] Use GET /api/v1/analytics/exports?format=csv instead",
-            "tags": ["analytics", "deprecated"],
-        },
-        {
-            "path": "/api/v1/analytics/export/pdf",
-            "methods": ["GET"],
-            "description": "[DEPRECATED] Use GET /api/v1/analytics/exports?format=pdf instead",
-            "tags": ["analytics", "deprecated"],
-        },
     ]
 
     for endpoint in endpoints:
@@ -291,61 +278,6 @@ def create_analytics_blueprint() -> Blueprint:
                 "supported_formats": ["csv", "pdf", "json"]
             }), 400
 
-    # Legacy export endpoints (deprecated)
-    @analytics_bp.route("/export/csv", methods=["GET"])
-    @api_version("v1", description="[DEPRECATED] Export CSV", tags=["analytics", "deprecated"])
-    @version_required(min_version="v1", features=["data_export"])
-    def export_csv_v1():
-        """Export analytics data as CSV (deprecated)."""
-        if analytics_available:
-            try:
-                response = export_csv()
-            except Exception as e:
-                logger.error(f"Error exporting CSV: {e}")
-                response = jsonify({"error": "Failed to export CSV"}), 500
-        else:
-            # Return sample CSV
-            csv_data = "Date,Species,Zone,Count\n"
-            csv_data += "2024-01-01,Deer,Zone A,5\n"
-            csv_data += "2024-01-01,Fox,Zone B,3\n"
-            response = (
-                csv_data,
-                200,
-                {"Content-Type": "text/csv", "Content-Disposition": "attachment; filename=analytics_export.csv"},
-            )
-        
-        # Add deprecation headers
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use GET /api/v1/analytics/exports?format=csv instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/analytics/export/csv'
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/analytics/exports?format=csv'
-        return response
-
-    @analytics_bp.route("/export/pdf", methods=["GET"])
-    @api_version("v1", description="[DEPRECATED] Export PDF", tags=["analytics", "deprecated"])
-    @version_required(min_version="v1", features=["data_export"])
-    def export_pdf_v1():
-        """Export analytics report as PDF (deprecated)."""
-        if analytics_available:
-            try:
-                response = export_pdf()
-            except Exception as e:
-                logger.error(f"Error exporting PDF: {e}")
-                response = jsonify({"error": "Failed to export PDF"}), 500
-        else:
-            response = (
-                jsonify(
-                    {"error": "PDF export not available", "message": "PDF export functionality is being implemented"}
-                ),
-                501,
-            )
-        
-        # Add deprecation headers
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use GET /api/v1/analytics/exports?format=pdf instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/analytics/export/pdf'  
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/analytics/exports?format=pdf'
-        return response
 
     @analytics_bp.route("/dashboard", methods=["GET"])
     @api_version("v1", description="Dashboard summary", tags=["analytics", "dashboard"])

@@ -51,37 +51,6 @@ def create_auth_blueprint() -> Blueprint:
             "description": "Get current token information (verify)",
             "tags": ["auth", "tokens"],
         },
-        # Legacy endpoints for backward compatibility
-        {
-            "path": "/api/v1/auth/login",
-            "methods": ["POST"],
-            "description": "[DEPRECATED] Use POST /api/v1/sessions instead",
-            "tags": ["auth", "deprecated"],
-        },
-        {
-            "path": "/api/v1/auth/logout",
-            "methods": ["POST"],
-            "description": "[DEPRECATED] Use DELETE /api/v1/sessions instead",
-            "tags": ["auth", "deprecated"],
-        },
-        {
-            "path": "/api/v1/auth/register",
-            "methods": ["POST"],
-            "description": "[DEPRECATED] Use POST /api/v1/users instead",
-            "tags": ["auth", "deprecated"],
-        },
-        {
-            "path": "/api/v1/auth/refresh",
-            "methods": ["POST"],
-            "description": "[DEPRECATED] Use POST /api/v1/tokens instead",
-            "tags": ["auth", "deprecated"],
-        },
-        {
-            "path": "/api/v1/auth/verify",
-            "methods": ["GET"],
-            "description": "[DEPRECATED] Use GET /api/v1/tokens/current instead",
-            "tags": ["auth", "deprecated"],
-        },
     ]
 
     for endpoint in endpoints:
@@ -91,7 +60,7 @@ def create_auth_blueprint() -> Blueprint:
             version="v1",
             description=endpoint["description"],
             tags=endpoint["tags"],
-            requires_auth=endpoint["path"] not in ["/api/v1/sessions", "/api/v1/users", "/api/v1/auth/login", "/api/v1/auth/register"],
+            requires_auth=endpoint["path"] not in ["/api/v1/sessions", "/api/v1/users"],
         )
 
     # RESTful routes with proper HTTP methods
@@ -132,64 +101,6 @@ def create_auth_blueprint() -> Blueprint:
         # Use the original verify logic
         return original_verify()
 
-    # Legacy routes for backward compatibility (deprecated)
-
-    @auth_bp.route("/login", methods=["POST"])
-    @api_version("v1", description="[DEPRECATED] Use POST /sessions", tags=["auth", "deprecated"])
-    def login_v1():
-        """Login endpoint for API v1 (deprecated)."""
-        # Add deprecation header and use the original login logic
-        response = original_login()
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use POST /api/v1/sessions instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/login'
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/sessions'
-        return response
-
-    @auth_bp.route("/register", methods=["POST"])
-    @api_version("v1", description="[DEPRECATED] Use POST /users", tags=["auth", "deprecated"])
-    def register_v1():
-        """Register endpoint for API v1 (deprecated)."""
-        response = original_register()
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use POST /api/v1/users instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/register'
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/users'
-        return response
-
-    @auth_bp.route("/refresh", methods=["POST"])
-    @api_version("v1", description="[DEPRECATED] Use POST /tokens", tags=["auth", "deprecated"])
-    def refresh_v1():
-        """Refresh token endpoint for API v1 (deprecated)."""
-        response = original_refresh()
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use POST /api/v1/tokens instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/refresh'
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/tokens'
-        return response
-
-    @auth_bp.route("/logout", methods=["POST"])
-    @api_version("v1", description="[DEPRECATED] Use DELETE /sessions", tags=["auth", "deprecated"])
-    @version_required(min_version="v1")
-    def logout_v1():
-        """Logout endpoint for API v1 (deprecated)."""
-        response = original_logout()
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use DELETE /api/v1/sessions instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/logout'
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/sessions'
-        return response
-
-    @auth_bp.route("/verify", methods=["GET"])
-    @api_version("v1", description="[DEPRECATED] Use GET /tokens/current", tags=["auth", "deprecated"])
-    def verify_v1():
-        """Verify token endpoint for API v1 (deprecated)."""
-        response = original_verify()
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use GET /api/v1/tokens/current instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/auth/verify'
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/tokens/current'
-        return response
 
     # Additional v1-specific auth endpoints
 

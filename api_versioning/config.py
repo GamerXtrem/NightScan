@@ -32,28 +32,24 @@ API_VERSIONS: Dict[str, APIVersionConfig] = {
         status="stable",
         release_date=datetime(2024, 1, 1),
         min_client_version="1.0.0",
-        features=["auth", "analytics", "cache", "detections", "quota", "retention", "location", "files"],
+        features=["auth", "analytics", "files", "predictions"],
         endpoints=[
-            "/api/v1/auth/*",
+            "/api/v1/sessions",
+            "/api/v1/users", 
+            "/api/v1/tokens",
             "/api/v1/analytics/*",
-            "/api/v1/cache/*",
-            "/api/v1/detections",
+            "/api/v1/files",
             "/api/v1/predictions",
-            "/api/v1/quota/*",
-            "/api/v1/retention/*",
-            "/api/v1/location/*",
-            "/api/v1/files/*",
-            "/api/v1/filename/*",
         ],
-        description="Initial stable API version with core functionality",
+        description="RESTful API with clean resource-based endpoints",
     ),
     "v2": APIVersionConfig(
         version="v2",
         status="beta",
         release_date=datetime(2024, 6, 1),
         min_client_version="2.0.0",
-        features=["unified-prediction", "batch-processing", "real-time-streaming", "advanced-analytics"],
-        endpoints=["/api/v2/predict/*", "/api/v2/models/*", "/api/v2/batch/*", "/api/v2/stream/*"],
+        features=["unified_prediction", "batch_processing", "real_time_streaming", "advanced_analytics"],
+        endpoints=["/api/v2/predictions", "/api/v2/models", "/api/v2/batch", "/api/v2/stream"],
         description="Next generation API with unified prediction system",
         breaking_changes=[
             "Unified prediction endpoint replaces separate audio/image endpoints",
@@ -65,67 +61,8 @@ API_VERSIONS: Dict[str, APIVersionConfig] = {
 }
 
 
-# Legacy route mappings for backward compatibility
-LEGACY_ROUTE_MAPPINGS = {
-    # Authentication routes - old legacy mappings
-    "/api/auth/login": "/api/v1/auth/login",
-    "/api/auth/register": "/api/v1/auth/register", 
-    "/api/auth/refresh": "/api/v1/auth/refresh",
-    "/api/auth/logout": "/api/v1/auth/logout",
-    "/api/auth/verify": "/api/v1/auth/verify",
-    # Analytics routes
-    "/analytics/dashboard": "/api/v1/analytics/dashboard",
-    "/analytics/api/metrics": "/api/v1/analytics/metrics",
-    "/analytics/api/species": "/api/v1/analytics/species",
-    "/analytics/api/zones": "/api/v1/analytics/zones",
-    "/analytics/export/csv": "/api/v1/analytics/export/csv",
-    "/analytics/export/pdf": "/api/v1/analytics/export/pdf",
-    # Cache routes
-    "/api/cache/metrics": "/api/v1/cache/metrics",
-    "/api/cache/health": "/api/v1/cache/health",
-    "/api/cache/clear": "/api/v1/cache/clear",
-    # Password reset routes
-    "/api/password-reset/request": "/api/v1/password-reset/request",
-    "/api/password-reset/verify": "/api/v1/password-reset/verify",
-    "/api/password-reset/reset": "/api/v1/password-reset/reset",
-    # Location routes
-    "/api/location": "/api/v1/location",
-    "/api/location/phone": "/api/v1/location/phone",
-    "/api/location/history": "/api/v1/location/history",
-    "/api/location/coordinates": "/api/v1/location/coordinates",
-    "/api/location/status": "/api/v1/location/status",
-    # File management routes
-    "/api/filename/parse": "/api/v1/filename/parse",
-    "/api/filename/generate": "/api/v1/filename/generate",
-    "/api/files/statistics": "/api/v1/files/statistics",
-    # Prediction routes (will be v2)
-    "/predict/upload": "/api/v2/predict/upload",
-    "/predict/file": "/api/v2/predict/file",
-    "/predict/batch": "/api/v2/predict/batch",
-    "/models/status": "/api/v2/models/status",
-    "/models/preload": "/api/v2/models/preload",
-}
 
 
-# RESTful route redirections for better API design
-# These handle redirections from non-RESTful endpoints to RESTful ones
-RESTFUL_REDIRECTIONS = {
-    # Authentication - redirect verbs to RESTful resources
-    "/api/v1/auth/login": ("/api/v1/sessions", "POST"),
-    "/api/v1/auth/logout": ("/api/v1/sessions", "DELETE"), 
-    "/api/v1/auth/register": ("/api/v1/users", "POST"),
-    "/api/v1/auth/refresh": ("/api/v1/tokens", "POST"),
-    "/api/v1/auth/verify": ("/api/v1/tokens/current", "GET"),
-    # Analytics - redirect to proper exports with query params
-    "/api/v1/analytics/export/csv": ("/api/v1/analytics/exports?format=csv", "GET"),
-    "/api/v1/analytics/export/pdf": ("/api/v1/analytics/exports?format=pdf", "GET"),
-    # Cache - redirect clear verb to DELETE method
-    "/api/v1/cache/clear": ("/api/v1/cache", "DELETE"),
-    # Files - redirect upload verb to POST resource
-    "/api/v1/files/upload": ("/api/v1/files", "POST"),
-    # Predictions - redirect analyze verb to POST resource
-    "/api/v1/predictions/analyze": ("/api/v1/predictions", "POST"),
-}
 
 
 # Feature flags per version
@@ -133,21 +70,19 @@ VERSION_FEATURES = {
     "v1": {
         "rate_limiting": True,
         "jwt_auth": True,
-        "quota_management": True,
-        "data_retention": True,
-        "websocket_support": False,
-        "batch_processing": False,
-        "streaming": False,
+        "restful_design": True,
+        "file_management": True,
+        "ml_predictions": True,
     },
     "v2": {
         "rate_limiting": True,
         "jwt_auth": True,
-        "quota_management": True,
-        "data_retention": True,
-        "websocket_support": True,
+        "restful_design": True,
+        "file_management": True,
+        "ml_predictions": True,
         "batch_processing": True,
         "streaming": True,
-        "ml_model_selection": True,
+        "unified_prediction": True,
         "async_processing": True,
     },
 }
@@ -158,8 +93,6 @@ class APIVersionManager:
 
     def __init__(self):
         self.versions = API_VERSIONS
-        self.legacy_mappings = LEGACY_ROUTE_MAPPINGS
-        self.restful_redirections = RESTFUL_REDIRECTIONS
         self.feature_flags = VERSION_FEATURES
 
     def get_version_config(self, version: str) -> Optional[APIVersionConfig]:
@@ -203,32 +136,6 @@ class APIVersionManager:
             "replacement_version": self.get_latest_stable_version(),
         }
 
-    def get_legacy_mapping(self, path: str) -> Optional[str]:
-        """Get the versioned route for a legacy path."""
-        # Direct mapping
-        if path in self.legacy_mappings:
-            return self.legacy_mappings[path]
-
-        # Try prefix matching for parameterized routes
-        for legacy, versioned in self.legacy_mappings.items():
-            if legacy.endswith("*") and path.startswith(legacy[:-1]):
-                # Replace the prefix
-                return path.replace(legacy[:-1], versioned[:-1])
-
-        return None
-
-    def get_restful_redirection(self, path: str, method: str) -> Optional[tuple]:
-        """Get RESTful redirection for a non-RESTful endpoint.
-        
-        Returns:
-            Tuple of (new_path, new_method) if redirection exists, None otherwise
-        """
-        if path in self.restful_redirections:
-            target_path, target_method = self.restful_redirections[path]
-            # Only redirect if the method matches or if target method is different
-            if target_method != method:
-                return (target_path, target_method)
-        return None
 
     def is_feature_enabled(self, version: str, feature: str) -> bool:
         """Check if a feature is enabled for a specific version."""

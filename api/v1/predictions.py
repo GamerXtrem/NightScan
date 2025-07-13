@@ -53,19 +53,6 @@ def create_predictions_blueprint() -> Blueprint:
             "description": "Delete prediction and associated data",
             "tags": ["predictions", "delete"],
         },
-        # Legacy endpoints for backward compatibility
-        {
-            "path": "/api/v1/predictions/analyze",
-            "methods": ["POST"],
-            "description": "[DEPRECATED] Use POST /api/v1/predictions instead",
-            "tags": ["predictions", "deprecated"],
-        },
-        {
-            "path": "/api/v1/predictions/status/<prediction_id>",
-            "methods": ["GET"],
-            "description": "[DEPRECATED] Use GET /api/v1/predictions/<prediction_id>/status instead",
-            "tags": ["predictions", "deprecated"],
-        },
     ]
 
     for endpoint in endpoints:
@@ -342,30 +329,5 @@ def create_predictions_blueprint() -> Blueprint:
                 "message": str(e)
             }), 500
 
-    # Legacy endpoints (deprecated)
-
-    @predictions_bp.route("/analyze", methods=["POST"])
-    @api_version("v1", description="[DEPRECATED] Analyze file", tags=["predictions", "deprecated"])
-    @version_required(min_version="v1")
-    def analyze_file_legacy():
-        """Analyze file (deprecated)."""
-        response = create_prediction()
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use POST /api/v1/predictions instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = '/api/v1/predictions/analyze'
-            response.headers['X-API-Replacement-Endpoint'] = '/api/v1/predictions'
-        return response
-
-    @predictions_bp.route("/status/<prediction_id>", methods=["GET"])
-    @api_version("v1", description="[DEPRECATED] Get status", tags=["predictions", "deprecated"])
-    @version_required(min_version="v1")
-    def get_status_legacy(prediction_id: str):
-        """Get prediction status (deprecated)."""
-        response = get_prediction_status(prediction_id)
-        if hasattr(response, 'headers'):
-            response.headers['X-API-Deprecation-Warning'] = 'This endpoint is deprecated. Use GET /api/v1/predictions/{prediction_id}/status instead.'
-            response.headers['X-API-Deprecated-Endpoint'] = f'/api/v1/predictions/status/{prediction_id}'
-            response.headers['X-API-Replacement-Endpoint'] = f'/api/v1/predictions/{prediction_id}/status'
-        return response
 
     return predictions_bp
