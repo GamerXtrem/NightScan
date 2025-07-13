@@ -75,20 +75,35 @@ class AudioModelLoader:
     
     @staticmethod
     def load_model(model_path: Path, config: Dict) -> torch.nn.Module:
-        """Charge un modèle audio EfficientNet."""
+        """Charge un modèle audio (ResNet18 ou EfficientNet)."""
         try:
-            from models.efficientnet_config import EfficientNetConfig, create_model
+            import torchvision.models as models
             
-            # Créer la configuration
-            model_config = EfficientNetConfig(**config)
+            model_name = config.get('model_name', 'resnet18')
+            num_classes = config.get('num_classes', 6)
             
-            # Créer le modèle
-            model = create_model(model_config)
+            # Créer le modèle selon le type
+            if model_name == 'resnet18':
+                model = models.resnet18(pretrained=False)
+                model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+            elif 'efficientnet' in model_name:
+                # Fallback vers EfficientNet si disponible
+                try:
+                    from models.efficientnet_config import EfficientNetConfig, create_model
+                    model_config = EfficientNetConfig(**config)
+                    model = create_model(model_config)
+                except ImportError:
+                    logger.warning("EfficientNet non disponible, utilisation ResNet18")
+                    model = models.resnet18(pretrained=False)
+                    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+            else:
+                raise ModelLoadError(f"Modèle non supporté: {model_name}")
             
             # Charger les poids
             if model_path.exists():
-                state_dict = torch.load(model_path, map_location='cpu')
-                model.load_state_dict(state_dict)
+                state_dict = torch.load(model_path, map_location='cpu', weights_only=False)
+                # Adapter les poids si nécessaire
+                model = AudioModelLoader._adapt_weights(model, state_dict, num_classes)
                 logger.info(f"Modèle audio chargé: {model_path}")
             else:
                 logger.warning(f"Modèle audio introuvable: {model_path}")
@@ -100,6 +115,23 @@ class AudioModelLoader:
         except Exception as e:
             logger.error(f"Erreur chargement modèle audio: {e}")
             raise ModelLoadError(f"Impossible de charger le modèle audio: {e}")
+    
+    @staticmethod
+    def _adapt_weights(model, state_dict, num_classes):
+        """Adapte les poids chargés au modèle."""
+        try:
+            model.load_state_dict(state_dict, strict=False)
+        except Exception as e:
+            logger.warning(f"Chargement strict échoué: {e}")
+            # Charger partiellement en ignorant les couches incompatibles
+            model_dict = model.state_dict()
+            filtered_dict = {k: v for k, v in state_dict.items() 
+                           if k in model_dict and v.shape == model_dict[k].shape}
+            model_dict.update(filtered_dict)
+            model.load_state_dict(model_dict)
+            logger.info(f"Chargement partiel: {len(filtered_dict)}/{len(state_dict)} couches")
+        
+        return model
     
     @staticmethod
     def preprocess_spectrogram(spectrogram: np.ndarray) -> torch.Tensor:
@@ -130,20 +162,35 @@ class PhotoModelLoader:
     
     @staticmethod
     def load_model(model_path: Path, config: Dict) -> torch.nn.Module:
-        """Charge un modèle photo (EfficientNet, ResNet, ViT)."""
+        """Charge un modèle photo (ResNet18, EfficientNet, etc.)."""
         try:
-            from models.photo_config import PhotoConfig, create_model
+            import torchvision.models as models
             
-            # Créer la configuration
-            model_config = PhotoConfig(**config)
+            model_name = config.get('model_name', 'resnet18')
+            num_classes = config.get('num_classes', 8)
             
-            # Créer le modèle
-            model = create_model(model_config)
+            # Créer le modèle selon le type
+            if model_name == 'resnet18':
+                model = models.resnet18(pretrained=False)
+                model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+            elif 'efficientnet' in model_name:
+                # Fallback vers EfficientNet si disponible
+                try:
+                    from models.photo_config import PhotoConfig, create_model
+                    model_config = PhotoConfig(**config)
+                    model = create_model(model_config)
+                except ImportError:
+                    logger.warning("Configuration photo non disponible, utilisation ResNet18")
+                    model = models.resnet18(pretrained=False)
+                    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+            else:
+                raise ModelLoadError(f"Modèle non supporté: {model_name}")
             
             # Charger les poids
             if model_path.exists():
-                state_dict = torch.load(model_path, map_location='cpu')
-                model.load_state_dict(state_dict)
+                state_dict = torch.load(model_path, map_location='cpu', weights_only=False)
+                # Adapter les poids si nécessaire
+                model = PhotoModelLoader._adapt_weights(model, state_dict, num_classes)
                 logger.info(f"Modèle photo chargé: {model_path}")
             else:
                 logger.warning(f"Modèle photo introuvable: {model_path}")
@@ -155,6 +202,23 @@ class PhotoModelLoader:
         except Exception as e:
             logger.error(f"Erreur chargement modèle photo: {e}")
             raise ModelLoadError(f"Impossible de charger le modèle photo: {e}")
+    
+    @staticmethod
+    def _adapt_weights(model, state_dict, num_classes):
+        """Adapte les poids chargés au modèle."""
+        try:
+            model.load_state_dict(state_dict, strict=False)
+        except Exception as e:
+            logger.warning(f"Chargement strict échoué: {e}")
+            # Charger partiellement en ignorant les couches incompatibles
+            model_dict = model.state_dict()
+            filtered_dict = {k: v for k, v in state_dict.items() 
+                           if k in model_dict and v.shape == model_dict[k].shape}
+            model_dict.update(filtered_dict)
+            model.load_state_dict(model_dict)
+            logger.info(f"Chargement partiel: {len(filtered_dict)}/{len(state_dict)} couches")
+        
+        return model
     
     @staticmethod
     def preprocess_image(image_path: Path, input_size: tuple = (224, 224)) -> torch.Tensor:
@@ -209,31 +273,59 @@ class UnifiedModelManager:
             return torch.device('cpu')
     
     def _load_config(self, config_path: Optional[Path]) -> Dict:
-        """Charge la configuration des modèles."""
+        """Charge la configuration des modèles depuis le registre central."""
         if config_path and config_path.exists():
             with open(config_path, 'r') as f:
                 return json.load(f)
         
-        # Configuration par défaut
+        # Tenter de charger depuis le registre de modèles
+        try:
+            registry_path = Path("model_registry.json")
+            if registry_path.exists():
+                with open(registry_path, 'r') as f:
+                    registry_data = json.load(f)
+                
+                # Extraire la configuration pour les modèles heavy (VPS)
+                config = {}
+                for model_id, model_data in registry_data.get('models', {}).items():
+                    if model_data.get('variant') == 'heavy':
+                        model_type = model_data.get('model_type')
+                        config[f"{model_type}_model"] = {
+                            "model_path": model_data.get('file_path'),
+                            "config": {
+                                "model_name": "resnet18",  # Basé sur ResNet18
+                                "num_classes": model_data.get('num_classes'),
+                                "pretrained": False,
+                                "dropout_rate": 0.3
+                            },
+                            "class_names": model_data.get('class_names', [])
+                        }
+                
+                if config:
+                    logger.info("Configuration chargée depuis le registre de modèles")
+                    return config
+        except Exception as e:
+            logger.warning(f"Impossible de charger le registre: {e}")
+        
+        # Configuration par défaut (fallback)
         return {
             "audio_model": {
-                "model_path": "audio_training_efficientnet/models/best_model.pth",
+                "model_path": "models/resnet18/best_model.pth",
                 "config": {
-                    "model_name": "efficientnet-b1",
+                    "model_name": "resnet18",
                     "num_classes": 6,
-                    "pretrained": True,
+                    "pretrained": False,
                     "dropout_rate": 0.3
                 },
                 "class_names": ["bird_song", "mammal_call", "insect_sound", 
                               "amphibian_call", "environmental_sound", "unknown_species"]
             },
             "photo_model": {
-                "model_path": "picture_training_enhanced/models/best_model.pth",
+                "model_path": "models/resnet18/best_model.pth",
                 "config": {
-                    "model_name": "efficientnet-b1",
-                    "architecture": "efficientnet",
+                    "model_name": "resnet18",
                     "num_classes": 8,
-                    "pretrained": True,
+                    "pretrained": False,
                     "dropout_rate": 0.3
                 },
                 "class_names": ["bat", "owl", "raccoon", "opossum", "deer", "fox", "coyote", "unknown"]

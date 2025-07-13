@@ -1,0 +1,27 @@
+{
+  "model_info": {
+    "model_version": "1.0.0",
+    "framework": "pytorch",
+    "creation_date": "2025-07-13T17:57:47.190003",
+    "description": "Lightweight EfficientNet-B0 for wildlife photo classification",
+    "model_type": "photo",
+    "variant": "light",
+    "deployment_target": "ios"
+  },
+  "training_info": {
+    "base_model": "picture_training_enhanced/models/best_model.pth",
+    "creation_date": "2025-07-13T17:57:47.189990",
+    "method": "Knowledge distillation from EfficientNet-B1",
+    "device": "cpu"
+  },
+  "class_names": [
+    "bat",
+    "owl",
+    "raccoon",
+    "opossum",
+    "deer",
+    "fox",
+    "coyote",
+    "unknown"
+  ]
+}

@@ -26,6 +26,12 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from .prediction_router import get_prediction_router, PredictionRouter
 from .file_type_detector import FileType
+from exceptions import (
+    PredictionError, ModelNotAvailableError, PredictionFailedError,
+    DataPreprocessingError, FileError, UnsupportedFileTypeError,
+    InvalidFileFormatError, FileProcessingError, ValidationError,
+    convert_exception
+)
 
 # Configuration
 UPLOAD_FOLDER = Path(tempfile.gettempdir()) / "nightscan_uploads"
@@ -98,12 +104,13 @@ class UnifiedPredictionAPI:
                         "failed_predictions": stats["failed_predictions"]
                     }
                 })
+            except ModelNotAvailableError as e:
+                logger.error(f"Model not available for status check: {e}")
+                return jsonify(e.to_dict()), 503
             except Exception as e:
-                logger.error(f"Erreur statut modèles: {e}")
-                return jsonify({
-                    "success": False,
-                    "error": str(e)
-                }), 500
+                logger.error(f"Unexpected error getting model status: {e}")
+                error = convert_exception(e, operation='model_status_check')
+                return jsonify(error.to_dict()), 500
         
         @self.app.route('/predict/upload', methods=['POST'])
         def predict_upload():
@@ -168,18 +175,33 @@ class UnifiedPredictionAPI:
                         "upload_filename": filename
                     })
                     
+                except PredictionError as e:
+                    # Nettoyer le fichier en cas d'erreur
+                    if filepath.exists():
+                        filepath.unlink()
+                    logger.error(f"Prediction error during upload: {e}")
+                    return jsonify(e.to_dict()), 400
+                except FileError as e:
+                    # Nettoyer le fichier en cas d'erreur
+                    if filepath.exists():
+                        filepath.unlink()
+                    logger.error(f"File error during upload: {e}")
+                    return jsonify(e.to_dict()), 400
                 except Exception as e:
                     # Nettoyer le fichier en cas d'erreur
                     if filepath.exists():
                         filepath.unlink()
-                    raise e
+                    logger.error(f"Unexpected error during prediction upload: {e}")
+                    error = convert_exception(e, operation='prediction_upload', file_name=filename)
+                    return jsonify(error.to_dict()), 500
                     
+            except ValidationError as e:
+                logger.error(f"Validation error in upload: {e}")
+                return jsonify(e.to_dict()), 400
             except Exception as e:
-                logger.error(f"Erreur prédiction upload: {e}")
-                return jsonify({
-                    "success": False,
-                    "error": str(e)
-                }), 500
+                logger.error(f"Unexpected error in upload endpoint: {e}")
+                error = convert_exception(e, operation='upload_endpoint')
+                return jsonify(error.to_dict()), 500
         
         @self.app.route('/predict/file', methods=['POST'])
         def predict_file():

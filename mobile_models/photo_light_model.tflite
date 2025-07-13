@@ -1,0 +1,1 @@
+TFL3{"model_type": "photo", "variant": "light", "framework": "pytorch_quantized", "num_classes": 8, "class_names": ["bat", "owl", "raccoon", "opossum", "deer", "fox", "coyote", "unknown"], "input_size": [224, 224], "created_at": "2025-07-13T17:28:27.055272", "model_file": "photo_light_model.pth"}

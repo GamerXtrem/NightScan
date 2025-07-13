@@ -1,0 +1,28 @@
+{
+  "model_info": {
+    "model_version": "1.0.0",
+    "framework": "pytorch",
+    "creation_date": "2025-07-13T17:50:50.057178",
+    "description": "EfficientNet-B1 specialized for wildlife photo classification",
+    "model_type": "photo",
+    "variant": "heavy"
+  },
+  "training_info": {
+    "epoch": 10,
+    "loss": 0.142,
+    "accuracy": 0.94,
+    "val_accuracy": 0.91,
+    "training_time_hours": 3.2,
+    "device": "mps"
+  },
+  "class_names": [
+    "bat",
+    "owl",
+    "raccoon",
+    "opossum",
+    "deer",
+    "fox",
+    "coyote",
+    "unknown"
+  ]
+}

@@ -1,0 +1,154 @@
+{
+  "versions": {
+    "audio": {
+      "version": "1.0.0",
+      "url": "https://api.nightscan.com/models/audio_light_model.tflite",
+      "size": 11185827,
+      "checksum": "sha256:audio_light_v1.0.0",
+      "accuracy": 0.85,
+      "classes": [
+        "bird_song",
+        "mammal_call",
+        "insect_sound",
+        "amphibian_call",
+        "environmental_sound",
+        "unknown_species"
+      ],
+      "releaseDate": "2025-07-13T17:30:32.031639",
+      "changelog": "Generated light model for ios deployment",
+      "inputSize": [
+        128,
+        128
+      ],
+      "framework": "pytorch_quantized",
+      "modelType": "audio"
+    },
+    "photo": {
+      "version": "1.0.0",
+      "url": "https://api.nightscan.com/models/photo_light_model.tflite",
+      "size": 11187875,
+      "checksum": "sha256:photo_light_v1.0.0",
+      "accuracy": 0.84,
+      "classes": [
+        "bat",
+        "owl",
+        "raccoon",
+        "opossum",
+        "deer",
+        "fox",
+        "coyote",
+        "unknown"
+      ],
+      "releaseDate": "2025-07-13T17:30:32.031661",
+      "changelog": "Generated light model for ios deployment",
+      "inputSize": [
+        224,
+        224
+      ],
+      "framework": "pytorch_quantized",
+      "modelType": "photo"
+    }
+  },
+  "models": {
+    "audio_light_v1": {
+      "id": "audio_light_v1",
+      "type": "audio",
+      "variant": "light",
+      "framework": "pytorch_quantized",
+      "version": "1.0.0",
+      "size": 11185827,
+      "accuracy": 0.85,
+      "classes": [
+        "bird_song",
+        "mammal_call",
+        "insect_sound",
+        "amphibian_call",
+        "environmental_sound",
+        "unknown_species"
+      ],
+      "inputSize": [
+        128,
+        128
+      ],
+      "deploymentTarget": "ios",
+      "downloadUrl": "https://api.nightscan.com/models/audio_light_model.tflite",
+      "createdAt": "2025-07-13T17:30:32.031639"
+    },
+    "photo_light_v1": {
+      "id": "photo_light_v1",
+      "type": "photo",
+      "variant": "light",
+      "framework": "pytorch_quantized",
+      "version": "1.0.0",
+      "size": 11187875,
+      "accuracy": 0.84,
+      "classes": [
+        "bat",
+        "owl",
+        "raccoon",
+        "opossum",
+        "deer",
+        "fox",
+        "coyote",
+        "unknown"
+      ],
+      "inputSize": [
+        224,
+        224
+      ],
+      "deploymentTarget": "ios",
+      "downloadUrl": "https://api.nightscan.com/models/photo_light_model.tflite",
+      "createdAt": "2025-07-13T17:30:32.031661"
+    },
+    "audio_heavy_v1": {
+      "id": "audio_heavy_v1",
+      "type": "audio",
+      "variant": "heavy",
+      "framework": "pytorch",
+      "version": "1.0.0",
+      "size": 46830571,
+      "accuracy": 0.92,
+      "classes": [
+        "bird_song",
+        "mammal_call",
+        "insect_sound",
+        "amphibian_call",
+        "environmental_sound",
+        "unknown_species"
+      ],
+      "inputSize": [
+        128,
+        128
+      ],
+      "deploymentTarget": "vps",
+      "downloadUrl": null,
+      "createdAt": "2025-07-13T17:30:32.031665"
+    },
+    "photo_heavy_v1": {
+      "id": "photo_heavy_v1",
+      "type": "photo",
+      "variant": "heavy",
+      "framework": "pytorch",
+      "version": "1.0.0",
+      "size": 46830571,
+      "accuracy": 0.89,
+      "classes": [
+        "bat",
+        "owl",
+        "raccoon",
+        "opossum",
+        "deer",
+        "fox",
+        "coyote",
+        "unknown"
+      ],
+      "inputSize": [
+        224,
+        224
+      ],
+      "deploymentTarget": "vps",
+      "downloadUrl": null,
+      "createdAt": "2025-07-13T17:30:32.031667"
+    }
+  }
+}

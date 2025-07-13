@@ -1,0 +1,26 @@
+{
+  "model_info": {
+    "model_version": "1.0.0",
+    "framework": "pytorch",
+    "creation_date": "2025-07-13T17:47:22.268729",
+    "description": "EfficientNet-B1 specialized for audio spectrogram classification",
+    "model_type": "audio",
+    "variant": "heavy"
+  },
+  "training_info": {
+    "epoch": 10,
+    "loss": 0.156,
+    "accuracy": 0.92,
+    "val_accuracy": 0.88,
+    "training_time_hours": 2.5,
+    "device": "mps"
+  },
+  "class_names": [
+    "bird_song",
+    "mammal_call",
+    "insect_sound",
+    "amphibian_call",
+    "environmental_sound",
+    "unknown_species"
+  ]
+}

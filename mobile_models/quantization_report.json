@@ -1,0 +1,27 @@
+{
+  "timestamp": "2025-07-13T17:53:20.475241",
+  "conversion_stats": {
+    "models_processed": 0,
+    "successful_conversions": 0,
+    "failed_conversions": 2,
+    "total_size_reduction": 0,
+    "accuracy_retention": []
+  },
+  "model_results": {
+    "audio": {
+      "success": false,
+      "model_type": "audio",
+      "error": "Module onnx is not installed!"
+    },
+    "photo": {
+      "success": false,
+      "model_type": "photo",
+      "error": "Module onnx is not installed!"
+    }
+  },
+  "system_info": {
+    "tensorflow_available": false,
+    "coreml_available": false,
+    "device": "cpu"
+  }
+}

@@ -210,29 +210,35 @@ class ModelQuantizationPipeline:
     def _load_pytorch_model(self, model_path: Path, config: Dict) -> nn.Module:
         """Charge un modèle PyTorch."""
         try:
+            # Charger le checkpoint complet
+            checkpoint = torch.load(model_path, map_location=self.device)
+            
             # Importer le modèle approprié
             if 'audio' in str(model_path):
-                from audio_training_efficientnet.models.efficientnet_config import EfficientNetConfig, create_model
-                model_config = EfficientNetConfig(
-                    model_name=config['model_name'],
+                from audio_training_efficientnet.models.efficientnet_config import create_audio_model
+                model = create_audio_model(
                     num_classes=config['num_classes'],
+                    model_name=config['model_name'],
                     pretrained=False
                 )
             else:
-                from picture_training_enhanced.models.photo_config import PhotoConfig, create_model
-                model_config = PhotoConfig(
-                    model_name=config['model_name'],
+                from picture_training_enhanced.models.photo_config import create_photo_model
+                model = create_photo_model(
                     num_classes=config['num_classes'],
-                    architecture='efficientnet',
+                    model_name=config['model_name'],
                     pretrained=False
                 )
             
-            # Créer et charger le modèle
-            model = create_model(model_config)
-            state_dict = torch.load(model_path, map_location=self.device)
-            model.load_state_dict(state_dict)
-            model.eval()
+            # Charger les poids du modèle depuis le checkpoint
+            if 'model_state_dict' in checkpoint:
+                model.load_state_dict(checkpoint['model_state_dict'])
+                logger.info(f"Modèle chargé avec métadonnées: {checkpoint.get('metadata', {}).get('description', 'N/A')}")
+            else:
+                # Fallback pour les anciens formats
+                model.load_state_dict(checkpoint)
+                logger.info("Modèle chargé (format legacy)")
             
+            model.eval()
             return model
             
         except Exception as e:

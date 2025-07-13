@@ -1,0 +1,25 @@
+{
+  "model_info": {
+    "model_version": "1.0.0",
+    "framework": "pytorch_quantized",
+    "creation_date": "2025-07-13T17:56:18.900628",
+    "description": "Quantized EfficientNet-B1 light model for audio classification",
+    "model_type": "audio",
+    "variant": "light",
+    "deployment_target": "ios"
+  },
+  "training_info": {
+    "base_model": "audio_training_efficientnet/models/best_model.pth",
+    "quantization_date": "2025-07-13T17:56:18.900615",
+    "quantization_method": "PyTorch dynamic quantization",
+    "device": "cpu"
+  },
+  "class_names": [
+    "bird_song",
+    "mammal_call",
+    "insect_sound",
+    "amphibian_call",
+    "environmental_sound",
+    "unknown_species"
+  ]
+}
