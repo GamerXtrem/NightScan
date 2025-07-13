@@ -1,0 +1,239 @@
+version: '3.8'
+
+services:
+  # Integration test database
+  integration-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: integration_test
+      POSTGRES_PASSWORD: integration_test_pass
+      POSTGRES_DB: nightscan_integration_test
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    volumes:
+      - integration_db_data:/var/lib/postgresql/data
+      - ./database/create_database.sql:/docker-entrypoint-initdb.d/01-create-tables.sql
+      - ./database/test_data.sql:/docker-entrypoint-initdb.d/02-test-data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U integration_test -d nightscan_integration_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      postgres 
+      -c log_statement=all
+      -c log_destination=stderr
+      -c logging_collector=off
+      -c max_connections=100
+      -c shared_buffers=256MB
+
+  # Integration test Redis
+  integration-redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - integration_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Integration test Celery worker
+  integration-celery:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    image: nightscan-worker:integration
+    environment:
+      - ENVIRONMENT=integration
+      - DATABASE_URL=postgresql://integration_test:integration_test_pass@integration-db:5432/nightscan_integration_test
+      - REDIS_URL=redis://integration-redis:6379/0
+      - CELERY_BROKER_URL=redis://integration-redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://integration-redis:6379/2
+      - SECRET_KEY=integration-secret-key-for-testing-only
+      - MODEL_PATH=/app/models/test_model.pth
+      - CSV_DIR=/app/data/test
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+    volumes:
+      - ./models:/app/models:ro
+      - ./data:/app/data:ro
+      - ./logs:/app/logs
+    depends_on:
+      integration-db:
+        condition: service_healthy
+      integration-redis:
+        condition: service_healthy
+    command: celery -A web.tasks worker --loglevel=info --concurrency=2
+    healthcheck:
+      test: ["CMD", "celery", "-A", "web.tasks", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Integration test web application
+  integration-web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    image: nightscan-web:integration
+    environment:
+      - ENVIRONMENT=integration
+      - DEBUG=true
+      - TESTING=true
+      - DATABASE_URL=postgresql://integration_test:integration_test_pass@integration-db:5432/nightscan_integration_test
+      - REDIS_URL=redis://integration-redis:6379/0
+      - CELERY_BROKER_URL=redis://integration-redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://integration-redis:6379/2
+      - SECRET_KEY=integration-secret-key-for-testing-only
+      - CSRF_SECRET_KEY=integration-csrf-secret-key
+      - ALLOWED_HOSTS=*
+      - PREDICT_API_URL=http://integration-prediction:8002/api/predict
+      - WTF_CSRF_ENABLED=false
+      - RATELIMIT_ENABLED=false
+      - LOGIN_DISABLED=false
+      - PYTHONPATH=/app
+      - FLASK_APP=web.app:app
+    ports:
+      - "8100:8000"  # Different port for integration tests
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./static:/app/static
+    depends_on:
+      integration-db:
+        condition: service_healthy
+      integration-redis:
+        condition: service_healthy
+      integration-celery:
+        condition: service_started
+    command: >
+      sh -c "
+        flask db upgrade || echo 'DB migration failed, continuing...' &&
+        gunicorn -w 2 -b 0.0.0.0:8000 --timeout 120 --keep-alive 2 web.app:app
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Integration test prediction API
+  integration-prediction:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.prediction
+    image: nightscan-prediction:integration
+    environment:
+      - ENVIRONMENT=integration
+      - MODEL_PATH=/app/models/test_model.pth
+      - CSV_DIR=/app/data/test
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+    ports:
+      - "8102:8002"  # Different port for integration tests
+    volumes:
+      - ./models:/app/models:ro
+      - ./data:/app/data:ro
+      - ./logs:/app/logs
+    command: >
+      sh -c "
+        python -c 'import torch; model = torch.nn.Linear(10, 5); torch.save(model.state_dict(), \"/app/models/test_model.pth\")' &&
+        gunicorn -w 1 -b 0.0.0.0:8002 --timeout 300 Audio_Training.scripts.api_server:application
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Integration test runner
+  integration-test-runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.test
+    image: nightscan-test:integration
+    environment:
+      - ENVIRONMENT=integration
+      - TESTING=true
+      - DATABASE_URL=postgresql://integration_test:integration_test_pass@integration-db:5432/nightscan_integration_test
+      - REDIS_URL=redis://integration-redis:6379/0
+      - TEST_DATABASE_URL=postgresql://integration_test:integration_test_pass@integration-db:5432/nightscan_integration_test
+      - TEST_REDIS_URL=redis://integration-redis:6379/1
+      - SECRET_KEY=integration-secret-key-for-testing-only
+      - PYTHONPATH=/app
+      - PYTEST_MARKERS=integration
+    volumes:
+      - .:/app
+      - ./test-results:/app/test-results
+      - ./logs:/app/logs
+    depends_on:
+      integration-web:
+        condition: service_healthy
+      integration-prediction:
+        condition: service_healthy
+      integration-celery:
+        condition: service_started
+    working_dir: /app
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 10 &&
+        echo 'Running integration tests...' &&
+        pytest tests/integration/ -v 
+        --tb=short 
+        --junitxml=/app/test-results/integration-results.xml 
+        --cov=web --cov=auth --cov=unified_prediction_system 
+        --cov-report=xml:/app/test-results/integration-coverage.xml 
+        --cov-report=html:/app/test-results/htmlcov-integration 
+        --cov-report=term-missing 
+        -m integration 
+        --durations=10 
+        --timeout=300
+      "
+    profiles:
+      - test
+
+  # Monitoring and debugging tools
+  integration-pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@nightscan.test
+      PGADMIN_DEFAULT_PASSWORD: integration_admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8180:80"
+    volumes:
+      - integration_pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - integration-db
+    profiles:
+      - debug
+
+  integration-redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      REDIS_HOSTS: integration:integration-redis:6379
+    ports:
+      - "8181:8081"
+    depends_on:
+      - integration-redis
+    profiles:
+      - debug
+
+volumes:
+  integration_db_data:
+    driver: local
+  integration_redis_data:
+    driver: local
+  integration_pgadmin_data:
+    driver: local
+
+networks:
+  default:
+    name: nightscan_integration
+    driver: bridge
