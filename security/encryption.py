@@ -301,9 +301,11 @@ class EncryptionManager:
         
         This is a complex operation that should be done carefully.
         """
-        logger.warning("Key rotation requested - this feature should be implemented with care")
-        # TODO: Implement key rotation with re-encryption of existing data
-        return False
+        logger.warning("Key rotation requested - manual implementation required for production")
+        # Key rotation requires careful planning and data re-encryption
+        # Implementation depends on specific encryption patterns in use
+        # For production: implement with database migration strategy
+        raise NotImplementedError("Key rotation requires production-specific implementation")
     
     def get_encryption_info(self) -> Dict[str, Any]:
         """Get information about encryption configuration."""

@@ -624,14 +624,14 @@ def migrate_legacy_config():
     Migre les configurations legacy vers le système unifié.
     Lit les anciens fichiers de configuration et génère le nouveau format.
     """
-    print("🔄 Migration des configurations legacy")
-    print("=" * 50)
+    logger.info("🔄 Migration des configurations legacy")
+    logger.info("=" * 50)
     
     # Configuration pour chaque environnement
     environments = [Environment.DEVELOPMENT, Environment.STAGING, Environment.PRODUCTION]
     
     for env in environments:
-        print(f"\\n📋 Migration environnement: {env.value}")
+        logger.info(f"\\n📋 Migration environnement: {env.value}")
         
         # Créer une configuration de base
         config = UnifiedConfig(env)
@@ -648,7 +648,7 @@ def migrate_legacy_config():
         migrations_applied = 0
         for legacy_file in legacy_files:
             if Path(legacy_file).exists():
-                print(f"  📄 Lecture de {legacy_file}")
+                logger.info(f"  📄 Lecture de {legacy_file}")
                 migrations_applied += 1
         
         # Sauvegarder la nouvelle configuration
@@ -657,15 +657,15 @@ def migrate_legacy_config():
         
         config_file = output_dir / f"{env.value}.json"
         config.save_to_file(str(config_file), include_secrets=False)
-        print(f"  ✅ Configuration sauvegardée: {config_file}")
+        logger.info(f"  ✅ Configuration sauvegardée: {config_file}")
         
         # Sauvegarder également un template avec secrets
         template_file = output_dir / f"{env.value}.template.json"
         config.save_to_file(str(template_file), include_secrets=True)
-        print(f"  📝 Template créé: {template_file}")
+        logger.info(f"  📝 Template créé: {template_file}")
     
-    print(f"\\n🎉 Migration terminée - {migrations_applied} configurations traitées")
-    print("📁 Nouvelles configurations dans: config/unified/")
+    logger.info(f"\\n🎉 Migration terminée - {migrations_applied} configurations traitées")
+    logger.info("📁 Nouvelles configurations dans: config/unified/")
 
 
 if __name__ == "__main__":
@@ -675,9 +675,9 @@ if __name__ == "__main__":
         migrate_legacy_config()
     else:
         # Test de la configuration
-        print("🧪 Test de la configuration unifiée")
+        logger.info("🧪 Test de la configuration unifiée")
         config = get_config()
-        print(f"Environnement: {config.environment.value}")
-        print(f"Base de données: {config.database.get_safe_url()}")
-        print(f"Cache: {config.cache.get_safe_url()}")
-        print(f"Service web: {config.get_service_url('web')}")
+        logger.info(f"Environnement: {config.environment.value}")
+        logger.info(f"Base de données: {config.database.get_safe_url()}")
+        logger.info(f"Cache: {config.cache.get_safe_url()}")
+        logger.info(f"Service web: {config.get_service_url('web')}")

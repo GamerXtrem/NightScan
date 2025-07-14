@@ -473,9 +473,9 @@ async def test_push_notifications():
         }
     )
     
-    # Print stats
+    # Log stats
     stats = service.get_stats()
-    print(f"Push service stats: {stats}")
+    logger.debug(f"Push service stats: {stats}")
 
 
 if __name__ == "__main__":
