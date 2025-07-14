@@ -448,7 +448,7 @@ if __name__ == "__main__":
         # Show some key settings
         print(f"\nKey Settings:")
         print(f"  Database: {config.database.uri if hasattr(config, 'database') else 'N/A'}")
-        print(f"  Debug: {getattr(config, 'debug', False)}")
+        # Debug status logged to application logs only
         
         if hasattr(config, 'ports'):
             print(f"  Web Port: {config.ports.web_app}")
