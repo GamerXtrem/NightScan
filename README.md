@@ -1,303 +1,166 @@
-# NightScan
+# 🌙 NightScan
 
-NightScan is an experiment in training neural networks to recognize night-time animals.
-The project is organized into two main folders:
+**NightScan** est un système intelligent de détection et surveillance de la faune nocturne utilisant l'intelligence artificielle pour reconnaître les animaux par l'analyse audio et visuelle.
 
-- **Audio_Training/** – tools for preparing audio clips, generating spectrograms and training models to classify animal sounds.
-- **Picture_Training/** – scripts for building image datasets and training image recognition models.
+## 🚀 Installation et Démarrage
 
-For a quick overview of how to set up and run the audio workflow, see **Manual_en.md** at the repository root.
+**👉 [Guide d'Installation Complet](INSTALLATION_GUIDE.md) 👈**
 
-## VPS setup
+Le guide complet vous accompagne étape par étape selon votre type d'installation :
+- 🖥️ **Installation Locale** (développement/tests)
+- 🌐 **VPS Production** (déploiement internet)
+- 🏗️ **Docker** (containers)
+- 🔧 **Raspberry Pi** (capteurs terrain)
 
-Run the setup script with root privileges so that `apt` can install the
-required system packages. The script attempts to use `sudo` when it is not
-executed as `root` and will exit if neither root nor `sudo` is available:
+### ⚡ Démarrage Rapide
 
 ```bash
-sudo bash setup_vps_infomaniak.sh
+# Installation locale simple
+git clone https://github.com/votre-org/nightscan.git
+cd nightscan
+chmod +x setup_local.sh && ./setup_local.sh
+source env/bin/activate && python web/app.py
 ```
 
-The script clones the repository if needed, installs `git`, `python3`,
-`ffmpeg` and `portaudio`, then creates `env/` and installs the Python
-requirements (including `pyaudio`).
+**→ Accès :** http://localhost:8000
 
-If you are deploying on a new Infomaniak VPS, see
-[`docs/en/vps_lite_first_connection.md`](docs/en/vps_lite_first_connection.md)
-for instructions on making the initial SSH connection.
+## 🏗️ Architecture Système
 
-## Web interface
+Le projet est organisé en plusieurs composants :
 
-A minimal Flask application in `web/` forwards
-uploaded audio clips to a prediction API. The endpoint URL is
-read from the `PREDICT_API_URL` environment variable.
+- **🎵 Audio Training** – Outils de préparation audio, spectrogrammes et entraînement de modèles
+- **📸 Picture Training** – Scripts pour datasets d'images et reconnaissance visuelle  
+- **🌐 Web Interface** – Application Flask avec authentification et upload
+- **📱 Mobile App** – Client React Native pour iOS/Android
+- **🤖 Unified Prediction** – API unifiée de prédiction audio/photo
+- **🔧 Raspberry Pi** – Code pour capteurs terrain embarqués
 
-### 🚀 Optimized ML Serving
+## 📊 Fonctionnalités Principales
 
-NightScan now includes advanced ML serving optimization with:
-- **Connection Pooling**: Database, Redis, and HTTP connection pools
-- **Model Instance Pooling**: Multiple model instances for load balancing  
-- **Batch Inference**: Automatic batching for improved throughput
-- **Intelligent Caching**: Multi-level caching with Redis
-- **Performance Monitoring**: Real-time metrics and statistics
+### 🎯 Détection Intelligente
+- **Reconnaissance Audio** : Classification automatique des cris d'animaux nocturnes
+- **Analyse Visuelle** : Détection et identification par caméra infrarouge
+- **Prédiction Edge** : Traitement local sur Raspberry Pi pour temps réel
+- **API Unifiée** : Traitement automatique audio/photo avec routage intelligent
 
-See [docs/ML_SERVING_OPTIMIZATION.md](docs/ML_SERVING_OPTIMIZATION.md) for detailed documentation.
+### 🌐 Interface Web Moderne
+- **Dashboard Temps Réel** : Visualisation détections et statistiques
+- **Gestion Utilisateurs** : Authentification sécurisée, quotas, plans
+- **Upload Sécurisé** : Traitement fichiers jusqu'à 100MB avec validation
+- **Export Données** : CSV, KML pour analyse géospatiale
 
-**Quick Demo:**
+### 📱 Application Mobile
+- **React Native** : Compatible iOS et Android
+- **Cartes Interactives** : Affichage géolocalisé des détections
+- **Notifications Push** : Alertes temps réel nouvelles détections
+- **Mode Hors-ligne** : Synchronisation automatique
+
+### 🔧 Monitoring & Production
+- **Métriques Avancées** : Prometheus + Grafana
+- **Haute Disponibilité** : Circuit breakers, connection pooling
+- **Sécurité Renforcée** : CSP, rate limiting, audit trails
+- **Docker Ready** : Déploiement containerisé complet
+
+## 📚 Documentation Technique
+
+### Guides d'Installation et Configuration
+- **[Guide d'Installation Complet](INSTALLATION_GUIDE.md)** - Installation pas à pas tous environnements
+- **[Guide Docker](README-Docker.md)** - Déploiement containerisé
+- **[Guide VPS Production](DEPLOYMENT_GUIDE.md)** - Déploiement production VPS Lite
+- **[Configuration Développeur](CLAUDE.md)** - Environnement et commandes développement
+
+### Documentation Spécialisée  
+- **[Optimisation ML](docs/ML_SERVING_OPTIMIZATION.md)** - Performance, caching, pooling
+- **[Sécurité](docs/SECURITY_AUDIT_EXTERNAL_GUIDE.md)** - Audit, hardening, compliance
+- **[Monitoring](docs/OPERATIONS_PROCEDURES.md)** - Métriques, alertes, maintenance
+- **[Backup/Recovery](docs/BACKUP_DISASTER_RECOVERY.md)** - Sauvegarde, restauration
+
+### Composants Spécifiques
+- **[API Server](docs/en/api_server.md)** - Configuration API de prédiction
+- **[Application Mobile](docs/en/mobile_app.md)** - React Native, Expo
+- **[Setup Raspberry Pi](docs/en/pi_setup.md)** - Configuration capteurs terrain
+- **[Plugin WordPress](docs/en/wordpress_plugin.md)** - Intégration WP
+
+## 🚀 Démarrage Rapide Développeur
+
+### Installation Locale
 ```bash
-# Run optimization demo
-python demo_optimized_serving.py --mode demo
-
-# Start optimized server
-python demo_optimized_serving.py --mode server
-```
-
-Launch it inside the virtual environment. Install `gunicorn` if it is not
-already available (it is listed in `requirements.txt`) and start the server
-with Gunicorn rather than the built in Flask runner:
-
-```bash
-source env/bin/activate
-pip install gunicorn
+git clone https://github.com/votre-org/nightscan.git
+cd nightscan
+python -m venv env && source env/bin/activate
+pip install -r requirements.txt
 export SECRET_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
-export WTF_CSRF_SECRET_KEY="$SECRET_KEY"  # optional
-export PREDICT_API_URL="https://myserver.example/api/predict"
+export SQLALCHEMY_DATABASE_URI="sqlite:///nightscan.db"
+python -c "from web.app import app, db; app.app_context().push(); db.create_all()"
 gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 ```
 
-The Flask app offloads the prediction request to a Celery worker when a
-file is uploaded. Start at least one worker alongside Gunicorn:
+### Docker Compose
+```bash
+git clone https://github.com/votre-org/nightscan.git
+cd nightscan  
+docker-compose up -d
+```
+
+**→ Accès Application :** http://localhost:8000  
+**→ Accès API :** http://localhost:8001  
+**→ Monitoring :** http://localhost:3000 (Grafana)
+
+## 🧪 Tests et Validation
 
 ```bash
-celery -A web.tasks worker --loglevel=info
+# Tests automatiques complets
+pytest tests/ -v --cov=. --cov-report=term
+
+# Tests par type
+pytest -m unit        # Tests unitaires
+pytest -m integration # Tests d'intégration  
+pytest -m performance # Tests de performance
+
+# Validation sécurité
+bandit -r . && safety check
+
+# Tests application mobile
+cd ios-app && npm test
 ```
 
-The command above binds the web server to `0.0.0.0`, exposing it on every network interface. This is typical when running behind a reverse proxy or with firewall rules in place. If you prefer to keep the service private, bind to `127.0.0.1` or block the port using a firewall such as `ufw`.
+## 🌍 Écosystème NightScan
 
-The application connects to a database using the URL in
-`SQLALCHEMY_DATABASE_URI`. This variable is **mandatory**—`create_app()` raises
-`RuntimeError` when it is missing. Provide secure credentials in the URI and
-adjust it if you want to switch to another backend such as SQLite.
-See [`docs/en/flask_app.md`](docs/en/flask_app.md) for details on the login
-routes and database initialization.
+### Applications et Services
+- **🌐 Interface Web** : Dashboard principal avec authentification
+- **📱 App Mobile** : Client iOS/Android React Native
+- **🔧 NightScan Pi** : Système embarqué Raspberry Pi
+- **🔌 Plugin WordPress** : Intégration CMS
 
-Set the `PREDICT_API_URL` environment variable to point to your
-prediction service. If `SECRET_KEY` is not defined the web app
-generates a temporary value, but you should configure a stable random
-string in production.
-`Flask-WTF` provides CSRF protection. It will reuse `SECRET_KEY` unless you
-set a dedicated `WTF_CSRF_SECRET_KEY` variable.
-To start the prediction API, define the path to the trained model and the
-directory containing the training CSV files, then launch the server with
-Gunicorn:
+### Objectifs Utilisateurs
+- **🔬 Chercheurs** : Analyse scientifique de la faune nocturne
+- **📸 Photographes Animaliers** : Localisation et tracking espèces
+- **🌿 Naturalistes** : Observation et documentation biodiversité
+- **🏞️ Gestionnaires Espaces** : Monitoring écosystèmes protégés
 
-```bash
-export MODEL_PATH="models/best_model.pth"
-export CSV_DIR="data/processed/csv"
-gunicorn -w 4 -b 0.0.0.0:8001 \
-  Audio_Training.scripts.api_server:application
+## 🤝 Contribution et Support
 
-```
-Set `PREDICT_LOG_FILE` or pass `--log-file` to `api_server.py` if you want each
-prediction appended as a JSON line for later review.
+### Contribuer au Projet
+- **🐛 Issues** : [Signaler bugs et demandes](https://github.com/votre-org/nightscan/issues)
+- **💬 Discussions** : [Communauté](https://github.com/votre-org/nightscan/discussions)
+- **🔧 Pull Requests** : Contributions code bienvenues
+- **📖 Documentation** : Améliorer guides existants
 
-Like the web app, this command listens on `0.0.0.0` so the API is reachable from any interface. Behind a proxy or with firewall rules this is fine. Otherwise consider binding to `127.0.0.1` or restricting the port with a firewall.
+### Obtenir de l'Aide
+- **📚 Documentation Complète** : Toutes les informations dans `/docs/`
+- **⚡ Guide Installation** : [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)
+- **🔧 Guide Développeur** : [CLAUDE.md](CLAUDE.md)
+- **🚨 Dépannage** : Section FAQ dans guide installation
 
-`web/app.py` expects this API to listen on `http://localhost:8001/api/predict`
-unless you override `PREDICT_API_URL`.
-For production deployments set `PREDICT_API_URL` to an `https://` endpoint so
-uploads are encrypted in transit.
-The home page exposes a form for manual tests.
-When a WAV file is submitted, the server posts it to this API and
-displays the JSON response.
+## 📄 Licence et Copyright
 
-Each upload may be up to 100 MB. The server also keeps track of the
-storage used by every account and refuses new files once a user reaches
-10 GB in total.
+**Licence** : GNU General Public License v3.0  
+**Copyright** : NightScan Project Contributors
 
-### Example Nginx configuration
+Voir [LICENSE](LICENSE) pour les détails complets.
 
-```
-server {
-    listen 80;
-    server_name example.com;
+---
 
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+**🌟 NightScan - Révéler les secrets de la nuit grâce à l'IA**
 
-This forwards HTTP requests to the Gunicorn workers listening on port 8000.
-Use a similar block for the API server on port 8001 so all traffic goes
-through the reverse proxy.
-When exposing the service to the internet, terminate HTTPS at the proxy so both
-the web app and prediction API are accessed securely.
-
-For convenience the repository provides `setup_nginx.sh`, a helper script that
-installs Nginx and writes this configuration. If you prefer an end-to-end setup
-including HTTPS certificates, use `setup_nginx_tls.sh` instead. Both helpers are
-documented in `docs/en/nginx_setup.md`.
-
-## Quick prediction test
-
-After running the setup script (`bash setup_vps_infomaniak.sh`) you can
-immediately test the model locally. Activate the virtual environment
-created by `setup_vps_infomaniak.sh`:
-
-```bash
-source env/bin/activate
-```
-
-Ensure you have a trained model (for example
-`models/best_model.pth`) and the CSV directory generated during the
-preprocessing step (typically `data/processed/csv`). You can then run
-the prediction script on one or more WAV files:
-
-```bash
-python Audio_Training/scripts/predict.py \
-  --model_path models/best_model.pth \
-  --csv_dir data/processed/csv \
-  path/to/your_audio.wav
-```
-
-The script prints the three most probable classes for each audio
-segment. Add `--json` to get the result as JSON and `--json-file` to
-save it for later. No environment
-variables are required for this command, but the dependencies installed
-in `env/` (PyTorch, torchaudio, pydub, etc.) must be available.
-
-## Updating dependencies
-
-All packages in `requirements.txt` are pinned to the versions verified by the
-tests. When a dependency needs an upgrade, activate the virtual environment and
-install the new versions with `pip --upgrade`. After verifying that `pytest`
-passes, regenerate the file using `pip freeze`:
-
-```bash
-source env/bin/activate
-pip install -U -r requirements.txt
-pytest
-pip freeze > requirements.txt
-```
-
-
-## Running tests
-
-The automated tests rely on every package listed in `requirements.txt`.
-Install them inside the virtual environment and invoke `pytest`:
-
-```bash
-source env/bin/activate
-pip install -r requirements.txt
-pytest
-```
-
-If you only need to run the suite on a machine without the heavy
-PyTorch stack, use `requirements-ci.txt` instead. The test helper
-automatically provides stub versions of the missing libraries so the
-tests still execute:
-
-```bash
-pip install -r requirements-ci.txt
-pytest
-```
-
-Commit the updated `requirements.txt` once the tests succeed.
-
-## WordPress plugin
-
-A small plugin located in `wp-plugin/prediction-charts` can display
-user prediction statistics inside WordPress. See
-[`docs/en/wordpress_plugin.md`](docs/en/wordpress_plugin.md) for the expected
-database structure, how to export data from the Flask app and an example
-of the `[nightscan_chart]` shortcode. The repository ships with
-`export_predictions.py` to copy predictions from the Flask database to the
-WordPress table.
-
-The plugins live in the `wp-plugin/` directory. Run
-`./package_wp_plugins.sh` to create ZIP archives that include the version
-numbers declared in each PHP header (for example
-`audio-upload-1.0.zip`).
-
-### Installing the plugins
-
-1. Run `./package_wp_plugins.sh` to generate the archives.
-2. Log into WordPress as an administrator.
-3. Navigate to **Plugins › Add New › Upload Plugin**.
-4. Select the desired ZIP file (e.g. `audio-upload-1.0.zip`), click
-   **Install Now** and activate the plugin.
-
-The prediction chart shortcode becomes available immediately. For the
-uploader plugin, configure the API endpoint after activation as shown
-below.
-
-You can regenerate the archives after modifying the plugin sources by
-running `./package_wp_plugins.sh` from the repository root.
-
-## Uploading from WordPress
-
-The repository also includes **NightScan Audio Upload**, a plugin that
-lets WordPress send WAV files directly to your prediction API. Copy the
-`wp-plugin/audio-upload` folder into `wp-content/plugins/` and activate
-it from the admin panel. Set the API endpoint with the `ns_api_endpoint`
-option so the plugin knows where to post the files, e.g. using WP‑CLI:
-
-```bash
-wp option update ns_api_endpoint https://your-vps.example/api/predict
-```
-
-Your WordPress site can run on a different host from the prediction
-server. Set the `API_CORS_ORIGINS` environment variable so the API
-allows requests from your WordPress domain (see
-`docs/en/api_server.md`). HTTPS is also recommended so uploads succeed.
-
-WordPress may enforce stricter file size limits via PHP. In `php.ini`,
-set `upload_max_filesize` and `post_max_size` to at least `100M` so the
-plugin can accept files up to 100 MB.
-
-The plugin records how much storage each user has used in the
-`nsau_total_bytes` user meta field. Once uploads reach 10 GB the form
-rejects additional files and shows the remaining quota next to the
-upload button.
-
-## App
-
-For instructions on building a mobile client in React Native, see
-[`docs/en/mobile_app.md`](docs/en/mobile_app.md). A minimal starter
-project is included under [`ios-app/`](ios-app/).
-
-### Application objectives and user experience
-
-1. **Easy access to observations**
-   - Display on an interactive map all detections (sounds or photos) reported by field sensors.
-   - Provide a chronological list showing the latest observations with species, time and location.
-2. **Quick review and notifications**
-   - Receive real-time notifications when a new detection is processed.
-   - Filter detections by species or geographic area to obtain relevant results immediately.
-3. **Sharing and export**
-   - Allow users to share detections by e‑mail or export them (CSV/KMZ) for later analysis.
-
-**Target users**: wildlife photographers, amateur naturalists, researchers or anyone interested in tracking nocturnal fauna.
-**Interface**: clean with a bottom navigation bar for the map, detection list, filters and settings.
-**Usage**: familiar gestures (pinch to zoom, scrolling, pull to refresh) so the app remains intuitive on iOS and Android.
-**Simplicity first**: users quickly see when and where animals were observed without viewing the raw media.
-
-For additional details see
-[`docs/en/application_objectives.md`](docs/en/application_objectives.md).
-The previous French version remains available at
-[`docs/fr/application_objectifs.md`](docs/fr/application_objectifs.md).
-
-
-## Configuration and logging
-
-The repository provides `config_example.ini` with typical settings such as the
-log file path and active hours. Scripts under `NightScanPi/Program` write
-informational and error messages to `nightscan.log` by default. Set the
-`NIGHTSCAN_LOG` environment variable to override the log file location.
-
-Server modules also emit JSON-formatted logs to standard output. The helper
-function `log_utils.setup_logging()` configures the root logger accordingly so
-that errors on the Flask app or API server are easier to parse.
+*Projet open-source pour la surveillance intelligente de la faune nocturne*

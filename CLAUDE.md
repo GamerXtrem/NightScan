@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 NightScan is a wildlife detection and monitoring system that uses machine learning to recognize nocturnal animals through audio and image analysis. The system consists of multiple components including a web interface, prediction APIs, mobile app, and edge computing capabilities.
 
+**Key Architecture:** Edge-cloud hybrid system with unified prediction API, modular Flask web application, React Native mobile client, and Raspberry Pi edge devices for field deployment.
+
 ## Common Development Commands
 
 ### Python Backend
@@ -41,9 +43,12 @@ gunicorn -w 4 -b 0.0.0.0:8000 web.app:application
 # Start Celery worker
 celery -A web.tasks worker --loglevel=info
 
-# Start prediction API
+# Start unified prediction API (preferred)
 export MODEL_PATH="models/best_model.pth"
 export CSV_DIR="data/processed/csv"
+gunicorn -w 4 -b 0.0.0.0:8002 unified_prediction_system.unified_prediction_api:application
+
+# Start legacy audio-only API
 gunicorn -w 4 -b 0.0.0.0:8001 Audio_Training.scripts.api_server:application
 ```
 
@@ -60,9 +65,49 @@ npm run ios         # Start iOS simulator
 ### Docker
 
 ```bash
-# Build and run with docker-compose
+# Development environment
+docker-compose up -d
+
+# Production deployment
 docker-compose -f docker-compose.production.yml up -d
+
+# Testing environment 
 docker-compose -f docker-compose.test.yml build
+docker-compose -f docker-compose.test.yml run --rm web pytest
+
+# Monitoring stack
+docker-compose -f docker-compose.monitoring.yml up -d
+```
+
+### Machine Learning
+
+```bash
+# Train audio model
+python audio_training_efficientnet/train_audio.py --epochs 50 --batch-size 32
+
+# Train photo model  
+python picture_training_enhanced/train_photo.py --epochs 100 --batch-size 16
+
+# Create lightweight models for edge deployment
+python create_light_models.py --audio-model models/best_model.pth --output mobile_models/
+
+# Test model performance
+python scripts/test-performance.py --model-path models/best_model.pth
+```
+
+### Raspberry Pi Edge Deployment
+
+```bash
+# Setup Pi hardware and services
+cd nightscan_pi
+sudo ./setup_pi.sh
+
+# Configure camera and audio
+sudo ./Hardware/configure_camera_boot.sh
+sudo ./Hardware/configure_respeaker_audio.sh
+
+# Run edge detection service
+python Program/main.py --config nightscan_config.db
 ```
 
 ## Architecture Overview
@@ -91,18 +136,38 @@ docker-compose -f docker-compose.test.yml build
 
 3. **Unified Prediction System (`unified_prediction_system/`)**
    - Single entry point for audio and image predictions
-   - Automatic file type detection and model routing
-   - Supports batch processing and model pooling
+   - Automatic file type detection and model routing via `prediction_router.py`
+   - Supports batch processing and model pooling through `model_manager.py`
+   - File type detection in `file_type_detector.py` handles .wav, .npy, .jpg, .jpeg formats
 
-4. **Configuration (`config.py`)**
-   - Centralized configuration with environment variable support
-   - Validates settings and provides defaults
-   - Manages database, Redis, security, and ML configurations
+4. **Configuration (`unified_config.py`)**
+   - Modern unified configuration system replacing legacy `config.py`
+   - Environment-based configs (development/staging/production) in `config/unified/`
+   - Pydantic validation with dataclass components (DatabaseConfig, CacheConfig, etc.)
+   - Automatic secret generation and environment variable mapping
 
 5. **Database Schema (`database/create_database.sql`)**
    - PostgreSQL with tables for users, predictions, detections, quotas, and retention
-   - Supports tiered plans and usage tracking
+   - Supports tiered plans and usage tracking via `quota_manager.py`
    - Implements archival and data retention strategies
+   - Connection pooling and circuit breakers for reliability
+
+6. **Security Module (`security/`)**
+   - Modular security components: auth, encryption, validation, rate limiting
+   - CSP nonce management in `csp_nonce.py` for dynamic security headers
+   - Sensitive data sanitization and secure logging in `secure_logging.py`
+   - File upload validation and streaming support in `secure_uploads.py`
+
+7. **Circuit Breaker System**
+   - Database, cache, and HTTP circuit breakers in `circuit_breaker_config.py`
+   - Protects against cascading failures in microservice architecture
+   - Configurable failure thresholds and recovery timeouts
+
+8. **Analytics & Monitoring**
+   - Real-time analytics dashboard in `analytics_dashboard.py`
+   - Prometheus metrics collection in `metrics.py`
+   - Cache monitoring and health checks
+   - Performance tracking and quota usage monitoring
 
 ### Critical Implementation Details
 
@@ -140,12 +205,18 @@ docker-compose -f docker-compose.test.yml build
 ### Environment Variables
 
 Critical environment variables that must be set:
-- `SECRET_KEY` - Flask secret key for sessions
-- `SQLALCHEMY_DATABASE_URI` - PostgreSQL connection string
+- `SECRET_KEY` - Flask secret key for sessions (auto-generated if not set)
+- `SQLALCHEMY_DATABASE_URI` - PostgreSQL connection string 
 - `REDIS_URL` - Redis connection for caching and sessions
-- `PREDICT_API_URL` - URL for prediction service
+- `PREDICT_API_URL` - URL for prediction service (defaults to unified API on 8002)
 - `MODEL_PATH` - Path to trained ML model
 - `CSV_DIR` - Directory containing training CSVs
+- `NIGHTSCAN_ENV` - Environment name (development/staging/production)
+- `DOMAIN_NAME` - Domain for production SSL certificates
+- `ADMIN_EMAIL` - Admin email for Let's Encrypt certificates
+
+**Modern Configuration:**
+Use `unified_config.py` with environment-specific JSON files in `config/unified/` for better organization and validation.
 
 ### Common Debugging Tips
 
@@ -160,5 +231,19 @@ Critical environment variables that must be set:
 - All API responses follow consistent JSON structure with `success`, `data`, and `error` fields
 - Database migrations should be backward compatible
 - Security headers are mandatory for all routes
-- File uploads are limited to 100MB with configurable user quotas
+- File uploads are limited to 100MB with configurable user quotas via `quota_manager.py`
 - All timestamps are stored in UTC
+- Use circuit breakers for external service calls to prevent cascade failures
+- Implement proper exception handling using the custom exceptions in `exceptions.py`
+- Follow the unified configuration pattern: prefer `unified_config.py` over legacy config files
+- CSP nonces are required for inline scripts - use `@csp_nonce_required` decorator
+- All sensitive operations should use the security module components
+- Model predictions should route through `unified_prediction_system` for consistency
+
+### Code Quality Standards
+
+- Line length: 120 characters (Black/Ruff configured)
+- Use type hints where possible (MyPy validation enabled)
+- Test markers: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.performance`
+- Security scanning with Bandit is enforced
+- ML code allows relaxed naming conventions (N803, N806 exceptions)
