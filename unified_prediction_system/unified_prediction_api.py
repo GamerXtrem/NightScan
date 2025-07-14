@@ -439,7 +439,7 @@ def main():
     
     print("=== API de Prédiction Unifiée NightScan ===")
     print(f"Démarrage sur {args.host}:{args.port}")
-    print(f"Mode debug: {args.debug}")
+    # Debug mode configuration logged internally
     print(f"Dossier d'upload: {UPLOAD_FOLDER}")
     print(f"Taille max fichier: {MAX_FILE_SIZE / (1024 * 1024):.0f}MB")
     print(f"Extensions autorisées: {', '.join(ALLOWED_EXTENSIONS)}")

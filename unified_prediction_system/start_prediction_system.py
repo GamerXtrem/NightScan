@@ -176,7 +176,7 @@ Exemples d'utilisation:
     print(f"\n🚀 Démarrage du système...")
     print(f"   API: {web_url}")
     print(f"   Interface: {interface_url}")
-    print(f"   Mode debug: {args.debug}")
+    # Debug mode logged to file only for security
     print(f"   Logs: prediction_system.log")
     
     # Démarrer l'API dans un thread séparé

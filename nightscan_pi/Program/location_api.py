@@ -23,7 +23,7 @@ app = Flask(__name__)
 CORS(app)  # Autoriser les requêtes cross-origin pour l'app mobile
 
 # Configuration
-app.config['SECRET_KEY'] = 'nightscan-location-api'
+app.config['SECRET_KEY'] = os.environ.get('LOCATION_API_SECRET', 'dev-location-key-change-in-prod')
 app.config['JSON_SORT_KEYS'] = False
 
 def create_response(success=True, data=None, message="", error=None):

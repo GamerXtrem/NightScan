@@ -67,7 +67,7 @@ class WiFiNetwork:
 class HotspotConfig:
     """Hotspot configuration."""
     ssid: str = "NightScan-Setup"
-    password: str = "nightscan2024"
+    password: str = os.environ.get('HOTSPOT_PASSWORD', 'changeme-hotspot-pwd')
     channel: int = 6
     hidden: bool = False
     max_clients: int = 10
