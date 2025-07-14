@@ -1,0 +1,102 @@
+# Configuration Alertmanager pour NightScan
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@nightscan.com'
+  smtp_require_tls: true
+
+# Templates d'alertes
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Configuration routage alertes
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+  routes:
+    # Alertes critiques - notification immédiate
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 5m
+    
+    # Alertes warning - notification différée
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 5m
+      repeat_interval: 30m
+
+# Inhibition rules - éviter spam alertes
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']
+
+# Configuration receivers
+receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'devops@nightscan.com'
+        subject: 'NightScan Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'devops@nightscan.com, oncall@nightscan.com'
+        subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        body: |
+          ALERTE CRITIQUE NIGHTSCAN
+          
+          {{ range .Alerts }}
+          🔥 {{ .Annotations.summary }}
+          
+          Description: {{ .Annotations.description }}
+          Heure: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          
+          Action requise immédiatement !
+          {{ end }}
+    
+    # Webhook pour Slack (si configuré)
+    webhook_configs:
+      - url: 'http://webhook.site/your-slack-webhook'
+        send_resolved: true
+        title: 'NightScan Critical Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'devops@nightscan.com'
+        subject: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        body: |
+          ALERTE WARNING NIGHTSCAN
+          
+          {{ range .Alerts }}
+          ⚠️ {{ .Annotations.summary }}
+          
+          Description: {{ .Annotations.description }}
+          Heure: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+
+# Configuration silence patterns
+silences:
+  # Maintenance windows automatiques
+  - matchers:
+      - name: alertname
+        value: MaintenanceWindow
+    starts_at: "2025-07-14T02:00:00Z"
+    ends_at: "2025-07-14T04:00:00Z"
+    created_by: "maintenance-script"
+    comment: "Maintenance window - automated"

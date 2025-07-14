@@ -1,0 +1,475 @@
+name: NightScan CI/CD Complete Pipeline
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # 1. Tests et validation qualité
+  test-quality:
+    name: Tests & Quality Checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: nightscan_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:6
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-ci.txt
+
+      - name: Validate environment
+        run: |
+          python scripts/validate_env.py --ci
+        env:
+          NIGHTSCAN_ENV: test
+          SQLALCHEMY_DATABASE_URI: postgresql://postgres:test_password@localhost:5432/nightscan_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run security audit
+        run: |
+          python scripts/security_audit.py --ci --no-interactive
+          bandit -r . -f json -o security-report.json
+          safety check --json --output safety-report.json
+        continue-on-error: true
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term \
+            --cov-report=html \
+            --junitxml=pytest-results.xml
+        env:
+          NIGHTSCAN_ENV: test
+          SQLALCHEMY_DATABASE_URI: postgresql://postgres:test_password@localhost:5432/nightscan_test
+          REDIS_URL: redis://localhost:6379
+          SECRET_KEY: test_secret_key_for_ci
+
+      - name: Code quality checks
+        run: |
+          # Formatting
+          black --check .
+          
+          # Import sorting
+          isort --check-only .
+          
+          # Linting
+          ruff check . --output-format=json --output-file=ruff-report.json
+          
+          # Type checking
+          mypy . --ignore-missing-imports --json-report mypy-report
+        continue-on-error: true
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: |
+            pytest-results.xml
+            coverage.xml
+            htmlcov/
+            security-report.json
+            safety-report.json
+            ruff-report.json
+            mypy-report/
+
+  # 2. Tests d'intégration
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test-quality
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: nightscan_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:6
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-ci.txt
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration/ -v \
+            --junitxml=integration-results.xml
+        env:
+          NIGHTSCAN_ENV: test
+          SQLALCHEMY_DATABASE_URI: postgresql://postgres:test_password@localhost:5432/nightscan_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Performance tests
+        run: |
+          python scripts/simple_load_test.py
+        env:
+          NIGHTSCAN_ENV: test
+
+      - name: Upload integration results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-results
+          path: integration-results.xml
+
+  # 3. Build et scan sécurité images Docker
+  build-security:
+    name: Build & Security Scan
+    runs-on: ubuntu-latest
+    needs: test-quality
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/nightscan-image.tar
+
+      - name: Security scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          input: /tmp/nightscan-image.tar
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Push Docker image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker load -i /tmp/nightscan-image.tar
+          docker push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+  # 4. Tests end-to-end
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [integration-tests, build-security]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: Start application stack
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 60  # Attendre démarrage complet
+
+      - name: Run E2E tests
+        run: |
+          python scripts/e2e_tests.py
+        env:
+          E2E_BASE_URL: http://localhost:8000
+
+      - name: Collect logs
+        if: always()
+        run: |
+          docker-compose -f docker-compose.test.yml logs > e2e-logs.txt
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose -f docker-compose.test.yml down -v
+
+      - name: Upload E2E results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-results
+          path: |
+            e2e-logs.txt
+            e2e-results/
+
+  # 5. Déploiement staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [e2e-tests]
+    if: github.ref == 'refs/heads/staging'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "🚀 Déploiement staging"
+          # Commandes déploiement staging
+          ./scripts/deploy_staging.sh
+        env:
+          STAGING_SERVER: ${{ secrets.STAGING_SERVER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Run staging tests
+        run: |
+          python scripts/staging_validation.py
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'NightScan déployé en staging: ${{ github.sha }}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+  # 6. Déploiement production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [e2e-tests]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Production pre-deployment checks
+        run: |
+          python scripts/pre_deployment_check.py --production
+          python scripts/security_audit.py --production
+
+      - name: Blue-Green deployment
+        run: |
+          echo "🟢 Déploiement production blue-green"
+          ./scripts/deploy_production.sh
+        env:
+          PRODUCTION_SERVER: ${{ secrets.PRODUCTION_SERVER }}
+          PRODUCTION_SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+      - name: Production smoke tests
+        run: |
+          python scripts/production_smoke_tests.py
+        env:
+          PRODUCTION_URL: ${{ secrets.PRODUCTION_URL }}
+
+      - name: Update monitoring
+        run: |
+          # Mise à jour dashboards et alertes
+          ./scripts/update_monitoring.sh
+        env:
+          GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
+
+      - name: Notify production deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: '🎉 NightScan déployé en production: ${{ github.sha }}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+  # 7. Release automation
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Générer notes de version automatiques
+          python scripts/generate_release_notes.py > release_notes.md
+          echo "::set-output name=notes::$(cat release_notes.md)"
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: NightScan v${{ github.run_number }}
+          body: ${{ steps.release_notes.outputs.notes }}
+          draft: false
+          prerelease: false
+
+  # 8. Post-deployment monitoring
+  post-deployment:
+    name: Post-Deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for deployment stabilization
+        run: sleep 300  # 5 minutes
+
+      - name: Run production health checks
+        run: |
+          python scripts/production_health_check.py
+        env:
+          PRODUCTION_URL: ${{ secrets.PRODUCTION_URL }}
+
+      - name: Performance monitoring
+        run: |
+          python scripts/load_testing_production.py --users=50 --duration=60
+        env:
+          PRODUCTION_URL: ${{ secrets.PRODUCTION_URL }}
+
+      - name: Alert if issues detected
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: '🚨 Problème détecté après déploiement production'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_CRITICAL }}
+
+  # 9. Nettoyage automatique
+  cleanup:
+    name: Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [deploy-production, post-deployment]
+    
+    steps:
+      - name: Cleanup old Docker images
+        run: |
+          # Nettoyage images Docker anciennes
+          echo "🧹 Nettoyage images Docker anciennes"
+
+      - name: Cleanup old releases
+        run: |
+          # Garder seulement les 10 dernières releases
+          echo "🧹 Nettoyage anciennes releases"
