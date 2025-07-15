@@ -71,7 +71,7 @@ graph TD
 **Purpose**: Validates functionality across all system components
 
 **Test Suites**:
-- **Python Unit Tests**: Multi-version compatibility (Python 3.9-3.11)
+- **Python Unit Tests**: Python 3.13 compatibility testing
 - **Integration Tests**: Database + Redis integration with real services
 - **Mobile Tests**: React Native Jest testing with coverage
 - **Docker Tests**: Container build validation and security scanning
@@ -403,7 +403,7 @@ jobs:
     timeout-minutes: 20  # Prevent hung jobs
     strategy:
       matrix:
-        python-version: ['3.11']  # Focus on primary version
+        python-version: ['3.13']  # Focus on primary version
       fail-fast: false  # Continue other jobs on failure
 ```
 

@@ -2,27 +2,27 @@
 
 ## Supported Python Versions
 
-NightScan supports Python versions **3.9 through 3.13**.
+NightScan supports **Python 3.13** exclusively.
 
 ### Version Matrix
 
 | Python Version | Status | Notes |
 |---------------|---------|-------|
-| 3.9           | ✅ Full Support | Minimum required version |
-| 3.10          | ✅ Full Support | Recommended for production |
-| 3.11          | ✅ Full Support | Recommended for development |
-| 3.12          | ✅ Full Support | Stable and well-tested |
-| 3.13          | ✅ Full Support | Latest supported version |
+| 3.9           | ❌ Not Supported | Legacy version, no longer supported |
+| 3.10          | ❌ Not Supported | Legacy version, no longer supported |
+| 3.11          | ❌ Not Supported | Legacy version, no longer supported |
+| 3.12          | ❌ Not Supported | Legacy version, no longer supported |
+| 3.13          | ✅ Full Support | **Required version** |
 | 3.14          | ❌ Not Supported | Future version, compatibility unknown |
 
 ## Key Compatibility Considerations
 
 ### Dependencies
-- **PyTorch**: Versions 2.1.1-2.7.x are compatible with Python 3.9-3.13
+- **PyTorch**: Versions 2.1.1-2.7.x are compatible with Python 3.13
 - **NumPy**: Using <3.0.0 constraint for Python 3.13 compatibility
-- **Flask**: Version 3.x supports Python 3.9+ including 3.13
-- **SQLAlchemy**: Version 2.x supports Python 3.9+ including 3.13
-- **audioop-lts**: Required for Python 3.13 as audioop module was removed
+- **Flask**: Version 3.x supports Python 3.13
+- **SQLAlchemy**: Version 2.x supports Python 3.13
+- **audioop**: Native module available in Python 3.13
 - **OpenCV**: opencv-python 4.12.0+ supports Python 3.13
 - **Plotly**: Version 6.2.0+ supports Python 3.13
 - **psycopg2-binary**: Version 2.9.10+ supports Python 3.13
@@ -42,8 +42,8 @@ CUDA dependencies are included for GPU acceleration:
 
 ### Standard Installation
 ```bash
-# Ensure you have Python 3.9-3.12
-python --version
+# Ensure you have Python 3.13
+python3.13 --version
 
 # Install dependencies
 pip install -r requirements.txt
@@ -57,33 +57,17 @@ pip install -e .[dev]
 ```
 
 ### Docker Installation
-The Docker images are built with Python 3.11 for optimal compatibility.
+The Docker images are built with Python 3.13 for optimal compatibility.
 
 ## Version-Specific Notes
 
-### Python 3.9
-- All features supported
-- Some performance optimizations available in newer versions
-
-### Python 3.10
-- Recommended for production deployment
-- Better performance with pattern matching features
-
-### Python 3.11
-- Recommended for development
-- Improved error messages and debugging
-- Better performance overall
-
-### Python 3.12
-- Stable and well-tested
-- Good performance optimizations
-- Recommended for most use cases
-
 ### Python 3.13
-- Latest supported version
-- Requires audioop-lts package for audio processing
+- **Required version** for NightScan
+- Native audioop module available (no audioop-lts needed)
 - All core features fully functional
-- Most recent Python optimizations
+- Latest Python optimizations and performance improvements
+- Improved error messages and debugging capabilities
+- Better memory management and performance
 
 ## Testing Across Versions
 
@@ -93,11 +77,7 @@ To test compatibility across Python versions:
 # Using tox (if configured)
 tox
 
-# Or test specific versions
-python3.9 -m pytest tests/
-python3.10 -m pytest tests/
-python3.11 -m pytest tests/
-python3.12 -m pytest tests/
+# Test with Python 3.13
 python3.13 -m pytest tests/
 ```
 
@@ -131,16 +111,12 @@ pip install -r requirements.txt
 
 - **Python 3.14**: Will be evaluated once all dependencies support it
 - **PyTorch 2.8+**: Will be tested and integrated when stable
-- **NumPy 2.x**: Now supported with Python 3.13 compatibility
-- **Flask 3.2+**: Will require migration from __version__ to importlib.metadata
+- **NumPy 2.x**: Fully supported with Python 3.13
+- **Flask 3.2+**: Ready for migration from __version__ to importlib.metadata
 
 ## Continuous Integration
 
 Our CI/CD pipeline tests against:
-- Python 3.9 (minimum)
-- Python 3.10 (production baseline)
-- Python 3.11 (development recommended)
-- Python 3.12 (stable)
-- Python 3.13 (latest)
+- Python 3.13 (required version)
 
-All tests must pass on these versions before merging.
+All tests must pass on Python 3.13 before merging.

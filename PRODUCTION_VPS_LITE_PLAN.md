@@ -77,7 +77,7 @@
 ### 1.2 Docker Compose sécurisé pour production
 - [ ] **Tâche** : Créer docker-compose.production.yml
   ```yaml
-  version: '3.8'
+  version: '3.13'
   
   services:
     nginx:

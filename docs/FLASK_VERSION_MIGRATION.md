@@ -31,9 +31,10 @@ def get_flask_version():
         import importlib.metadata
         return importlib.metadata.version("flask")
     except ImportError:
-        # Fallback for Python < 3.8
-        import pkg_resources
-        return pkg_resources.get_distribution("flask").version
+        # Fallback not needed for Python 3.13
+        # import pkg_resources
+        # return pkg_resources.get_distribution("flask").version
+        raise ImportError("importlib.metadata not available")
 ```
 
 ### Python 3.13 Compatibility
@@ -86,5 +87,5 @@ assert old_version == new_version  # Should be True
 
 ✅ **No breaking changes** - This is only a deprecation warning
 ✅ **Python 3.13 compatible** - importlib.metadata is standard library
-✅ **Backward compatible** - Works with Python 3.8+
+✅ **Python 3.13 compatible** - Works with Python 3.13+
 ⚠️ **Action needed** - Update version checks before Flask 3.2

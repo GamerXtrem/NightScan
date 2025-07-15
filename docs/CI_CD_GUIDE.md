@@ -37,7 +37,7 @@ The NightScan CI/CD pipeline is built using GitHub Actions and provides:
 
 **Jobs**:
 - **lint-python**: Runs flake8, black, isort, mypy
-- **test-python**: Runs pytest with coverage for Python 3.8, 3.9, 3.10
+- **test-python**: Runs pytest with coverage for Python 3.13
 - **security-scan**: Checks for vulnerabilities with safety and bandit
 - **build-docker**: Builds all Docker images to verify they compile
 - **integration-test**: Runs integration tests with docker-compose

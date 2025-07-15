@@ -3,7 +3,7 @@
 NightScan classifies animal calls from audio files. This simplified manual explains how to use the project without developer knowledge.
 
 ## 1. Prepare your environment
-Install Python (version 3.10 or newer)
+Install Python (version 3.13 or newer)
 
 - **Windows**: download Python from python.org and install it.
 - **macOS and Linux**: Python is usually already installed. Check with `python --version` in a terminal.

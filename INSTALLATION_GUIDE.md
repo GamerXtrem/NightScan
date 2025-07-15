@@ -21,13 +21,13 @@ Sélectionnez le type d'installation qui correspond à vos besoins :
 - **OS** : Linux (Ubuntu 20.04+), macOS 10.15+, Windows 10
 - **RAM** : 4 GB minimum, 8 GB recommandé  
 - **Storage** : 10 GB libre minimum
-- **Python** : 3.10+ 
+- **Python** : 3.13+ 
 - **Git** : Pour clonage repository
 
 ### Pré-requis par Type d'Installation
 
 #### 🖥️ Installation Locale
-- Python 3.10+
+- Python 3.13+
 - Git
 - FFmpeg
 - PostgreSQL (optionnel, SQLite par défaut)
@@ -91,10 +91,10 @@ docker-compose ps
 ```bash
 # Installer dépendances système (Ubuntu/Debian)
 sudo apt update
-sudo apt install -y python3.10 python3.10-venv python3-pip git ffmpeg portaudio19-dev
+sudo apt install -y python3.13 python3.13-venv python3-pip git ffmpeg portaudio19-dev
 
 # macOS avec Homebrew
-brew install python@3.10 git ffmpeg portaudio
+brew install python@3.13 git ffmpeg portaudio
 
 # Windows - Installer depuis python.org et ffmpeg.org
 ```
@@ -106,7 +106,7 @@ git clone https://github.com/votre-org/nightscan.git
 cd nightscan
 
 # Créer environnement virtuel
-python3.10 -m venv env
+python3.13 -m venv env
 source env/bin/activate  # Windows: env\Scripts\activate
 
 # Installer dépendances Python
@@ -472,7 +472,7 @@ wget https://github.com/votre-org/nightscan-models/releases/download/v1.0/best_m
 ### FAQ Installation
 
 **Q: Quelle version de Python utiliser ?**  
-A: Python 3.10+ recommandé. 3.8+ minimum supporté.
+A: Python 3.13+ requis. Seule version officiellement supportée.
 
 **Q: Peut-on utiliser SQLite en production ?**  
 A: Non recommandé. PostgreSQL conseillé pour performances et concurrent access.
@@ -532,7 +532,7 @@ A: Vérifier `MODEL_PATH` et télécharger modèle depuis releases GitHub.
 ## ✅ Checklist Installation Réussie
 
 ### Installation Locale
-- [ ] Python 3.10+ installé et vérifié
+- [ ] Python 3.13+ installé et vérifié
 - [ ] Repository cloné et dépendances installées
 - [ ] Base de données créée et accessible
 - [ ] Variables d'environnement configurées

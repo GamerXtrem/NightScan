@@ -232,7 +232,7 @@ configure_system_services() {
 # 1. Détection système intelligente
 🔍 Raspberry Pi Zero 2W detected
 📊 OS: Raspberry Pi OS Bookworm (rpicam commands)
-🐍 Python: 3.11.2
+🐍 Python: 3.13.3
 
 # 2. Installation adaptée
 📦 Installing Pi Zero optimized packages...
@@ -253,7 +253,7 @@ configure_system_services() {
 📊 Installation Summary:
   • System: Raspberry Pi Zero 2 W
   • OS: bookworm (rpicam commands)
-  • Python: 3.11.2
+  • Python: 3.13.3
   • Camera: Configured
 
 📋 Next Steps:

@@ -119,7 +119,7 @@ REDIS_URL=redis://localhost:6379/0
 
 ```bash
 # Docker Compose pour Redis
-version: '3.8'
+version: '3.13'
 services:
   redis:
     image: redis:7-alpine

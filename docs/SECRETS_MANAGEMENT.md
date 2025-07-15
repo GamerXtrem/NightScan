@@ -125,7 +125,7 @@ export CSRF_SECRET_KEY='<generated-secret>'
 
 ```yaml
 # docker-compose.prod.yml
-version: '3.8'
+version: '3.13'
 
 secrets:
   db_password:
