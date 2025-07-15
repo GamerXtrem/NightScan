@@ -171,7 +171,7 @@ def check_system_requirements():
     print("🔧 Checking System Requirements...")
     
     requirements = {
-        "Python 3.7+": sys.version_info >= (3, 7),
+        "Python 3.13+": sys.version_info >= (3, 13),
         "pathlib": True,  # Built-in since Python 3.4
     }
     

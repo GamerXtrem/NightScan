@@ -180,7 +180,7 @@ def check_system_requirements():
     
     # Check Python version
     import sys
-    print(f"🐍 Python: {sys.version.split()[0]} {'✅' if sys.version_info >= (3, 7) else '❌'}")
+    print(f"🐍 Python: {sys.version.split()[0]} {'✅' if sys.version_info >= (3, 13) else '❌'}")
     
     # Check if on Raspberry Pi
     try:

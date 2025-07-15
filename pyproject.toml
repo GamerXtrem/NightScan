@@ -7,7 +7,7 @@ name = "nightscan"
 dynamic = ["version"]
 description = "NightScan - AI-powered wildlife detection system"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.14"
 license = {text = "MIT"}
 authors = [
     {name = "NightScan Team", email = "contact@nightscan.example.com"},
@@ -22,6 +22,8 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
@@ -78,7 +80,7 @@ write_to = "nightscan/_version.py"
 # Black configuration
 [tool.black]
 line-length = 120
-target-version = ['py39', 'py310', 'py311']
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
 include = '\.pyi?$'
 extend-exclude = '''
 # A regex preceded with ^/ will apply only to files and directories
@@ -129,7 +131,7 @@ known_third_party = [
 
 # Ruff configuration
 [tool.ruff]
-target-version = "py39"
+target-version = "py313"
 line-length = 120
 select = [
     "E",  # pycodestyle errors
@@ -197,7 +199,7 @@ exclude = [
 
 # MyPy configuration
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false  # Gradually enable this
