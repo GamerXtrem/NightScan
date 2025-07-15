@@ -1,5 +1,7 @@
 # Multi-stage build for NightScan wildlife detection system
-FROM python:3.9-slim as base
+# Support for multiple Python versions including 3.13
+ARG PYTHON_VERSION=3.13
+FROM python:${PYTHON_VERSION}-slim as base
 
 # Set working directory
 WORKDIR /app
@@ -15,8 +17,14 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Use Python 3.13 compatible requirements if available
+ARG PYTHON_VERSION=3.13
+COPY requirements*.txt ./
+RUN if [ "${PYTHON_VERSION}" = "3.13" ] && [ -f requirements-python313.txt ]; then \
+        pip install --no-cache-dir -r requirements-python313.txt; \
+    else \
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
 
 # Production stage
 FROM base as production
@@ -48,8 +56,12 @@ CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120",
 FROM base as development
 
 # Install development dependencies
+ARG PYTHON_VERSION=3.13
 COPY requirements-dev.txt .
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN if [ "${PYTHON_VERSION}" = "3.13" ] && [ -f requirements-python313.txt ]; then \
+        echo "Using Python 3.13 requirements for development"; \
+    fi && \
+    pip install --no-cache-dir -r requirements-dev.txt
 
 # Copy application code
 COPY . .

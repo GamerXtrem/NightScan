@@ -60,7 +60,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10']
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+      fail-fast: false
     
     steps:
       - uses: actions/checkout@v4
@@ -87,8 +88,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest pytest-cov pytest-mock
-          # Install main requirements
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Install main requirements - use Python 3.13 compatible version if available
+          if [ "${{ matrix.python-version }}" = "3.13" ] && [ -f requirements-python313.txt ]; then
+            echo "Installing Python 3.13 compatible requirements"
+            pip install -r requirements-python313.txt
+          elif [ -f requirements.txt ]; then 
+            pip install -r requirements.txt
+          fi
           # Install test requirements
           if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
       

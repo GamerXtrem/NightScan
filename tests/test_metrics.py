@@ -20,21 +20,16 @@ from metrics import (
     track_request_metrics,
     record_failed_login,
     record_quota_usage,
-    record_detection_event,
+    record_detection,
     record_prediction_metrics,
-    record_websocket_connection,
-    record_email_sent,
     get_metrics,
     CONTENT_TYPE_LATEST,
     # Import metric instances for testing
-    REQUEST_COUNT,
-    REQUEST_DURATION,
-    FAILED_LOGIN_COUNT,
-    QUOTA_USAGE,
-    DETECTION_COUNT,
-    PREDICTION_PROCESSING_TIME,
-    WEBSOCKET_CONNECTIONS,
-    EMAIL_NOTIFICATIONS
+    http_requests_total,
+    http_request_duration,
+    failed_logins,
+    predictions_total,
+    detections_total
 )
 
 

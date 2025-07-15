@@ -13,10 +13,7 @@ from config import (
     SecurityConfig,
     DatabaseConfig,
     RateLimitConfig,
-    UploadConfig,
-    EmailConfig,
-    NotificationConfig,
-    Config,
+    FileUploadConfig,
     get_config
 )
 
@@ -136,11 +133,11 @@ class TestUploadConfig:
     
     def test_upload_config_default(self):
         """Test upload config with default values."""
-        config = UploadConfig()
+        config = FileUploadConfig()
         
-        assert config.max_file_size == 100 * 1024 * 1024  # 100MB
-        assert config.max_total_size == 10 * 1024 * 1024 * 1024  # 10GB
-        assert config.allowed_extensions == {'.wav'}
+        assert config.max_file_size == 104857600  # 100MB
+        assert config.max_total_size == 10737418240  # 10GB
+        assert config.allowed_extensions == ['.wav']
         
     def test_upload_config_from_env(self):
         """Test upload config from environment variables."""
@@ -148,14 +145,14 @@ class TestUploadConfig:
             'MAX_FILE_SIZE': str(50 * 1024 * 1024),  # 50MB
             'MAX_TOTAL_SIZE': str(5 * 1024 * 1024 * 1024)  # 5GB
         }):
-            config = UploadConfig()
+            config = FileUploadConfig()
             
             assert config.max_file_size == 50 * 1024 * 1024
             assert config.max_total_size == 5 * 1024 * 1024 * 1024
             
     def test_upload_config_custom_extensions(self):
         """Test upload config with custom extensions."""
-        config = UploadConfig(allowed_extensions={'.wav', '.mp3', '.flac'})
+        config = FileUploadConfig(allowed_extensions=['.wav', '.mp3', '.flac'])
         
         assert '.wav' in config.allowed_extensions
         assert '.mp3' in config.allowed_extensions
