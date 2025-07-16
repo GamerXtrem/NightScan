@@ -106,7 +106,7 @@ csp_manager = CSPNonceManager(app)
 
 # Enhanced security headers without CSP (handled by CSP manager)
 Talisman(app, 
-    force_https=True, 
+    force_https=False,  # Disabled for local development 
     frame_options="DENY",
     content_security_policy=None,  # CSP handled by CSPNonceManager with nonces
     referrer_policy="strict-origin-when-cross-origin",
