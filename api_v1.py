@@ -1497,7 +1497,6 @@ def get_user_predictions():
 
 
 @api_v1.route("/status/<task_id>", methods=["GET"])
-@limiter.limit(config.rate_limit.status_check_limit if limiter else None)
 @track_request_metrics
 def get_task_status(task_id):
     """
@@ -1520,7 +1519,6 @@ def get_task_status(task_id):
 
 
 @api_v1.route("/result/<task_id>", methods=["GET"])
-@limiter.limit(config.rate_limit.default_limit if limiter else None)
 @track_request_metrics
 def get_task_result(task_id):
     """
@@ -1589,7 +1587,6 @@ def get_task_result(task_id):
 
 
 @api_v1.route("/tasks", methods=["GET"])
-@limiter.limit(config.rate_limit.default_limit if limiter else None)
 @login_required
 @track_request_metrics
 def get_user_tasks():
@@ -1613,7 +1610,6 @@ def get_user_tasks():
 
 
 @api_v1.route("/cancel/<task_id>", methods=["POST"])
-@limiter.limit(config.rate_limit.default_limit if limiter else None)
 @login_required
 @track_request_metrics
 def cancel_task(task_id):

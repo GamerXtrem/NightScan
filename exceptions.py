@@ -330,6 +330,18 @@ class ExternalServiceError(NightScanError):
     pass
 
 
+class CircuitBreakerOpenException(ExternalServiceError):
+    """Raised when a circuit breaker is in open state."""
+    
+    def __init__(self, circuit_name: str, reason: str = None):
+        super().__init__(
+            message=f"Circuit breaker '{circuit_name}' is open",
+            code="CIRCUIT_BREAKER_OPEN",
+            details={'circuit_name': circuit_name, 'reason': reason},
+            user_message="Service temporarily unavailable. Please try again later."
+        )
+
+
 class CacheServiceError(ExternalServiceError):
     """Raised when cache service (Redis) is unavailable."""
     

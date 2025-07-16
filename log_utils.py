@@ -36,6 +36,34 @@ except ImportError:
 request_id_var: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
 user_id_var: ContextVar[Optional[int]] = ContextVar('user_id', default=None)
 
+
+class LogRotationConfig:
+    """Configuration for log rotation settings."""
+    
+    def __init__(self,
+                 log_dir: str = "logs",
+                 max_file_size: int = 10 * 1024 * 1024,  # 10MB
+                 backup_count: int = 5,
+                 compress_backups: bool = True,
+                 use_json: bool = True,
+                 level: str = "INFO",
+                 enable_console: bool = True,
+                 rotation_time: str = "midnight",  # for TimedRotatingFileHandler
+                 retention_days: int = 30):
+        self.log_dir = Path(log_dir)
+        self.max_file_size = max_file_size
+        self.backup_count = backup_count
+        self.compress_backups = compress_backups
+        self.use_json = use_json
+        self.level = getattr(logging, level.upper(), logging.INFO)
+        self.enable_console = enable_console
+        self.rotation_time = rotation_time
+        self.retention_days = retention_days
+        
+        # Ensure log directory exists
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+
 # Global configuration instance
 _log_config: Optional[LogRotationConfig] = None
 _specialized_loggers: Dict[str, logging.Logger] = {}
@@ -151,32 +179,6 @@ class CompressedRotatingFileHandler(logging.handlers.RotatingFileHandler):
         if not self.delay:
             self.stream = self._open()
 
-
-class LogRotationConfig:
-    """Configuration for log rotation settings."""
-    
-    def __init__(self,
-                 log_dir: str = "logs",
-                 max_file_size: int = 10 * 1024 * 1024,  # 10MB
-                 backup_count: int = 5,
-                 compress_backups: bool = True,
-                 use_json: bool = True,
-                 level: str = "INFO",
-                 enable_console: bool = True,
-                 rotation_time: str = "midnight",  # for TimedRotatingFileHandler
-                 retention_days: int = 30):
-        self.log_dir = Path(log_dir)
-        self.max_file_size = max_file_size
-        self.backup_count = backup_count
-        self.compress_backups = compress_backups
-        self.use_json = use_json
-        self.level = getattr(logging, level.upper(), logging.INFO)
-        self.enable_console = enable_console
-        self.rotation_time = rotation_time
-        self.retention_days = retention_days
-        
-        # Ensure log directory exists
-        self.log_dir.mkdir(parents=True, exist_ok=True)
 
 
 def setup_logging(config: Optional[LogRotationConfig] = None, 
