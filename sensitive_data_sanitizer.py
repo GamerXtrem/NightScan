@@ -44,7 +44,7 @@ import os
 
 # Import existing secure logging if available
 try:
-    from security.logging import SecureLogger
+    from security.secure_logging import SecureLogger
     SECURE_LOGGER_AVAILABLE = True
 except ImportError:
     SECURE_LOGGER_AVAILABLE = False

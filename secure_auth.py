@@ -6,7 +6,7 @@ Implements modern authentication security practices.
 import hashlib
 import secrets
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 import bcrypt
 import jwt

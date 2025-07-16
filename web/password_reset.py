@@ -12,8 +12,7 @@ from flask_mail import Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
 import logging
 
-from database import db, User
-from web.app import limiter, get_remote_address
+from web.app import db, User, limiter, get_remote_address
 from web.app_extensions import mail
 from secure_auth import SecureAuth
 

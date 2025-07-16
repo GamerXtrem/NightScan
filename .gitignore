@@ -11,5 +11,13 @@ wp-plugin/*.zip
 
 # Secrets (sensibles)
 secrets/
+.env
 .env.production
 .env.staging
+
+# Instance folder (Flask)
+instance/
+
+# SQLite databases
+*.db
+nightscan.db

@@ -8,7 +8,7 @@ and other security features in a unified API.
 
 from typing import Optional, Dict, Any, List
 from flask import Flask
-import logging
+import logging as standard_logging
 
 # Import all security components
 from .auth import SecurityAuth
@@ -38,7 +38,7 @@ __all__ = [
     'SecurityUtils'
 ]
 
-logger = logging.getLogger(__name__)
+logger = standard_logging.getLogger(__name__)
 
 
 class UnifiedSecurity:

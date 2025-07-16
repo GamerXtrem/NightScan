@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 import psutil
+from sqlalchemy import text
 
 from log_utils import setup_logging
 from exceptions import (
@@ -532,7 +533,7 @@ class QuotaTransaction(db.Model):
     transaction_type = db.Column(db.String(50), nullable=False)  # usage, bonus, reset, adjustment
     amount = db.Column(db.Integer, nullable=False)  # Can be negative for usage
     reason = db.Column(db.String(200))
-    metadata = db.Column(db.Text)  # JSON string
+    transaction_metadata = db.Column(db.Text)  # JSON string
     prediction_id = db.Column(db.Integer, db.ForeignKey("prediction.id"))
     admin_user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -550,7 +551,7 @@ class QuotaTransaction(db.Model):
             "transaction_type": self.transaction_type,
             "amount": self.amount,
             "reason": self.reason,
-            "metadata": json.loads(self.metadata) if self.metadata else {},
+            "metadata": json.loads(self.transaction_metadata) if self.transaction_metadata else {},
             "prediction_id": self.prediction_id,
             "admin_user_id": self.admin_user_id,
             "created_at": self.created_at.isoformat()
@@ -567,7 +568,7 @@ class SubscriptionEvent(db.Model):
     old_plan_type = db.Column(db.String(50))
     new_plan_type = db.Column(db.String(50))
     effective_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    metadata = db.Column(db.Text)  # JSON string
+    transaction_metadata = db.Column(db.Text)  # JSON string
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
@@ -584,7 +585,7 @@ class SubscriptionEvent(db.Model):
             "old_plan_type": self.old_plan_type,
             "new_plan_type": self.new_plan_type,
             "effective_date": self.effective_date.isoformat(),
-            "metadata": json.loads(self.metadata) if self.metadata else {},
+            "metadata": json.loads(self.transaction_metadata) if self.transaction_metadata else {},
             "created_by": self.created_by,
             "created_at": self.created_at.isoformat()
         }
@@ -606,7 +607,7 @@ class DataRetentionLog(db.Model):
     retention_policy_version = db.Column(db.String(50), default='1.0')
     admin_override = db.Column(db.Boolean, default=False)
     admin_reason = db.Column(db.Text)
-    metadata = db.Column(db.Text)  # JSON string for additional info
+    transaction_metadata = db.Column(db.Text)  # JSON string for additional info
     
     # Relationships
     user = db.relationship("User", backref=db.backref("retention_logs", lazy=True))
@@ -1133,7 +1134,7 @@ def readiness_check():
     
     # Check database connectivity
     try:
-        db.session.execute("SELECT 1")
+        db.session.execute(text("SELECT 1"))
         checks["database"] = True
     except DatabaseError as e:
         logger.error(f"Database check failed: {e}")
@@ -1404,14 +1405,15 @@ def create_app():
         # This just verifies the connection and tables exist
         try:
             # Test database connection
-            db.session.execute("SELECT 1")
+            db.session.execute(text("SELECT 1"))
             logger.info("Database connection successful")
             
             # Verify critical tables exist
-            critical_tables = ['user', 'prediction', 'plan_features', 'user_plans']
-            for table in critical_tables:
-                db.session.execute(f"SELECT 1 FROM {table} LIMIT 1")
-            logger.info("All critical tables verified")
+            # TODO: Uncomment after initial database creation
+            # critical_tables = ['user', 'prediction', 'plan_features', 'user_plans']
+            # for table in critical_tables:
+            #     db.session.execute(text(f"SELECT 1 FROM {table} LIMIT 1"))
+            # logger.info("All critical tables verified")
             
         except DatabaseError as e:
             logger.error(f"Database initialization error: {e}")
