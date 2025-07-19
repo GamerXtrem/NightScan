@@ -16,7 +16,7 @@ from sqlalchemy import text
 from log_utils import setup_logging
 from exceptions import (
     AuthenticationError, InvalidCredentialsError, AccountLockedError,
-    SessionExpiredError, InsufficientPermissionsError, CaptchaValidationError,
+    SessionExpiredError, InsufficientPermissionsError,
     FileError, UnsupportedFileTypeError, FileTooBigError, InvalidFileFormatError,
     FileProcessingError, QuotaExceededError, RateLimitExceededError,
     PredictionError, ModelNotAvailableError, PredictionFailedError,
@@ -92,6 +92,7 @@ def get_or_create_web_circuit_breakers():
 app = Flask(__name__)
 app.secret_key = config.security.secret_key
 app.config["WTF_CSRF_SECRET_KEY"] = config.security.csrf_secret_key or config.security.secret_key
+app.config["WTF_CSRF_ENABLED"] = True  # Enable CSRF protection
 csrf = CSRFProtect(app)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -146,9 +147,6 @@ PASSWORD_RE = re.compile(rf"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{{{min_le
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
 
 PREDICT_API_URL = os.environ.get("PREDICT_API_URL", "http://localhost:8001/api/predict")
-
-
-CAPTCHA_OPERATIONS = ["+", "-"]
 
 
 def load_failed_logins() -> dict:
@@ -245,16 +243,6 @@ def validate_filename(filename: str) -> str:
         filename += '.wav'
     
     return filename
-
-def generate_captcha() -> str:
-    """Create a simple math challenge and store the result in the session."""
-    a = random.randint(1, 9)
-    b = random.randint(1, 9)
-    op = random.choice(CAPTCHA_OPERATIONS)
-    answer = a + b if op == "+" else a - b
-    session["captcha_answer"] = str(answer)
-    return f"{a} {op} {b} = ?"
-
 
 def is_wav_header(file_obj) -> bool:
     """Check whether the file-like object has a valid RIFF/WAVE header."""
@@ -533,7 +521,7 @@ class QuotaTransaction(db.Model):
     transaction_type = db.Column(db.String(50), nullable=False)  # usage, bonus, reset, adjustment
     amount = db.Column(db.Integer, nullable=False)  # Can be negative for usage
     reason = db.Column(db.String(200))
-    transaction_metadata = db.Column(db.Text)  # JSON string
+    metadata_ = db.Column('metadata', db.Text)  # JSON string - using metadata_ to avoid SQLAlchemy reserved word
     prediction_id = db.Column(db.Integer, db.ForeignKey("prediction.id"))
     admin_user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -568,7 +556,7 @@ class SubscriptionEvent(db.Model):
     old_plan_type = db.Column(db.String(50))
     new_plan_type = db.Column(db.String(50))
     effective_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    transaction_metadata = db.Column(db.Text)  # JSON string
+    metadata_ = db.Column('metadata', db.Text)  # JSON string - using metadata_ to avoid SQLAlchemy reserved word
     created_by = db.Column(db.Integer, db.ForeignKey("user.id"))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
@@ -607,7 +595,7 @@ class DataRetentionLog(db.Model):
     retention_policy_version = db.Column(db.String(50), default='1.0')
     admin_override = db.Column(db.Boolean, default=False)
     admin_reason = db.Column(db.Text)
-    transaction_metadata = db.Column(db.Text)  # JSON string for additional info
+    metadata_ = db.Column('metadata', db.Text)  # JSON string for additional info - using metadata_ to avoid SQLAlchemy reserved word
     
     # Relationships
     user = db.relationship("User", backref=db.backref("retention_logs", lazy=True))
@@ -718,22 +706,13 @@ def login():
         return "Too many failed attempts. Try again later.", 429
 
     if request.method == "POST":
-        if request.form.get("captcha") != session.get("captcha_answer"):
-            record_failed_login(ip)
-            record_failed_login('invalid_captcha')
-            flash("Invalid captcha")
-            question = generate_captcha()
-            return render_template("login.html", captcha_question=question)
-
         username = validate_input(request.form.get("username", ""), 30)
         password = request.form.get("password", "")
         
         if not username or not password:
             record_failed_login(ip)
-            record_failed_login('missing_credentials')
             flash("Please provide username and password")
-            question = generate_captcha()
-            return render_template("login.html", captcha_question=question)
+            return render_template("login.html")
         
         # Protected user lookup with circuit breaker
         db_circuit, cache_circuit, notification_circuit = get_or_create_web_circuit_breakers()
@@ -751,31 +730,25 @@ def login():
             if user and user.check_password(password):
                 login_user(user)
                 clear_failed_logins(ip)
-                session.pop("captcha_answer", None)
                 logger.info(f"Successful login for user: {username}")
                 return redirect(url_for("index"))
                 
         except CircuitBreakerOpenException as e:
             logger.error(f"Database circuit breaker open during login for {username}: {e}")
             flash("Authentication service temporarily unavailable. Please try again later.")
-            question = generate_captcha()
-            return render_template("login.html", captcha_question=question)
+            return render_template("login.html")
         except DatabaseError as e:
             logger.error(f"Database error during login for {username}: {e}")
             flash("Authentication service error. Please try again.")
-            question = generate_captcha()
-            return render_template("login.html", captcha_question=question)
+            return render_template("login.html")
         except Exception as e:
             logger.error(f"Unexpected error during login for {username}: {e}")
             flash("Authentication error. Please try again.")
-            question = generate_captcha()
-            return render_template("login.html", captcha_question=question)
+            return render_template("login.html")
         record_failed_login(ip)
-        record_failed_login('invalid_credentials')
         flash("Invalid credentials")
 
-    question = generate_captcha()
-    return render_template("login.html", captcha_question=question)
+    return render_template("login.html")
 
 
 @app.route("/logout")
@@ -1404,29 +1377,45 @@ def create_app():
         # Database should be created using database/create_database.sql
         # This just verifies the connection and tables exist
         try:
-            # Test database connection
-            db.session.execute(text("SELECT 1"))
+            # Test database connection with a timeout
+            from sqlalchemy import create_engine
+            
+            # Only add connect_timeout for PostgreSQL
+            connect_args = {}
+            if "postgresql" in config.database.uri or "postgres" in config.database.uri:
+                connect_args = {"connect_timeout": 5}  # 5 second timeout
+            
+            engine = create_engine(
+                config.database.uri,
+                connect_args=connect_args
+            )
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
             logger.info("Database connection successful")
             
-            # Verify critical tables exist
-            # TODO: Uncomment after initial database creation
-            # critical_tables = ['user', 'prediction', 'plan_features', 'user_plans']
-            # for table in critical_tables:
-            #     db.session.execute(text(f"SELECT 1 FROM {table} LIMIT 1"))
-            # logger.info("All critical tables verified")
+            # Create tables if they don't exist (for development)
+            db.create_all()
+            logger.info("Database tables ensured")
             
         except DatabaseError as e:
             logger.error(f"Database initialization error: {e}")
-            logger.error("Please run 'psql -U $DB_USER -d $DB_NAME -f database/create_database.sql' to create the database schema")
-            raise ConfigurationError(
-                message=f"Database not properly configured: {e}",
-                config_key="SQLALCHEMY_DATABASE_URI",
-                user_message="Database configuration error. Please contact support."
-            )
+            logger.error("Please ensure PostgreSQL is running and the database exists")
+            logger.error("To create the database schema, run:")
+            logger.error("  1. export DB_HOST=localhost DB_PORT=5432 DB_NAME=nightscan DB_USER=nightscan DB_PASSWORD=your_password")
+            logger.error("  2. cd database && ./init_database.sh")
+            # Don't raise error in development to allow app to start
+            if os.environ.get('FLASK_ENV') != 'development':
+                raise ConfigurationError(
+                    message=f"Database not properly configured: {e}",
+                    config_key="SQLALCHEMY_DATABASE_URI",
+                    user_message="Database configuration error. Please contact support."
+                )
         except Exception as e:
             logger.error(f"Unexpected database initialization error: {e}")
-            error = convert_exception(e, operation='database_initialization')
-            raise error
+            # Don't raise error in development to allow app to start
+            if os.environ.get('FLASK_ENV') != 'development':
+                error = convert_exception(e, operation='database_initialization')
+                raise error
     return app
 
 
