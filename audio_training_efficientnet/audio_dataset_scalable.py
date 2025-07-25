@@ -47,7 +47,8 @@ class AudioDatasetScalable(Dataset):
                  augment: bool = False,
                  max_samples_per_class: int = 500,
                  balance_classes: bool = True,
-                 chunk_size: int = 10000):
+                 chunk_size: int = 10000,
+                 split: str = 'train'):
         """
         Args:
             index_db: Chemin vers la base SQLite contenant l'index
@@ -59,6 +60,7 @@ class AudioDatasetScalable(Dataset):
             max_samples_per_class: Limite max d'échantillons par classe
             balance_classes: Si True, équilibre les classes lors du sampling
             chunk_size: Taille des chunks pour le chargement par batch
+            split: Split à utiliser ('train', 'val', 'test')
         """
         self.index_db = index_db
         self.audio_root = Path(audio_root)
@@ -67,6 +69,7 @@ class AudioDatasetScalable(Dataset):
         self.max_samples_per_class = max_samples_per_class
         self.balance_classes = balance_classes
         self.chunk_size = chunk_size
+        self.split = split
         
         # Configuration du spectrogramme
         if config is None:
@@ -98,17 +101,18 @@ class AudioDatasetScalable(Dataset):
         """Initialise les métadonnées depuis la base de données."""
         cursor = self.conn.cursor()
         
-        # Obtenir le nombre total d'échantillons
-        cursor.execute("SELECT COUNT(*) FROM audio_samples")
+        # Obtenir le nombre total d'échantillons pour ce split
+        cursor.execute("SELECT COUNT(*) FROM audio_samples WHERE split = ?", (self.split,))
         self.total_samples = cursor.fetchone()[0]
         
-        # Obtenir les classes et leurs comptes
+        # Obtenir les classes et leurs comptes pour ce split
         cursor.execute("""
             SELECT class_name, COUNT(*) as count 
             FROM audio_samples 
+            WHERE split = ?
             GROUP BY class_name
             ORDER BY class_name
-        """)
+        """, (self.split,))
         
         self.class_info = {}
         self.class_names = []
@@ -153,10 +157,10 @@ class AudioDatasetScalable(Dataset):
         # Remplir l'index équilibré
         idx = 0
         for class_name, info in self.class_info.items():
-            # Obtenir tous les échantillons de cette classe
+            # Obtenir tous les échantillons de cette classe pour ce split
             cursor.execute(
-                "SELECT id FROM audio_samples WHERE class_name = ? LIMIT ?",
-                (class_name, self.max_samples_per_class)
+                "SELECT id FROM audio_samples WHERE class_name = ? AND split = ? LIMIT ?",
+                (class_name, self.split, self.max_samples_per_class)
             )
             sample_ids = [row[0] for row in cursor.fetchall()]
             
@@ -203,7 +207,7 @@ class AudioDatasetScalable(Dataset):
                 WHERE b.idx = ?
             """, (idx,))
         else:
-            cursor.execute("SELECT * FROM audio_samples WHERE id = ?", (idx + 1,))
+            cursor.execute("SELECT * FROM audio_samples WHERE split = ? LIMIT 1 OFFSET ?", (self.split, idx))
         
         row = cursor.fetchone()
         cursor.close()
@@ -347,7 +351,8 @@ class AudioDatasetScalable(Dataset):
             self.conn.close()
 
 
-def create_index_database(audio_dir: Path, output_db: str, extensions: List[str] = ['.wav', '.mp3']):
+def create_index_database(audio_dir: Path, output_db: str, extensions: List[str] = ['.wav', '.mp3'], 
+                         val_split: float = 0.1, test_split: float = 0.1, random_seed: int = 42):
     """
     Crée une base de données SQLite d'index pour les fichiers audio.
     
@@ -355,26 +360,31 @@ def create_index_database(audio_dir: Path, output_db: str, extensions: List[str]
         audio_dir: Répertoire contenant les fichiers audio organisés par classe
         output_db: Chemin de sortie pour la base SQLite
         extensions: Extensions de fichiers à indexer
+        val_split: Proportion pour la validation (défaut: 0.1)
+        test_split: Proportion pour le test (défaut: 0.1)
+        random_seed: Graine aléatoire pour la reproductibilité
     """
     logger.info(f"Création de l'index pour {audio_dir}...")
     
     conn = sqlite3.connect(output_db)
     cursor = conn.cursor()
     
-    # Créer la table
+    # Créer la table avec colonne split
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS audio_samples (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             file_path TEXT NOT NULL,
             class_name TEXT NOT NULL,
             duration REAL,
-            file_size INTEGER
+            file_size INTEGER,
+            split TEXT NOT NULL DEFAULT 'train'
         )
     """)
     
     # Créer les index
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_class ON audio_samples(class_name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_path ON audio_samples(file_path)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_split ON audio_samples(split)")
     
     # Scanner les fichiers
     sample_count = 0
@@ -431,12 +441,52 @@ def create_index_database(audio_dir: Path, output_db: str, extensions: List[str]
     
     conn.commit()
     
+    # Assigner les splits train/val/test par classe
+    logger.info("Assignation des splits train/val/test...")
+    np.random.seed(random_seed)
+    
+    cursor.execute("SELECT DISTINCT class_name FROM audio_samples")
+    all_classes = [row[0] for row in cursor.fetchall()]
+    
+    for class_name in all_classes:
+        # Obtenir tous les échantillons de cette classe
+        cursor.execute("SELECT id FROM audio_samples WHERE class_name = ? ORDER BY id", (class_name,))
+        sample_ids = [row[0] for row in cursor.fetchall()]
+        
+        # Mélanger les échantillons
+        np.random.shuffle(sample_ids)
+        
+        # Calculer les indices de split
+        n_samples = len(sample_ids)
+        n_val = int(n_samples * val_split)
+        n_test = int(n_samples * test_split)
+        
+        # Assigner les splits
+        val_ids = sample_ids[:n_val]
+        test_ids = sample_ids[n_val:n_val + n_test]
+        # train_ids = sample_ids[n_val + n_test:]  # Le reste est déjà 'train' par défaut
+        
+        # Mettre à jour la base de données
+        if val_ids:
+            cursor.executemany("UPDATE audio_samples SET split = 'val' WHERE id = ?", 
+                             [(id,) for id in val_ids])
+        if test_ids:
+            cursor.executemany("UPDATE audio_samples SET split = 'test' WHERE id = ?", 
+                             [(id,) for id in test_ids])
+    
+    conn.commit()
+    
     # Statistiques finales
     cursor.execute("SELECT COUNT(DISTINCT class_name) as classes, COUNT(*) as samples FROM audio_samples")
     stats = cursor.fetchone()
     
+    cursor.execute("SELECT split, COUNT(*) FROM audio_samples GROUP BY split")
+    split_stats = cursor.fetchall()
+    
     logger.info(f"\nIndex créé avec succès!")
     logger.info(f"Total: {stats[1]} échantillons, {stats[0]} classes")
+    for split, count in split_stats:
+        logger.info(f"  {split}: {count} échantillons")
     logger.info(f"Base de données sauvegardée: {output_db}")
     
     conn.close()
@@ -447,51 +497,53 @@ def create_scalable_data_loaders(
     audio_root: Path,
     batch_size: int = 32,
     num_workers: int = 4,
-    val_split: float = 0.1,
-    test_split: float = 0.1,
     **dataset_kwargs
 ) -> Dict[str, DataLoader]:
     """
     Crée les DataLoaders scalables pour train/val/test.
     """
-    # TODO: Implémenter le split train/val/test directement dans SQLite
-    # Pour l'instant, utiliser un seul dataset
+    loaders = {}
     
-    dataset = AudioDatasetScalable(
-        index_db=index_db,
-        audio_root=audio_root,
-        augment=True,
-        **dataset_kwargs
-    )
-    
-    # Créer un sampler équilibré
-    if dataset.balance_classes:
-        # Utiliser l'échantillonnage uniforme par défaut
-        sampler = None
-        shuffle = True
-    else:
-        # Pour un dataset non équilibré, utiliser WeightedRandomSampler
-        weights = dataset.get_class_weights()
-        sample_weights = torch.zeros(len(dataset))
+    for split in ['train', 'val', 'test']:
+        # Vérifier si le split existe dans la base
+        conn = sqlite3.connect(index_db)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM audio_samples WHERE split = ?", (split,))
+        count = cursor.fetchone()[0]
+        conn.close()
         
-        # Cette partie nécessiterait une optimisation pour éviter de charger tout en mémoire
-        # Pour l'instant, on utilise le shuffle simple
-        sampler = None
-        shuffle = True
+        if count == 0:
+            logger.warning(f"Aucun échantillon pour le split '{split}', ignoré")
+            continue
+        
+        # Créer le dataset pour ce split
+        dataset = AudioDatasetScalable(
+            index_db=index_db,
+            audio_root=audio_root,
+            split=split,
+            augment=(split == 'train'),  # Augmentation seulement pour train
+            **dataset_kwargs
+        )
+        
+        # Configuration du DataLoader
+        shuffle = (split == 'train')
+        drop_last = (split == 'train')
+        
+        loader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            pin_memory=torch.cuda.is_available(),
+            persistent_workers=False,  # Désactivé pour économiser la mémoire
+            prefetch_factor=2 if num_workers > 0 else None,
+            drop_last=drop_last
+        )
+        
+        loaders[split] = loader
+        logger.info(f"DataLoader {split}: {len(dataset)} échantillons, {len(loader)} batches")
     
-    loader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        sampler=sampler,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-        persistent_workers=False,  # Désactivé pour économiser la mémoire
-        prefetch_factor=2 if num_workers > 0 else None,
-        drop_last=True
-    )
-    
-    return {'train': loader}
+    return loaders
 
 
 if __name__ == "__main__":

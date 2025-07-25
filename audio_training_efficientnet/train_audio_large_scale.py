@@ -200,18 +200,27 @@ def main():
             output_db=args.index_db
         )
     
-    # Créer le dataset
-    logger.info("Chargement du dataset...")
-    train_loader = create_scalable_data_loaders(
+    # Créer les datasets
+    logger.info("Chargement des datasets...")
+    loaders = create_scalable_data_loaders(
         index_db=args.index_db,
         audio_root=Path(args.audio_root),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         max_samples_per_class=args.max_samples_per_class,
         balance_classes=args.balance_classes
-    )['train']
+    )
     
-    logger.info(f"Dataset chargé: {len(train_loader)} batches")
+    if 'train' not in loaders:
+        logger.error("Aucun dataset d'entraînement trouvé!")
+        return
+    
+    train_loader = loaders['train']
+    val_loader = loaders.get('val', None)
+    
+    logger.info(f"Dataset train chargé: {len(train_loader)} batches")
+    if val_loader:
+        logger.info(f"Dataset val chargé: {len(val_loader)} batches")
     
     # Créer le modèle
     logger.info(f"Création du modèle {args.model}...")
@@ -266,8 +275,37 @@ def main():
         # Mise à jour du scheduler
         scheduler.step()
         
+        # Validation si disponible
+        val_loss = None
+        val_acc = None
+        if val_loader:
+            val_loss, val_acc = validate(model, val_loader, criterion, device)
+            history['val_loss'].append(val_loss)
+            history['val_acc'].append(val_acc)
+            
+            # Sauvegarder le meilleur modèle
+            if val_acc > best_acc:
+                best_acc = val_acc
+                best_model_path = output_dir / 'best_model.pth'
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict(),
+                    'scaler_state_dict': scaler.state_dict(),
+                    'best_val_acc': best_acc,
+                    'train_loss': train_loss,
+                    'train_acc': train_acc,
+                    'val_loss': val_loss,
+                    'val_acc': val_acc,
+                    'args': args
+                }, best_model_path)
+                logger.info(f"✅ Nouveau meilleur modèle sauvegardé! Val Acc: {val_acc:.2f}%")
+        
         # Log
         logger.info(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%")
+        if val_loader:
+            logger.info(f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%")
         logger.info(f"Memory Usage: {get_memory_usage():.0f} MB")
         
         history['train_loss'].append(train_loss)
@@ -311,6 +349,8 @@ def main():
         json.dump(history, f, indent=2)
     
     logger.info("\nEntraînement terminé!")
+    if val_loader and best_acc > 0:
+        logger.info(f"Meilleure précision validation: {best_acc:.2f}%")
 
 
 if __name__ == "__main__":
