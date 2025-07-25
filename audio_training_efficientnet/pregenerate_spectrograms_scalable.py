@@ -15,7 +15,10 @@ import logging
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 import gc
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
+import pickle
+from datetime import datetime
+import json
 
 # Ajouter le chemin parent
 sys.path.append(str(Path(__file__).parent.parent))
@@ -166,7 +169,7 @@ def generate_augmented_spectrogram_standalone(audio_path: Path, config: dict, va
     return mel_spec_db
 
 
-def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict]) -> Optional[str]:
+def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict]) -> Dict[str, any]:
     """
     Traite un seul échantillon pour générer ses spectrogrammes.
     
@@ -174,24 +177,51 @@ def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict]) -> 
         args: Tuple contenant (sample_id, file_path, audio_root, class_name, split, output_dir, config_dict)
     
     Returns:
-        Message de succès ou None si erreur
+        Dict avec status ('success', 'error', 'skipped') et détails
     """
     sample_id, file_path, audio_root, class_name, split, output_dir, config_dict = args
     
     try:
         # Chemins de sortie
         audio_path = audio_root / file_path
+        
+        # Vérifier que le fichier audio existe
+        if not audio_path.exists():
+            return {
+                'status': 'error',
+                'file': str(file_path),
+                'error': 'Fichier audio introuvable',
+                'generated': 0
+            }
+        
+        # Vérifier la taille du fichier
+        file_size = audio_path.stat().st_size
+        if file_size == 0:
+            return {
+                'status': 'error',
+                'file': str(file_path),
+                'error': 'Fichier audio vide',
+                'generated': 0
+            }
+        
+        # Logger le début du traitement
+        logger.debug(f"Traitement de {file_path} ({file_size/1024:.1f}KB)")
+        
         base_name = Path(file_path).stem
         
         # Créer les répertoires de sortie
         class_output_dir = output_dir / split / class_name
         class_output_dir.mkdir(parents=True, exist_ok=True)
         
+        generated_count = 0
+        
         # 1. Générer le spectrogramme original
         original_path = class_output_dir / f"{base_name}.npy"
         if not original_path.exists():
             spec = generate_spectrogram_standalone(audio_path, config_dict)
             np.save(original_path, spec.detach().cpu().numpy())
+            generated_count += 1
+            logger.debug(f"Généré original: {original_path.name}")
         
         # 2. Générer les variantes augmentées (seulement pour train)
         if split == 'train':
@@ -201,15 +231,30 @@ def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict]) -> 
                 if not variant_path.exists():
                     spec = generate_augmented_spectrogram_standalone(audio_path, config_dict, variant)
                     np.save(variant_path, spec.detach().cpu().numpy())
+                    generated_count += 1
+                    logger.debug(f"Généré variante {variant}: {variant_path.name}")
         
         # Libérer la mémoire
         gc.collect()
         
-        return f"Traité: {file_path}"
+        return {
+            'status': 'success',
+            'file': str(file_path),
+            'generated': generated_count,
+            'split': split,
+            'class': class_name
+        }
         
     except Exception as e:
-        logger.error(f"Erreur pour {file_path}: {e}")
-        return None
+        logger.error(f"Erreur pour {file_path}: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.debug(traceback.format_exc())
+        return {
+            'status': 'error',
+            'file': str(file_path),
+            'error': f"{type(e).__name__}: {str(e)}",
+            'generated': 0
+        }
 
 
 def pregenerate_spectrograms(index_db: str, 
@@ -276,23 +321,59 @@ def pregenerate_spectrograms(index_db: str,
     # Traiter en parallèle
     logger.info("Début du traitement...")
     
-    if num_workers > 1:
-        with Pool(num_workers) as pool:
-            results = list(tqdm(
-                pool.imap(process_single_sample, args_list),
-                total=len(args_list),
-                desc="Génération des spectrogrammes"
-            ))
-    else:
-        # Traitement séquentiel pour le debug
-        results = []
-        for args in tqdm(args_list, desc="Génération des spectrogrammes"):
-            result = process_single_sample(args)
-            results.append(result)
+    results = []
+    errors = []
     
-    # Compter les succès
-    successes = sum(1 for r in results if r is not None)
-    logger.info(f"Génération terminée: {successes}/{len(samples)} échantillons traités avec succès")
+    try:
+        if num_workers > 1:
+            # Utiliser imap_unordered pour plus de robustesse
+            with Pool(num_workers) as pool:
+                # Utiliser un timeout pour éviter les blocages
+                for result in tqdm(
+                    pool.imap_unordered(process_single_sample, args_list, chunksize=10),
+                    total=len(args_list),
+                    desc="Génération des spectrogrammes"
+                ):
+                    results.append(result)
+                    if result['status'] == 'error':
+                        errors.append(result)
+        else:
+            # Traitement séquentiel pour le debug
+            for i, args in enumerate(tqdm(args_list, desc="Génération des spectrogrammes")):
+                result = process_single_sample(args)
+                results.append(result)
+                if result['status'] == 'error':
+                    errors.append(result)
+                    logger.warning(f"Erreur {i+1}/{len(args_list)}: {result['file']} - {result['error']}")
+    
+    except KeyboardInterrupt:
+        logger.warning("Interruption par l'utilisateur")
+        pool.terminate()
+        pool.join()
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement: {e}")
+        if 'pool' in locals():
+            pool.terminate()
+            pool.join()
+        raise
+    
+    # Statistiques détaillées
+    successes = sum(1 for r in results if r['status'] == 'success')
+    total_generated = sum(r.get('generated', 0) for r in results)
+    
+    logger.info(f"\nGénération terminée:")
+    logger.info(f"  - Échantillons traités avec succès: {successes}/{len(samples)}")
+    logger.info(f"  - Total spectrogrammes générés: {total_generated}")
+    logger.info(f"  - Erreurs: {len(errors)}")
+    
+    # Afficher les erreurs
+    if errors:
+        logger.warning(f"\nFichiers en erreur ({len(errors)}):")
+        for err in errors[:10]:  # Afficher max 10 erreurs
+            logger.warning(f"  - {err['file']}: {err['error']}")
+        if len(errors) > 10:
+            logger.warning(f"  ... et {len(errors) - 10} autres erreurs")
     
     # Statistiques par split
     for split in ['train', 'val', 'test']:
@@ -300,6 +381,22 @@ def pregenerate_spectrograms(index_db: str,
         if split_dir.exists():
             n_files = sum(1 for _ in split_dir.rglob("*.npy"))
             logger.info(f"  {split}: {n_files} fichiers .npy")
+    
+    # Sauvegarder un rapport de génération
+    report_path = output_dir / f"generation_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    report = {
+        'timestamp': datetime.now().isoformat(),
+        'config': config_dict,
+        'total_samples': len(samples),
+        'successes': successes,
+        'errors': len(errors),
+        'total_generated': total_generated,
+        'error_files': [err['file'] for err in errors]
+    }
+    
+    with open(report_path, 'w') as f:
+        json.dump(report, f, indent=2)
+    logger.info(f"\\nRapport sauvegardé: {report_path}")
 
 
 def main():
@@ -315,8 +412,17 @@ def main():
                        help='Nombre de workers parallèles')
     parser.add_argument('--animal-type', type=str, default='general',
                        help='Type d\'animal pour la configuration')
+    parser.add_argument('--verbose', action='store_true',
+                       help='Mode verbose pour le debug')
+    parser.add_argument('--continue-on-error', action='store_true',
+                       help='Continuer même en cas d\'erreur')
     
     args = parser.parse_args()
+    
+    # Configurer le logging selon le mode verbose
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Mode verbose activé")
     
     pregenerate_spectrograms(
         args.index_db,
