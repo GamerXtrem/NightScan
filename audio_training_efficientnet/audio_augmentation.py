@@ -405,6 +405,7 @@ class AdaptiveAudioAugmentation(AudioAugmentation):
     def get_augmentation_multiplier(self, n_samples: int) -> int:
         """
         Retourne le multiplicateur d'augmentation pour une classe donnée.
+        Limité pour ne pas dépasser 500 échantillons au total.
         
         Args:
             n_samples: Nombre d'échantillons dans la classe
@@ -412,8 +413,19 @@ class AdaptiveAudioAugmentation(AudioAugmentation):
         Returns:
             Multiplicateur d'augmentation
         """
+        MAX_SAMPLES_PER_CLASS = 500
+        
+        if n_samples >= MAX_SAMPLES_PER_CLASS:
+            return 1  # Pas d'augmentation si déjà >= 500 échantillons
+        
         category = self.get_class_category(n_samples)
-        return self.minority_params[category]['augmentation_multiplier']
+        base_multiplier = self.minority_params[category]['augmentation_multiplier']
+        
+        # Calculer le multiplicateur maximal pour ne pas dépasser 500
+        max_multiplier = MAX_SAMPLES_PER_CLASS // n_samples
+        
+        # Retourner le minimum entre le multiplicateur de base et le max calculé
+        return min(base_multiplier, max_multiplier)
     
     def should_augment(self, n_samples: int) -> bool:
         """

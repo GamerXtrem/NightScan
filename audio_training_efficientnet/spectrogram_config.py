@@ -103,14 +103,16 @@ PREPROCESSING_PARAMS = {
 }
 
 # Configuration pour l'augmentation adaptative des classes minoritaires
+MAX_SAMPLES_PER_CLASS = 500  # Limite maximale d'échantillons par classe après augmentation
+
 MINORITY_CLASS_CONFIG = {
     'thresholds': {
         'very_small': 50,      # Classes avec < 50 échantillons
         'small': 250,          # Classes avec 50-250 échantillons
     },
     'augmentation_multipliers': {
-        'very_small': 5,       # 5x augmentation pour < 50 échantillons
-        'small': 2,            # 2x augmentation pour 50-250 échantillons
+        'very_small': 5,       # 5x augmentation pour < 50 échantillons (mais limité à 500 total)
+        'small': 2,            # 2x augmentation pour 50-250 échantillons (mais limité à 500 total)
         'large': 1,            # Pas de multiplication pour > 250 échantillons
     },
     'augmentation_params': {
@@ -271,6 +273,7 @@ def get_augmentation_params_for_class(n_samples: int) -> Dict:
 def get_augmentation_multiplier(n_samples: int) -> int:
     """
     Retourne le multiplicateur d'augmentation pour une classe.
+    Limité pour ne pas dépasser MAX_SAMPLES_PER_CLASS.
     
     Args:
         n_samples: Nombre d'échantillons dans la classe
@@ -278,8 +281,17 @@ def get_augmentation_multiplier(n_samples: int) -> int:
     Returns:
         Multiplicateur d'augmentation
     """
+    if n_samples >= MAX_SAMPLES_PER_CLASS:
+        return 1  # Pas d'augmentation si déjà >= 500 échantillons
+    
     category = get_minority_class_category(n_samples)
-    return MINORITY_CLASS_CONFIG['augmentation_multipliers'][category]
+    base_multiplier = MINORITY_CLASS_CONFIG['augmentation_multipliers'][category]
+    
+    # Calculer le multiplicateur maximal pour ne pas dépasser 500
+    max_multiplier = MAX_SAMPLES_PER_CLASS // n_samples
+    
+    # Retourner le minimum entre le multiplicateur de base et le max calculé
+    return min(base_multiplier, max_multiplier)
 
 
 def validate_audio_params(sample_rate: int, duration: float, n_samples: int) -> bool:

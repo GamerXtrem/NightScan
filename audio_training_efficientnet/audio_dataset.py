@@ -136,17 +136,19 @@ class AudioSpectrogramDataset(Dataset):
     def _apply_oversampling(self):
         """
         Applique l'oversampling pour les classes avec moins de 500 échantillons.
+        Limite stricte à 500 échantillons maximum par classe.
         """
+        MAX_SAMPLES_PER_CLASS = 500
         new_rows = []
         
         for class_name in self.class_names:
             class_df = self.data_df[self.data_df['label'] == class_name]
             count = len(class_df)
             
-            if count < 250 and count > 0:
+            if count < MAX_SAMPLES_PER_CLASS and count > 0:
                 # Calculer combien de fois dupliquer selon le multiplicateur
                 multiplier = self.augmenter.get_augmentation_multiplier(count)
-                target_count = count * multiplier
+                target_count = min(count * multiplier, MAX_SAMPLES_PER_CLASS)
                 n_duplicates = (target_count // count) - 1
                 
                 if n_duplicates > 0:
@@ -157,10 +159,10 @@ class AudioSpectrogramDataset(Dataset):
                     # Ajouter des échantillons aléatoires pour atteindre exactement target_count
                     remaining = target_count - count * (n_duplicates + 1)
                     if remaining > 0:
-                        sampled_rows = class_df.sample(n=remaining, replace=True)
+                        sampled_rows = class_df.sample(n=min(remaining, len(class_df)), replace=True)
                         new_rows.append(sampled_rows)
                     
-                    logger.info(f"Oversampling classe '{class_name}': {count} -> ~{target_count} échantillons")
+                    logger.info(f"Oversampling classe '{class_name}': {count} -> {target_count} échantillons (max: {MAX_SAMPLES_PER_CLASS})")
         
         if new_rows:
             # Combiner avec le dataframe original
