@@ -196,6 +196,10 @@ def main():
                        help="Prégénérer tous les spectrogrammes avant l'entraînement")
     parser.add_argument('--use-mock-data', action='store_true',
                        help="Utiliser des données simulées (pour les tests)")
+    parser.add_argument('--augment', type=str, default='true', choices=['true', 'false'],
+                       help="Activer l'augmentation des données (défaut: true)")
+    parser.add_argument('--oversampling', type=str, default='true', choices=['true', 'false'],
+                       help="Activer l'oversampling des classes minoritaires (défaut: true)")
     
     args = parser.parse_args()
     
@@ -270,7 +274,9 @@ def main():
             num_workers=args.num_workers,
             spectrogram_dir=args.spectrogram_dir,
             persistent_workers=args.persistent_workers,
-            prefetch_factor=args.prefetch_factor
+            prefetch_factor=args.prefetch_factor,
+            augment_train=(args.augment == 'true'),
+            enable_oversampling=(args.oversampling == 'true')
         )
         
         if 'train' not in loaders or 'val' not in loaders:
