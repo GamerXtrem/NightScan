@@ -220,7 +220,7 @@ class AudioDatasetScalable(Dataset):
         spectrogram = self._generate_spectrogram_memory_efficient(audio_path)
         
         # Appliquer l'augmentation si demandé
-        if self.augment and self.training:
+        if self.augment:
             spectrogram = self._augment_spectrogram(spectrogram)
         
         # Appliquer les transformations
@@ -376,17 +376,30 @@ def create_index_database(audio_dir: Path, output_db: str, extensions: List[str]
         class_samples = 0
         
         for audio_file in class_dir.iterdir():
+            # Ignorer les fichiers cachés macOS et autres fichiers système
+            if audio_file.name.startswith('._') or audio_file.name == '.DS_Store':
+                continue
+                
             if audio_file.suffix.lower() in extensions:
                 relative_path = audio_file.relative_to(audio_dir)
-                file_size = audio_file.stat().st_size
+                
+                # Vérifier que le fichier est valide
+                try:
+                    file_size = audio_file.stat().st_size
+                    if file_size == 0:
+                        logger.warning(f"Fichier vide ignoré: {relative_path}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"Impossible d'accéder au fichier {relative_path}: {e}")
+                    continue
                 
                 # Essayer d'obtenir la durée
                 duration = None
                 try:
                     info = torchaudio.info(str(audio_file))
                     duration = info.num_frames / info.sample_rate
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Impossible d'obtenir la durée de {relative_path}: {e}")
                 
                 cursor.execute("""
                     INSERT INTO audio_samples (file_path, class_name, duration, file_size)
