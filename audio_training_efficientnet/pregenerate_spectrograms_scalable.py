@@ -191,7 +191,7 @@ def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict]) -> 
         original_path = class_output_dir / f"{base_name}.npy"
         if not original_path.exists():
             spec = generate_spectrogram_standalone(audio_path, config_dict)
-            np.save(original_path, spec.cpu().numpy())
+            np.save(original_path, spec.detach().cpu().numpy())
         
         # 2. Générer les variantes augmentées (seulement pour train)
         if split == 'train':
@@ -200,7 +200,7 @@ def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict]) -> 
                 variant_path = class_output_dir / f"{base_name}_var{variant:03d}.npy"
                 if not variant_path.exists():
                     spec = generate_augmented_spectrogram_standalone(audio_path, config_dict, variant)
-                    np.save(variant_path, spec.cpu().numpy())
+                    np.save(variant_path, spec.detach().cpu().numpy())
         
         # Libérer la mémoire
         gc.collect()
