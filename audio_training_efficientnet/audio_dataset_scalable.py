@@ -132,6 +132,12 @@ class AudioDatasetScalable(Dataset):
         
         self.num_classes = len(self.class_names)
         
+        # Logger la distribution des classes
+        logger.info(f"Distribution des classes pour split '{self.split}':")
+        for class_name in sorted(self.class_names):
+            info = self.class_info[class_name]
+            logger.info(f"  {class_name}: {info['count']} échantillons (original: {info['original_count']})")
+        
         # Créer l'index d'échantillonnage équilibré si nécessaire
         if self.balance_classes:
             self._create_balanced_index()
@@ -165,9 +171,17 @@ class AudioDatasetScalable(Dataset):
             sample_ids = [row[0] for row in cursor.fetchall()]
             
             # Si moins d'échantillons que max_samples_per_class, dupliquer
+            original_count = len(sample_ids)
+            if original_count == 0:
+                logger.warning(f"Classe '{class_name}' vide dans le split '{self.split}'!")
+                continue
+                
             while len(sample_ids) < self.max_samples_per_class:
                 sample_ids.extend(sample_ids[:min(len(sample_ids), 
                                                  self.max_samples_per_class - len(sample_ids))])
+            
+            if len(sample_ids) > original_count:
+                logger.info(f"  Classe '{class_name}': {original_count} → {len(sample_ids)} échantillons (×{len(sample_ids)//original_count})")
             
             # Insérer dans l'index équilibré
             for sample_id in sample_ids[:self.max_samples_per_class]:
