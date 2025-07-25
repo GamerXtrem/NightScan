@@ -48,7 +48,8 @@ class AudioDatasetScalable(Dataset):
                  max_samples_per_class: int = 500,
                  balance_classes: bool = True,
                  chunk_size: int = 10000,
-                 split: str = 'train'):
+                 split: str = 'train',
+                 spectrogram_cache_dir: Optional[Path] = None):
         """
         Args:
             index_db: Chemin vers la base SQLite contenant l'index
@@ -61,6 +62,7 @@ class AudioDatasetScalable(Dataset):
             balance_classes: Si True, équilibre les classes lors du sampling
             chunk_size: Taille des chunks pour le chargement par batch
             split: Split à utiliser ('train', 'val', 'test')
+            spectrogram_cache_dir: Répertoire contenant les spectrogrammes pré-générés (.npy)
         """
         self.index_db = index_db
         self.audio_root = Path(audio_root)
@@ -70,6 +72,7 @@ class AudioDatasetScalable(Dataset):
         self.balance_classes = balance_classes
         self.chunk_size = chunk_size
         self.split = split
+        self.spectrogram_cache_dir = Path(spectrogram_cache_dir) if spectrogram_cache_dir else None
         
         # Configuration du spectrogramme
         if config is None:
@@ -96,6 +99,9 @@ class AudioDatasetScalable(Dataset):
         
         logger.info(f"Dataset initialisé: {self.total_samples} échantillons, {self.num_classes} classes")
         logger.info(f"Mémoire maximale: {MAX_MEMORY_MB}MB, Cache max: {self.max_cache_size} spectrogrammes")
+        
+        if self.spectrogram_cache_dir:
+            logger.info(f"Utilisation du cache de spectrogrammes: {self.spectrogram_cache_dir}")
     
     def _init_metadata(self):
         """Initialise les métadonnées depuis la base de données."""
@@ -258,12 +264,18 @@ class AudioDatasetScalable(Dataset):
         # SQLite retourne un dictionnaire, utiliser l'index ou la clé selon le driver
         augmentation_variant = row['augmentation_variant'] if 'augmentation_variant' in row.keys() else 0
         
-        # Générer le spectrogramme avec augmentation basée sur la variante
-        if augmentation_variant > 0 and self.split == 'train':
-            # Utiliser la variante comme seed pour des augmentations déterministes mais différentes
-            spectrogram = self._generate_augmented_spectrogram_variant(audio_path, augmentation_variant)
-        else:
-            spectrogram = self._generate_spectrogram_memory_efficient(audio_path)
+        # Essayer de charger depuis le cache de spectrogrammes pré-générés
+        spectrogram = None
+        if self.spectrogram_cache_dir:
+            spectrogram = self._load_cached_spectrogram(audio_path, label, augmentation_variant)
+        
+        # Si pas de cache ou échec du chargement, générer le spectrogramme
+        if spectrogram is None:
+            if augmentation_variant > 0 and self.split == 'train':
+                # Utiliser la variante comme seed pour des augmentations déterministes mais différentes
+                spectrogram = self._generate_augmented_spectrogram_variant(audio_path, augmentation_variant)
+            else:
+                spectrogram = self._generate_spectrogram_memory_efficient(audio_path)
         
         # Appliquer l'augmentation aléatoire supplémentaire si demandé
         if self.augment and self.split == 'train':
@@ -277,6 +289,50 @@ class AudioDatasetScalable(Dataset):
         self._manage_cache(idx, spectrogram, label_idx)
         
         return spectrogram, label_idx
+    
+    def _load_cached_spectrogram(self, audio_path: Path, class_name: str, variant: int) -> Optional[torch.Tensor]:
+        """
+        Charge un spectrogramme pré-généré depuis le cache.
+        
+        Args:
+            audio_path: Chemin du fichier audio original
+            class_name: Nom de la classe
+            variant: Numéro de variante (0 = original, >0 = augmenté)
+        
+        Returns:
+            Spectrogramme chargé ou None si non trouvé
+        """
+        try:
+            # Construire le chemin du fichier .npy
+            base_name = audio_path.stem
+            
+            if variant == 0:
+                # Spectrogramme original
+                npy_filename = f"{base_name}.npy"
+            else:
+                # Spectrogramme augmenté
+                npy_filename = f"{base_name}_var{variant:03d}.npy"
+            
+            # Chemin complet
+            npy_path = self.spectrogram_cache_dir / self.split / class_name / npy_filename
+            
+            if npy_path.exists():
+                # Charger le spectrogramme
+                spec_array = np.load(npy_path)
+                spectrogram = torch.from_numpy(spec_array).float()
+                
+                # S'assurer que c'est en 3 canaux
+                if spectrogram.dim() == 2:
+                    spectrogram = spectrogram.unsqueeze(0).repeat(3, 1, 1)
+                elif spectrogram.shape[0] == 1:
+                    spectrogram = spectrogram.repeat(3, 1, 1)
+                
+                return spectrogram
+            
+        except Exception as e:
+            logger.debug(f"Impossible de charger le spectrogramme en cache {npy_path}: {e}")
+        
+        return None
     
     def _generate_spectrogram_memory_efficient(self, audio_path: Path) -> torch.Tensor:
         """
@@ -631,6 +687,7 @@ def create_scalable_data_loaders(
     audio_root: Path,
     batch_size: int = 32,
     num_workers: int = 4,
+    spectrogram_cache_dir: Optional[Path] = None,
     **dataset_kwargs
 ) -> Dict[str, DataLoader]:
     """
@@ -656,6 +713,7 @@ def create_scalable_data_loaders(
             audio_root=audio_root,
             split=split,
             augment=(split == 'train'),  # Augmentation seulement pour train
+            spectrogram_cache_dir=spectrogram_cache_dir,
             **dataset_kwargs
         )
         

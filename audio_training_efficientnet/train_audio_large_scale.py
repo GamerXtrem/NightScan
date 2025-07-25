@@ -167,6 +167,8 @@ def main():
                        help='Maximum d\'échantillons par classe')
     parser.add_argument('--no-balance-classes', action='store_true',
                        help='Désactiver l\'équilibrage des classes')
+    parser.add_argument('--spectrogram-cache-dir', type=Path, default=None,
+                       help='Répertoire contenant les spectrogrammes pré-générés')
     
     # Sauvegarde
     parser.add_argument('--output-dir', type=str, default='models_large_scale',
@@ -186,6 +188,8 @@ def main():
     logger.info(f"  Epochs: {args.epochs}")
     logger.info(f"  Balance classes: {not args.no_balance_classes}")
     logger.info(f"  Max samples per class: {args.max_samples_per_class}")
+    if args.spectrogram_cache_dir:
+        logger.info(f"  Spectrogram cache: {args.spectrogram_cache_dir}")
     
     # Device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -210,7 +214,8 @@ def main():
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         max_samples_per_class=args.max_samples_per_class,
-        balance_classes=not args.no_balance_classes
+        balance_classes=not args.no_balance_classes,
+        spectrogram_cache_dir=args.spectrogram_cache_dir
     )
     
     if 'train' not in loaders:
