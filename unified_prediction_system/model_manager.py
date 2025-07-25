@@ -10,7 +10,7 @@ import sys
 import time
 import threading
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, Tuple
 import logging
 import json
 from datetime import datetime, timedelta
@@ -74,10 +74,33 @@ class AudioModelLoader:
     """Chargeur spécialisé pour les modèles audio."""
     
     @staticmethod
-    def load_model(model_path: Path, config: Dict) -> torch.nn.Module:
-        """Charge un modèle audio (ResNet18 ou EfficientNet)."""
+    def load_model(model_path: Path, config: Dict) -> Tuple[torch.nn.Module, Dict]:
+        """Charge un modèle audio (ResNet18 ou EfficientNet) et retourne le modèle et les infos."""
         try:
             import torchvision.models as models
+            
+            # Charger le checkpoint complet si disponible
+            checkpoint_data = None
+            if model_path.exists():
+                checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
+                
+                # Vérifier si c'est un checkpoint complet ou juste un state_dict
+                if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                    # Checkpoint complet avec métadonnées
+                    checkpoint_data = checkpoint
+                    state_dict = checkpoint['model_state_dict']
+                    
+                    # Utiliser les infos du checkpoint si disponibles
+                    if 'model_config' in checkpoint:
+                        config.update(checkpoint['model_config'])
+                    if 'num_classes' in checkpoint:
+                        config['num_classes'] = checkpoint['num_classes']
+                else:
+                    # Simple state_dict
+                    state_dict = checkpoint
+            else:
+                logger.warning(f"Modèle audio introuvable: {model_path}")
+                raise ModelLoadError(f"Fichier modèle audio non trouvé: {model_path}")
             
             model_name = config.get('model_name', 'resnet18')
             num_classes = config.get('num_classes', 6)
@@ -100,17 +123,11 @@ class AudioModelLoader:
                 raise ModelLoadError(f"Modèle non supporté: {model_name}")
             
             # Charger les poids
-            if model_path.exists():
-                state_dict = torch.load(model_path, map_location='cpu', weights_only=False)
-                # Adapter les poids si nécessaire
-                model = AudioModelLoader._adapt_weights(model, state_dict, num_classes)
-                logger.info(f"Modèle audio chargé: {model_path}")
-            else:
-                logger.warning(f"Modèle audio introuvable: {model_path}")
-                raise ModelLoadError(f"Fichier modèle audio non trouvé: {model_path}")
+            model = AudioModelLoader._adapt_weights(model, state_dict, num_classes)
+            logger.info(f"Modèle audio chargé: {model_path}")
             
             model.eval()
-            return model
+            return model, checkpoint_data
             
         except Exception as e:
             logger.error(f"Erreur chargement modèle audio: {e}")
@@ -161,10 +178,33 @@ class PhotoModelLoader:
     """Chargeur spécialisé pour les modèles photo."""
     
     @staticmethod
-    def load_model(model_path: Path, config: Dict) -> torch.nn.Module:
-        """Charge un modèle photo (ResNet18, EfficientNet, etc.)."""
+    def load_model(model_path: Path, config: Dict) -> Tuple[torch.nn.Module, Dict]:
+        """Charge un modèle photo (ResNet18, EfficientNet, etc.) et retourne le modèle et les infos."""
         try:
             import torchvision.models as models
+            
+            # Charger le checkpoint complet si disponible
+            checkpoint_data = None
+            if model_path.exists():
+                checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
+                
+                # Vérifier si c'est un checkpoint complet ou juste un state_dict
+                if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                    # Checkpoint complet avec métadonnées
+                    checkpoint_data = checkpoint
+                    state_dict = checkpoint['model_state_dict']
+                    
+                    # Utiliser les infos du checkpoint si disponibles
+                    if 'model_config' in checkpoint:
+                        config.update(checkpoint['model_config'])
+                    if 'num_classes' in checkpoint:
+                        config['num_classes'] = checkpoint['num_classes']
+                else:
+                    # Simple state_dict
+                    state_dict = checkpoint
+            else:
+                logger.warning(f"Modèle photo introuvable: {model_path}")
+                raise ModelLoadError(f"Fichier modèle photo non trouvé: {model_path}")
             
             model_name = config.get('model_name', 'resnet18')
             num_classes = config.get('num_classes', 8)
@@ -187,17 +227,11 @@ class PhotoModelLoader:
                 raise ModelLoadError(f"Modèle non supporté: {model_name}")
             
             # Charger les poids
-            if model_path.exists():
-                state_dict = torch.load(model_path, map_location='cpu', weights_only=False)
-                # Adapter les poids si nécessaire
-                model = PhotoModelLoader._adapt_weights(model, state_dict, num_classes)
-                logger.info(f"Modèle photo chargé: {model_path}")
-            else:
-                logger.warning(f"Modèle photo introuvable: {model_path}")
-                raise ModelLoadError(f"Fichier modèle photo non trouvé: {model_path}")
+            model = PhotoModelLoader._adapt_weights(model, state_dict, num_classes)
+            logger.info(f"Modèle photo chargé: {model_path}")
             
             model.eval()
-            return model
+            return model, checkpoint_data
             
         except Exception as e:
             logger.error(f"Erreur chargement modèle photo: {e}")
@@ -352,14 +386,19 @@ class UnifiedModelManager:
                 audio_config = self.config["audio_model"]
                 model_path = Path(audio_config["model_path"])
                 
-                # Charger le modèle
-                model = AudioModelLoader.load_model(model_path, audio_config["config"])
+                # Charger le modèle et les données du checkpoint
+                model, checkpoint_data = AudioModelLoader.load_model(model_path, audio_config["config"])
                 model.to(self.device)
                 
                 # Créer l'objet ModelInfo
                 model_info = ModelInfo("audio", model_path, audio_config)
                 model_info.model = model
                 model_info.device = self.device
+                
+                # Mettre à jour les classes si disponibles dans le checkpoint
+                if checkpoint_data and 'class_names' in checkpoint_data:
+                    model_info.class_names = checkpoint_data['class_names']
+                    logger.info(f"Classes chargées depuis le checkpoint: {model_info.class_names}")
                 
                 self.models[model_id] = model_info
                 logger.info(f"Modèle audio {model_id} chargé avec succès")
@@ -389,14 +428,19 @@ class UnifiedModelManager:
                 photo_config = self.config["photo_model"]
                 model_path = Path(photo_config["model_path"])
                 
-                # Charger le modèle
-                model = PhotoModelLoader.load_model(model_path, photo_config["config"])
+                # Charger le modèle et les données du checkpoint
+                model, checkpoint_data = PhotoModelLoader.load_model(model_path, photo_config["config"])
                 model.to(self.device)
                 
                 # Créer l'objet ModelInfo
                 model_info = ModelInfo("photo", model_path, photo_config)
                 model_info.model = model
                 model_info.device = self.device
+                
+                # Mettre à jour les classes si disponibles dans le checkpoint
+                if checkpoint_data and 'class_names' in checkpoint_data:
+                    model_info.class_names = checkpoint_data['class_names']
+                    logger.info(f"Classes chargées depuis le checkpoint: {model_info.class_names}")
                 
                 self.models[model_id] = model_info
                 logger.info(f"Modèle photo {model_id} chargé avec succès")

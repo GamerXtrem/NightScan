@@ -44,6 +44,7 @@ class DatabaseCircuitBreakerConfig(CircuitBreakerConfig):
     connection_timeout: float = 3.0     # Timeout for getting connections
     
     # Pool monitoring
+    enable_pool_monitoring: bool = True  # Enable/disable pool monitoring
     pool_check_interval: float = 30.0   # Seconds between pool health checks
     max_pool_failures: int = 3          # Pool failures before circuit opens
     
@@ -98,7 +99,11 @@ class DatabaseCircuitBreaker(CircuitBreaker):
         self._pool_monitor_thread = None
         self._monitoring_active = False
         
-        self._start_pool_monitoring()
+        # Only start monitoring if enabled
+        if self.db_config.enable_pool_monitoring:
+            self._start_pool_monitoring()
+        else:
+            logger.info(f"Pool monitoring disabled for database circuit '{config.name}'")
         
         logger.info(f"Database circuit breaker '{config.name}' initialized")
     
@@ -194,13 +199,22 @@ class DatabaseCircuitBreaker(CircuitBreaker):
             # Check connection health before executing
             self._check_connection_health()
             
-            # Execute query
+            # Execute query based on type
             if isinstance(query, str):
+                # SQL string query
                 if params:
                     result = self.db_session.execute(text(query), params)
                 else:
                     result = self.db_session.execute(text(query))
+            elif hasattr(query, '_legacy_facade') or (hasattr(query, '__class__') and 'Query' in query.__class__.__name__):
+                # SQLAlchemy ORM Query object - return it directly
+                # The caller will execute methods like .first(), .all(), etc.
+                result = query
+            elif hasattr(query, 'statement'):
+                # SQLAlchemy Core Select/Query object
+                result = self.db_session.execute(query.statement, params or {})
             else:
+                # Default: try to execute as is
                 result = self.db_session.execute(query, params or {})
             
             execution_time = time.time() - start_time
@@ -419,6 +433,20 @@ class DatabaseCircuitBreaker(CircuitBreaker):
     def _check_pool_health(self):
         """Check health of connection pool."""
         try:
+            # Import Flask here to avoid circular imports
+            try:
+                from flask import current_app, has_app_context
+                
+                # Check if we're in an application context
+                if not has_app_context():
+                    # Skip pool health check if no app context
+                    logger.debug("Skipping pool health check - no Flask app context")
+                    return
+            except ImportError:
+                # Flask not available, skip check
+                logger.debug("Skipping pool health check - Flask not available")
+                return
+                
             if self.db_session and hasattr(self.db_session, 'bind'):
                 engine = self.db_session.bind
                 

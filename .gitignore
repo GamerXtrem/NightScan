@@ -1,9 +1,38 @@
-__pycache__/
-*.pyc
+# Python
+**/__pycache__/
+**/*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.ipynb_checkpoints
 env/
 venv/
 ios-app/node_modules/
 nightscan.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Training data and generated files
+audio_training_efficientnet/data/
+audio_training_efficientnet/audio_training_efficientnet/
+data/processed/csv/*.csv
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
+# Model files (keep only essential ones)
+*.pth
+!models/best_model.pth
+!audio_training_efficientnet/models/best_model.pth
 ios-app/assets/wake_tone.wav
 
 # Ignore packaged plugin archives

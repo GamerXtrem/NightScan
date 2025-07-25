@@ -1438,12 +1438,16 @@ with application.app_context():
     init_session_jwt_bridge(application)
     
     # Register password reset blueprint
-    from web.password_reset import password_reset_bp
-    application.register_blueprint(password_reset_bp)
+    try:
+        from web.password_reset import password_reset_bp
+        application.register_blueprint(password_reset_bp)
+        logger.info("Password reset blueprint registered successfully")
+    except ImportError as e:
+        logger.warning(f"Could not import password reset blueprint: {e}")
     
     # Initialize WebSocket integration
     websocket_integration = FlaskWebSocketIntegration(application)
 
 
 if __name__ == "__main__":
-    create_app().run(host="0.0.0.0", port=8000)
+    application.run(host="0.0.0.0", port=8000)

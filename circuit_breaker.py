@@ -47,6 +47,10 @@ class CircuitBreakerConfig:
     # Advanced configuration
     rolling_window_size: int = 100      # Size of rolling window for failure tracking
     minimum_requests: int = 10          # Minimum requests before considering failures
+    
+    def __post_init__(self):
+        """Post-initialization hook for subclasses."""
+        pass
     slow_call_duration: float = 5.0    # Calls slower than this count as failures
     slow_call_rate_threshold: float = 0.5  # % of slow calls that trigger circuit
     
@@ -58,6 +62,10 @@ class CircuitBreakerConfig:
     # Monitoring
     enable_metrics: bool = True
     health_check_interval: float = 30.0  # Seconds between health checks in OPEN state
+    
+    def __post_init__(self):
+        """Post-initialization hook for dataclass."""
+        pass
 
 
 @dataclass

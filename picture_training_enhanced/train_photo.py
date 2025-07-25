@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import datetime
 import json
 from PIL import Image
+from torch.cuda.amp import GradScaler, autocast
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -106,12 +107,17 @@ def create_mock_wildlife_images(num_samples=1000, num_classes=8):
     
     return np.array(X), np.array(y)
 
-def simple_training_loop(model, train_loader, num_epochs=5, device='cpu'):
+def simple_training_loop(model, train_loader, num_epochs=5, device='cpu', weight_decay=0.01, use_amp=True):
     """Simple training loop to create a functional model."""
     print(f"Training model for {num_epochs} epochs on {device}...")
+    print(f"Optimizer: AdamW (lr=0.001, weight_decay={weight_decay})")
+    print(f"Mixed Precision Training (AMP): {'Enabled' if use_amp and device.type == 'cuda' else 'Disabled'}")
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=weight_decay)
+    
+    # Initialize GradScaler for Mixed Precision Training
+    scaler = GradScaler() if use_amp and device.type == 'cuda' else None
     
     model.train()
     for epoch in range(num_epochs):
@@ -123,10 +129,22 @@ def simple_training_loop(model, train_loader, num_epochs=5, device='cpu'):
             data, targets = data.to(device), targets.to(device)
             
             optimizer.zero_grad()
-            outputs = model(data)
-            loss = criterion(outputs, targets)
-            loss.backward()
-            optimizer.step()
+            
+            # Use autocast for mixed precision if available
+            if scaler is not None:
+                with autocast():
+                    outputs = model(data)
+                    loss = criterion(outputs, targets)
+                
+                # Backward pass with gradient scaling
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                outputs = model(data)
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
             
             total_loss += loss.item()
             _, predicted = torch.max(outputs.data, 1)
@@ -177,7 +195,8 @@ def main():
     
     # Train model
     print("\n🚀 Starting training...")
-    trained_model = simple_training_loop(model, train_loader, num_epochs=10, device=device)
+    use_amp = device.type == 'cuda'  # Enable AMP for CUDA devices
+    trained_model = simple_training_loop(model, train_loader, num_epochs=10, device=device, weight_decay=0.01, use_amp=use_amp)
     
     # Create output directory
     output_dir = Path("picture_training_enhanced/models")
@@ -203,7 +222,11 @@ def main():
             'accuracy': 0.94,  # Simulated final accuracy
             'val_accuracy': 0.91,
             'training_time_hours': 3.2,
-            'device': str(device)
+            'device': str(device),
+            'optimizer': 'AdamW',
+            'learning_rate': 0.001,
+            'weight_decay': 0.01,
+            'mixed_precision': use_amp
         },
         'class_names': get_wildlife_classes(),
         'metadata': {
