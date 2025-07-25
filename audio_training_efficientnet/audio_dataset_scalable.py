@@ -257,6 +257,16 @@ class AudioDatasetScalable(Dataset):
                 waveform = resampler(waveform)
                 del resampler  # Libérer la mémoire
             
+            # Ajuster la durée pour garantir une taille uniforme
+            target_length = int(self.sample_rate * self.duration)
+            if waveform.shape[1] < target_length:
+                # Padding
+                pad = target_length - waveform.shape[1]
+                waveform = torch.nn.functional.pad(waveform, (0, pad))
+            elif waveform.shape[1] > target_length:
+                # Truncate
+                waveform = waveform[:, :target_length]
+            
             # Créer le spectrogramme mel avec float16 pour économiser la mémoire
             mel_transform = T.MelSpectrogram(
                 sample_rate=self.sample_rate,
@@ -290,7 +300,9 @@ class AudioDatasetScalable(Dataset):
         except Exception as e:
             logger.error(f"Erreur génération spectrogramme {audio_path}: {e}")
             # Retourner un spectrogramme vide en cas d'erreur
-            return torch.zeros((3, self.n_mels, 345), dtype=torch.float16)
+            # Calculer la taille correcte du spectrogramme
+            n_frames = int(np.ceil(self.duration * self.sample_rate / self.config.hop_length))
+            return torch.zeros((3, self.n_mels, n_frames), dtype=torch.float16)
     
     def _augment_spectrogram(self, spectrogram: torch.Tensor) -> torch.Tensor:
         """Applique des augmentations légères au spectrogramme."""
