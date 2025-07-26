@@ -175,17 +175,17 @@ def generate_augmented_spectrogram_standalone(audio_path: Path, config: dict, va
     return mel_spec_db
 
 
-def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict]) -> Dict[str, any]:
+def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict, dict]) -> Dict[str, any]:
     """
     Traite un seul échantillon pour générer ses spectrogrammes.
     
     Args:
-        args: Tuple contenant (sample_id, file_path, audio_root, class_name, split, output_dir, config_dict)
+        args: Tuple contenant (sample_id, file_path, audio_root, class_name, split, output_dir, config_dict, class_aug_needs)
     
     Returns:
         Dict avec status ('success', 'error', 'skipped') et détails
     """
-    sample_id, file_path, audio_root, class_name, split, output_dir, config_dict = args
+    sample_id, file_path, audio_root, class_name, split, output_dir, config_dict, class_aug_needs = args
     
     try:
         # Chemins de sortie
@@ -229,10 +229,10 @@ def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict]) -> 
             generated_count += 1
             logger.debug(f"Généré original: {original_path.name}")
         
-        # 2. Générer les variantes augmentées (seulement pour train)
-        if split == 'train':
-            # On génère jusqu'à 10 variantes pour les classes minoritaires
-            for variant in range(1, 11):
+        # 2. Générer les variantes augmentées (seulement pour train et classes minoritaires)
+        if split == 'train' and class_name in class_aug_needs:
+            variants_to_generate = class_aug_needs.get(class_name, 0)
+            for variant in range(1, variants_to_generate + 1):
                 variant_path = class_output_dir / f"{base_name}_var{variant:03d}.npy"
                 if not variant_path.exists():
                     spec = generate_augmented_spectrogram_standalone(audio_path, config_dict, variant)
@@ -267,7 +267,8 @@ def pregenerate_spectrograms(index_db: str,
                            audio_root: Path,
                            output_dir: Path,
                            num_workers: int = 4,
-                           animal_type: str = 'general'):
+                           animal_type: str = 'general',
+                           max_samples_per_class: int = 500):
     """
     Pré-génère tous les spectrogrammes depuis la base SQLite.
     
@@ -314,14 +315,46 @@ def pregenerate_spectrograms(index_db: str,
     """)
     
     samples = cursor.fetchall()
+    
+    # Analyser les classes pour déterminer les besoins d'augmentation
+    cursor.execute("""
+        SELECT class_name, split, COUNT(*) as count
+        FROM audio_samples
+        WHERE split = 'train'
+        GROUP BY class_name, split
+    """)
+    
+    class_augmentation_needs = {}
+    logger.info("\nAnalyse des besoins d'augmentation par classe:")
+    
+    for row in cursor.fetchall():
+        class_name = row[0]
+        count = row[2]
+        
+        if count >= max_samples_per_class:
+            # Pas besoin d'augmentation
+            variants_needed = 0
+            logger.info(f"  {class_name}: {count} échantillons - PAS D'AUGMENTATION NÉCESSAIRE")
+        else:
+            # Calculer combien de variantes sont nécessaires
+            target_count = min(max_samples_per_class, count * 10)  # Max 10x
+            total_augmented_needed = target_count - count
+            variants_per_sample = total_augmented_needed // count
+            if total_augmented_needed % count > 0:
+                variants_per_sample += 1
+            variants_needed = min(variants_per_sample, 10)  # Max 10 variantes
+            logger.info(f"  {class_name}: {count} échantillons → {variants_needed} variantes par échantillon")
+        
+        class_augmentation_needs[class_name] = variants_needed
+    
     conn.close()
     
-    logger.info(f"Nombre total d'échantillons: {len(samples)}")
+    logger.info(f"\nNombre total d'échantillons: {len(samples)}")
     
     # Préparer les arguments pour le traitement parallèle
     args_list = []
     for sample_id, file_path, class_name, split in samples:
-        args = (sample_id, file_path, audio_root, class_name, split, output_dir, config_dict)
+        args = (sample_id, file_path, audio_root, class_name, split, output_dir, config_dict, class_augmentation_needs)
         args_list.append(args)
     
     # Traiter en parallèle
@@ -418,6 +451,8 @@ def main():
                        help='Nombre de workers parallèles')
     parser.add_argument('--animal-type', type=str, default='general',
                        help='Type d\'animal pour la configuration')
+    parser.add_argument('--max-samples-per-class', type=int, default=500,
+                       help='Maximum d\'échantillons par classe (pour déterminer les besoins d\'augmentation)')
     parser.add_argument('--verbose', action='store_true',
                        help='Mode verbose pour le debug')
     parser.add_argument('--continue-on-error', action='store_true',
@@ -435,7 +470,8 @@ def main():
         args.audio_root,
         args.output_dir,
         args.num_workers,
-        args.animal_type
+        args.animal_type,
+        args.max_samples_per_class
     )
 
 
