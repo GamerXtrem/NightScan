@@ -25,8 +25,24 @@ def apply_audio_augmentation(waveform: torch.Tensor, sr: int, augmentation_type:
     if augmentation_type == 'time_stretch':
         rate = 1.0 + (strength - 0.5) * 0.4  # 0.8x à 1.2x
         if rate != 1.0:
-            waveform = T.Resample(sr, int(sr * rate))(waveform)
-            waveform = T.Resample(int(sr * rate), sr)(waveform)
+            # Optimisation mémoire: éviter le double resample pour les taux proches de 1
+            if abs(rate - 1.0) < 0.05:  # Pour des taux entre 0.95 et 1.05
+                # Utiliser une interpolation directe plus économe
+                target_length = int(waveform.shape[-1] / rate)
+                waveform = torch.nn.functional.interpolate(
+                    waveform.unsqueeze(0), 
+                    size=target_length, 
+                    mode='linear', 
+                    align_corners=False
+                ).squeeze(0)
+            else:
+                # Pour des taux plus extrêmes, utiliser le resample classique
+                # mais forcer la libération mémoire entre les opérations
+                target_sr = int(sr * rate)
+                stretched = T.Resample(sr, target_sr)(waveform)
+                del waveform  # Libérer la mémoire de l'original
+                waveform = T.Resample(target_sr, sr)(stretched)
+                del stretched  # Libérer la mémoire intermédiaire
     
     elif augmentation_type == 'noise':
         noise_level = 0.002 * strength
@@ -41,8 +57,14 @@ def apply_audio_augmentation(waveform: torch.Tensor, sr: int, augmentation_type:
         # Time stretch léger
         rate = 1.0 + (strength - 0.5) * 0.2  # 0.9x à 1.1x
         if rate != 1.0:
-            waveform = T.Resample(sr, int(sr * rate))(waveform)
-            waveform = T.Resample(int(sr * rate), sr)(waveform)
+            # Toujours utiliser l'interpolation pour combined (taux légers)
+            target_length = int(waveform.shape[-1] / rate)
+            waveform = torch.nn.functional.interpolate(
+                waveform.unsqueeze(0), 
+                size=target_length, 
+                mode='linear', 
+                align_corners=False
+            ).squeeze(0)
         
         # Bruit léger
         noise_level = 0.001 * strength
