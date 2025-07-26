@@ -96,7 +96,8 @@ def create_augmented_pool(
     max_augmentations_per_sample: int = 20,
     batch_size: int = 5,
     save_detailed_metadata: bool = False,
-    specific_class: Optional[str] = None
+    specific_class: Optional[str] = None,
+    low_memory: bool = False
 ) -> Dict:
     """
     Crée un pool augmenté équilibré pour toutes les classes.
@@ -236,13 +237,21 @@ def create_augmented_pool(
                             # Varier la force de l'augmentation
                             strength = 0.3 + (aug_idx / max(augmentations_per_sample - 1, 1)) * 0.7
                             
-                            # Appliquer l'augmentation
-                            aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
+                            if low_memory:
+                                # Mode faible mémoire: recharger l'audio à chaque fois
+                                waveform_aug, sr_aug = torchaudio.load(str(audio_file))
+                                if waveform_aug.shape[0] > 1:
+                                    waveform_aug = waveform_aug.mean(dim=0, keepdim=True)
+                                aug_waveform = apply_audio_augmentation(waveform_aug, sr_aug, aug_type, strength)
+                                del waveform_aug
+                            else:
+                                # Mode normal: utiliser le waveform déjà chargé
+                                aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
                             
                             # Sauvegarder
                             aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
                             aug_path = class_output_dir / aug_name
-                            torchaudio.save(str(aug_path), aug_waveform, sr)
+                            torchaudio.save(str(aug_path), aug_waveform, sr if not low_memory else sr_aug)
                             files_created_count += 1
                             
                             if save_detailed_metadata:
@@ -256,6 +265,10 @@ def create_augmented_pool(
                             
                             # Libérer la mémoire de l'augmentation
                             del aug_waveform
+                            
+                            # En mode faible mémoire, forcer le gc après chaque augmentation
+                            if low_memory:
+                                gc.collect()
                         
                         # Libérer la mémoire du waveform original
                         del waveform
@@ -347,6 +360,8 @@ def main():
                        help='Sauvegarder les métadonnées détaillées (liste de tous les fichiers)')
     parser.add_argument('--specific-class', type=str, default=None,
                        help='Traiter uniquement cette classe spécifique')
+    parser.add_argument('--low-memory', action='store_true',
+                       help='Mode faible mémoire: recharge l\'audio pour chaque augmentation')
     
     args = parser.parse_args()
     
@@ -357,7 +372,8 @@ def main():
         args.max_augmentations,
         args.batch_size,
         args.save_detailed_metadata,
-        args.specific_class
+        args.specific_class,
+        args.low_memory
     )
 
 
