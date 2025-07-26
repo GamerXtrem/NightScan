@@ -9,6 +9,11 @@ import sys
 import argparse
 import numpy as np
 import torch
+# Désactiver MKLDNN pour éviter les fuites mémoire avec torchaudio
+# Voir https://github.com/pytorch/audio/issues/2338
+from torch.backends import mkldnn
+mkldnn.m.set_flags(False)
+
 import torchaudio
 import torchaudio.transforms as T
 from pathlib import Path
@@ -32,43 +37,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-try:
-    import soundfile as sf
-    HAS_SOUNDFILE = True
-except ImportError:
-    HAS_SOUNDFILE = False
-    logger.warning("soundfile non disponible - utilisation de torchaudio uniquement")
 
-
-def load_audio_safe(file_path: str, use_soundfile_for_airplane: bool = True):
-    """
-    Charge un fichier audio de manière sûre.
-    Utilise soundfile pour airplane si disponible (bug VMS avec torchaudio).
-    """
-    file_path = str(file_path)
-    
-    # Détecter si c'est un fichier airplane
-    is_airplane = 'airplane' in file_path.lower()
-    
-    if use_soundfile_for_airplane and is_airplane and HAS_SOUNDFILE:
-        # Utiliser soundfile pour airplane
-        try:
-            data, sr = sf.read(file_path)
-            # Convertir en tensor torch
-            waveform = torch.from_numpy(data).float()
-            
-            # soundfile retourne (samples, channels), torch attend (channels, samples)
-            if len(waveform.shape) == 1:
-                waveform = waveform.unsqueeze(0)
-            else:
-                waveform = waveform.T
-            
-            return waveform, sr
-        except Exception as e:
-            logger.warning(f"Erreur soundfile, fallback sur torchaudio: {e}")
-    
-    # Utiliser torchaudio par défaut
-    return torchaudio.load(file_path)
 
 
 def count_torch_tensors():
@@ -721,7 +690,7 @@ def create_augmented_pool(
                                 log_memory_state(f"Avant load {audio_file.name}", verbose=True)
                             
                             try:
-                                waveform, sr = load_audio_safe(str(audio_file))
+                                waveform, sr = torchaudio.load(str(audio_file))
                                 if ultra_debug:
                                     logger.info(f"  Waveform shape: {waveform.shape}, dtype: {waveform.dtype}")
                                     log_memory_state(f"Après load {audio_file.name}", verbose=True)
