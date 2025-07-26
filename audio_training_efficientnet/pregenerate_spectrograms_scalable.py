@@ -229,9 +229,9 @@ def process_single_sample(args: Tuple[int, str, Path, str, str, Path, dict, dict
             generated_count += 1
             logger.debug(f"Généré original: {original_path.name}")
         
-        # 2. Générer les variantes augmentées (seulement pour train et classes minoritaires)
-        if split == 'train' and class_name in class_aug_needs:
-            variants_to_generate = class_aug_needs.get(class_name, 0)
+        # 2. Générer les variantes augmentées (pour tous les splits et classes minoritaires)
+        if split in class_aug_needs and class_name in class_aug_needs[split]:
+            variants_to_generate = class_aug_needs[split].get(class_name, 0)
             for variant in range(1, variants_to_generate + 1):
                 variant_path = class_output_dir / f"{base_name}_var{variant:03d}.npy"
                 if not variant_path.exists():
@@ -316,25 +316,31 @@ def pregenerate_spectrograms(index_db: str,
     
     samples = cursor.fetchall()
     
-    # Analyser les classes pour déterminer les besoins d'augmentation
+    # Analyser les classes pour déterminer les besoins d'augmentation pour TOUS les splits
     cursor.execute("""
         SELECT class_name, split, COUNT(*) as count
         FROM audio_samples
-        WHERE split = 'train'
         GROUP BY class_name, split
+        ORDER BY split, class_name
     """)
     
-    class_augmentation_needs = {}
-    logger.info("\nAnalyse des besoins d'augmentation par classe:")
+    class_augmentation_needs = {'train': {}, 'val': {}, 'test': {}}
+    logger.info("\nAnalyse des besoins d'augmentation par classe et split:")
     
+    current_split = None
     for row in cursor.fetchall():
         class_name = row[0]
+        split = row[1]
         count = row[2]
+        
+        if split != current_split:
+            logger.info(f"\n{split.upper()}:")
+            current_split = split
         
         if count >= max_samples_per_class:
             # Pas besoin d'augmentation
             variants_needed = 0
-            logger.info(f"  {class_name}: {count} échantillons - PAS D'AUGMENTATION NÉCESSAIRE")
+            logger.info(f"  {class_name}: {count} échantillons - PAS D'AUGMENTATION")
         else:
             # Calculer combien de variantes sont nécessaires
             target_count = min(max_samples_per_class, count * 10)  # Max 10x
@@ -343,9 +349,10 @@ def pregenerate_spectrograms(index_db: str,
             if total_augmented_needed % count > 0:
                 variants_per_sample += 1
             variants_needed = min(variants_per_sample, 10)  # Max 10 variantes
-            logger.info(f"  {class_name}: {count} échantillons → {variants_needed} variantes par échantillon")
+            logger.info(f"  {class_name}: {count} échantillons → {variants_needed} variantes/échantillon")
         
-        class_augmentation_needs[class_name] = variants_needed
+        if split in class_augmentation_needs:
+            class_augmentation_needs[split][class_name] = variants_needed
     
     conn.close()
     
