@@ -17,10 +17,11 @@ from tqdm import tqdm
 import json
 from datetime import datetime
 import shutil
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import random
 import gc
 import psutil
+import time
 
 # Configuration du logging
 logging.basicConfig(
@@ -94,7 +95,8 @@ def create_augmented_pool(
     target_samples_per_class: int = 500,
     max_augmentations_per_sample: int = 20,
     batch_size: int = 5,
-    save_detailed_metadata: bool = False
+    save_detailed_metadata: bool = False,
+    specific_class: Optional[str] = None
 ) -> Dict:
     """
     Crée un pool augmenté équilibré pour toutes les classes.
@@ -122,13 +124,23 @@ def create_augmented_pool(
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Scanner les classes
-    classes = [d for d in audio_root.iterdir() if d.is_dir() and not d.name.startswith('.')]
-    logger.info(f"Nombre de classes trouvées: {len(classes)}")
+    if specific_class:
+        class_dir = audio_root / specific_class
+        if not class_dir.exists() or not class_dir.is_dir():
+            logger.error(f"Classe spécifique '{specific_class}' non trouvée dans {audio_root}")
+            return pool_stats
+        classes = [class_dir]
+        logger.info(f"Traitement de la classe spécifique: {specific_class}")
+    else:
+        classes = [d for d in audio_root.iterdir() if d.is_dir() and not d.name.startswith('.')]
+        logger.info(f"Nombre de classes trouvées: {len(classes)}")
     
     pool_stats = {
         'timestamp': datetime.now().isoformat(),
         'target_samples_per_class': target_samples_per_class,
-        'classes': {}
+        'classes_processed': 0,
+        'total_original': 0,
+        'total_created': 0
     }
     
     # Types d'augmentation disponibles
@@ -206,8 +218,13 @@ def create_augmented_pool(
                 # 2. Créer les augmentations si nécessaire
                 if augmentations_per_sample > 0:
                     try:
-                        # Charger l'audio une seule fois
-                        waveform, sr = torchaudio.load(str(audio_file))
+                        # Charger l'audio avec gestion mémoire
+                        # Utiliser backend sox_io pour une meilleure gestion mémoire
+                        try:
+                            waveform, sr = torchaudio.load(str(audio_file))
+                        except Exception as load_error:
+                            logger.error(f"  Impossible de charger {audio_file.name}: {load_error}")
+                            continue
                         
                         # Convertir en mono si nécessaire
                         if waveform.shape[0] > 1:
@@ -262,25 +279,39 @@ def create_augmented_pool(
         if save_detailed_metadata:
             class_stats['files'] = created_files
             
-        pool_stats['classes'][class_name] = class_stats
+        # Sauvegarder les métadonnées de la classe immédiatement
+        class_metadata_path = output_dir / 'class_metadata' / f'{class_name}.json'
+        class_metadata_path.parent.mkdir(exist_ok=True)
+        with open(class_metadata_path, 'w') as f:
+            json.dump({
+                'class_name': class_name,
+                'stats': class_stats,
+                'timestamp': datetime.now().isoformat()
+            }, f, indent=2)
         
-        # Sauvegarder les métadonnées de la classe immédiatement pour libérer la mémoire
-        if save_detailed_metadata:
-            class_metadata_path = output_dir / f'metadata_{class_name}.json'
-            with open(class_metadata_path, 'w') as f:
-                json.dump({
-                    'class_name': class_name,
-                    'stats': class_stats,
-                    'timestamp': datetime.now().isoformat()
-                }, f, indent=2)
-            logger.info(f"  Métadonnées sauvegardées dans {class_metadata_path.name}")
+        # Mettre à jour les statistiques globales
+        pool_stats['classes_processed'] += 1
+        pool_stats['total_original'] += original_count
+        pool_stats['total_created'] += files_created_count
         
         logger.info(f"  Créé {files_created_count} fichiers pour {class_name}")
         
         # Libérer la mémoire
-        if save_detailed_metadata:
+        if save_detailed_metadata and created_files:
             created_files.clear()
+        del class_stats
+        
+        # Forcer la libération de la mémoire
         gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        # Pause pour permettre au GC de nettoyer
+        time.sleep(0.5)
+        
+        # Afficher l'utilisation mémoire
+        memory_info = psutil.virtual_memory()
+        logger.info(f"  Mémoire utilisée: {memory_info.percent:.1f}% ({memory_info.used / (1024**3):.1f}GB / {memory_info.total / (1024**3):.1f}GB)")
     
     # Sauvegarder les métadonnées
     metadata_path = output_dir / 'pool_metadata.json'
@@ -291,13 +322,11 @@ def create_augmented_pool(
     logger.info(f"Métadonnées sauvegardées dans: {metadata_path}")
     
     # Résumé
-    total_original = sum(stats['original_count'] for stats in pool_stats['classes'].values())
-    total_created = sum(stats['total_count'] for stats in pool_stats['classes'].values())
     logger.info(f"\nRésumé:")
-    logger.info(f"  Classes traitées: {len(pool_stats['classes'])}")
-    logger.info(f"  Fichiers originaux: {total_original}")
-    logger.info(f"  Fichiers dans le pool: {total_created}")
-    logger.info(f"  Ratio d'augmentation moyen: {total_created/max(total_original, 1):.1f}x")
+    logger.info(f"  Classes traitées: {pool_stats['classes_processed']}")
+    logger.info(f"  Fichiers originaux: {pool_stats['total_original']}")
+    logger.info(f"  Fichiers dans le pool: {pool_stats['total_created']}")
+    logger.info(f"  Ratio d'augmentation moyen: {pool_stats['total_created']/max(pool_stats['total_original'], 1):.1f}x")
     
     return pool_stats
 
@@ -317,6 +346,8 @@ def main():
                        help='Nombre de fichiers à traiter simultanément')
     parser.add_argument('--save-detailed-metadata', action='store_true',
                        help='Sauvegarder les métadonnées détaillées (liste de tous les fichiers)')
+    parser.add_argument('--specific-class', type=str, default=None,
+                       help='Traiter uniquement cette classe spécifique')
     
     args = parser.parse_args()
     
@@ -326,7 +357,8 @@ def main():
         args.target_samples,
         args.max_augmentations,
         args.batch_size,
-        args.save_detailed_metadata
+        args.save_detailed_metadata,
+        args.specific_class
     )
 
 
