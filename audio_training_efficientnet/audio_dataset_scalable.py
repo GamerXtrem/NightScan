@@ -430,11 +430,11 @@ class AudioDatasetScalable(Dataset):
             torch.manual_seed(variant + hash(str(audio_path)) % 1000000)
             np.random.seed(variant + hash(str(audio_path)) % 1000000)
             
-            # Augmentations audio basées sur la variante
-            if variant % 3 == 1:  # Pitch shift
-                pitch_shift = (variant % 5 - 2) * 2  # -4, -2, 0, +2, +4 semitones
-                pitch_shift_transform = T.PitchShift(self.sample_rate, pitch_shift)
-                waveform = pitch_shift_transform(waveform)
+            # Augmentations audio basées sur la variante (PitchShift désactivé car trop lent)
+            # if variant % 3 == 1:  # Pitch shift - DÉSACTIVÉ
+            #     pitch_shift = (variant % 5 - 2) * 2  # -4, -2, 0, +2, +4 semitones
+            #     pitch_shift_transform = T.PitchShift(self.sample_rate, pitch_shift)
+            #     waveform = pitch_shift_transform(waveform)
             
             if variant % 3 == 2:  # Time stretch
                 rate = 1.0 + (variant % 5 - 2) * 0.1  # 0.8x à 1.2x

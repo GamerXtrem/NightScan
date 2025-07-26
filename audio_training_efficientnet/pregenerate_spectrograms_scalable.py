@@ -110,12 +110,13 @@ def generate_augmented_spectrogram_standalone(audio_path: Path, config: dict, va
     torch.manual_seed(variant + hash(str(audio_path)) % 1000000)
     np.random.seed(variant + hash(str(audio_path)) % 1000000)
     
-    # Augmentations audio
-    if variant % 3 == 1:  # Pitch shift
-        pitch_shift = (variant % 5 - 2) * 2  # -4, -2, 0, +2, +4 semitones
-        pitch_shift_transform = T.PitchShift(config['sample_rate'], pitch_shift)
-        waveform = pitch_shift_transform(waveform)
+    # Augmentations audio (PitchShift désactivé car trop lent)
+    # if variant % 3 == 1:  # Pitch shift - DÉSACTIVÉ
+    #     pitch_shift = (variant % 5 - 2) * 2  # -4, -2, 0, +2, +4 semitones
+    #     pitch_shift_transform = T.PitchShift(config['sample_rate'], pitch_shift)
+    #     waveform = pitch_shift_transform(waveform)
     
+    # Time stretch (plus rapide que PitchShift)
     if variant % 3 == 2:  # Time stretch
         rate = 1.0 + (variant % 5 - 2) * 0.1  # 0.8x à 1.2x
         if rate != 1.0:
@@ -127,6 +128,11 @@ def generate_augmented_spectrogram_standalone(audio_path: Path, config: dict, va
         noise_level = 0.001 * (1 + variant % 5)  # 0.001 à 0.005
         noise = torch.randn_like(waveform) * noise_level
         waveform = waveform + noise
+    
+    # Variation de volume
+    if variant % 4 == 0:
+        volume_factor = 0.7 + (variant % 4) * 0.1  # 0.7 à 1.0
+        waveform = waveform * volume_factor
     
     # Ajuster la durée
     target_length = int(config['sample_rate'] * config['duration'])
