@@ -199,7 +199,6 @@ def create_augmented_pool(
             if memory_percent > 85:
                 logger.warning(f"  Mémoire à {memory_percent}%, pause de 5 secondes...")
                 gc.collect()
-                import time
                 time.sleep(5)
             
             for audio_file in tqdm(batch_files, desc=f"  {class_name} (batch {batch_start//batch_size + 1})"):
