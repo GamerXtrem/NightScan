@@ -36,7 +36,8 @@ for CLASS in $CLASSES; do
         --target-samples 500 \
         --max-augmentations 20 \
         --specific-class "$CLASS" \
-        --low-memory
+        --low-memory \
+        --debug
     
     EXIT_CODE=$?
     

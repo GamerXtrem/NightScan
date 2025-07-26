@@ -97,7 +97,8 @@ def create_augmented_pool(
     batch_size: int = 5,
     save_detailed_metadata: bool = False,
     specific_class: Optional[str] = None,
-    low_memory: bool = False
+    low_memory: bool = False,
+    debug: bool = False
 ) -> Dict:
     """
     Crée un pool augmenté équilibré pour toutes les classes.
@@ -118,6 +119,9 @@ def create_augmented_pool(
     logger.info(f"Batch size: {batch_size} fichiers à la fois")
     if low_memory:
         logger.info("Mode FAIBLE MÉMOIRE activé")
+    if debug:
+        logger.info("Mode DEBUG activé")
+        logging.getLogger().setLevel(logging.DEBUG)
     
     # Vérifier la mémoire initiale
     memory_info = psutil.virtual_memory()
@@ -154,18 +158,39 @@ def create_augmented_pool(
         class_name = class_dir.name
         logger.info(f"\nTraitement de la classe: {class_name}")
         
+        if debug:
+            memory_info = psutil.virtual_memory()
+            logger.debug(f"  [DEBUG] Mémoire avant traitement classe: {memory_info.percent:.1f}% ({memory_info.used / (1024**3):.1f} GB)")
+        
         # Créer le répertoire de sortie pour cette classe
         class_output_dir = output_dir / class_name
+        if debug:
+            logger.debug(f"  [DEBUG] Création du répertoire: {class_output_dir}")
         class_output_dir.mkdir(exist_ok=True)
         
         # Lister tous les fichiers audio
+        if debug:
+            logger.debug(f"  [DEBUG] Début du listage des fichiers dans: {class_dir}")
+        
         try:
             wav_files = list(class_dir.glob("*.wav"))
+            if debug:
+                logger.debug(f"  [DEBUG] Fichiers WAV trouvés: {len(wav_files)}")
+            
             mp3_files = list(class_dir.glob("*.mp3"))
+            if debug:
+                logger.debug(f"  [DEBUG] Fichiers MP3 trouvés: {len(mp3_files)}")
+            
             audio_files = wav_files + mp3_files
-            logger.debug(f"  Trouvé: {len(wav_files)} WAV, {len(mp3_files)} MP3")
+            if debug:
+                logger.debug(f"  [DEBUG] Total fichiers audio: {len(audio_files)}")
+                if audio_files:
+                    logger.debug(f"  [DEBUG] Premier fichier: {audio_files[0].name}")
         except Exception as e:
             logger.error(f"  Erreur lors du listage des fichiers: {e}")
+            if debug:
+                import traceback
+                logger.debug(f"  [DEBUG] Traceback: {traceback.format_exc()}")
             continue
             
         original_count = len(audio_files)
@@ -201,9 +226,15 @@ def create_augmented_pool(
         files_created_count = 0
         
         # Traiter par batch pour gérer la mémoire
+        if debug:
+            logger.debug(f"  [DEBUG] Début du traitement par batch (batch_size={batch_size})")
+        
         for batch_start in range(0, len(audio_files), batch_size):
             batch_end = min(batch_start + batch_size, len(audio_files))
             batch_files = audio_files[batch_start:batch_end]
+            
+            if debug:
+                logger.debug(f"  [DEBUG] Batch {batch_start//batch_size + 1}: indices {batch_start}-{batch_end}, {len(batch_files)} fichiers")
             
             # Vérifier la mémoire disponible
             memory_percent = psutil.virtual_memory().percent
@@ -212,9 +243,23 @@ def create_augmented_pool(
                 gc.collect()
                 time.sleep(5)
             
-            for file_idx, audio_file in enumerate(tqdm(batch_files, desc=f"  {class_name} (batch {batch_start//batch_size + 1})")):
-                if file_idx == 0 and batch_start == 0:
-                    logger.debug(f"  Traitement du premier fichier: {audio_file.name}")
+            if debug:
+                logger.debug(f"  [DEBUG] Création de la barre de progression tqdm")
+            
+            try:
+                progress_bar = tqdm(batch_files, desc=f"  {class_name} (batch {batch_start//batch_size + 1})")
+            except Exception as e:
+                logger.error(f"  Erreur création tqdm: {e}")
+                if debug:
+                    import traceback
+                    logger.debug(f"  [DEBUG] Traceback: {traceback.format_exc()}")
+                progress_bar = batch_files
+            
+            for file_idx, audio_file in enumerate(progress_bar):
+                if debug and file_idx == 0:
+                    logger.debug(f"  [DEBUG] Début traitement fichier {file_idx}: {audio_file.name}")
+                    memory_info = psutil.virtual_memory()
+                    logger.debug(f"  [DEBUG] Mémoire: {memory_info.percent:.1f}% ({memory_info.used / (1024**3):.1f} GB)")
                 # 1. Copier l'original
                 try:
                     output_name = f"{audio_file.stem}_original{audio_file.suffix}"
@@ -378,6 +423,8 @@ def main():
                        help='Traiter uniquement cette classe spécifique')
     parser.add_argument('--low-memory', action='store_true',
                        help='Mode faible mémoire: recharge l\'audio pour chaque augmentation')
+    parser.add_argument('--debug', action='store_true',
+                       help='Activer les logs de debug détaillés')
     
     args = parser.parse_args()
     
@@ -389,7 +436,8 @@ def main():
         args.batch_size,
         args.save_detailed_metadata,
         args.specific_class,
-        args.low_memory
+        args.low_memory,
+        args.debug
     )
 
 
