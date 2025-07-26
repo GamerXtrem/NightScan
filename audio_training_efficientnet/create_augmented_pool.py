@@ -262,12 +262,36 @@ def create_augmented_pool(
                     logger.debug(f"  [DEBUG] Mémoire: {memory_info.percent:.1f}% ({memory_info.used / (1024**3):.1f} GB)")
                 # 1. Copier l'original
                 try:
+                    if debug:
+                        logger.debug(f"  [DEBUG] Avant création nom de sortie pour: {audio_file.name}")
+                        logger.debug(f"  [DEBUG] audio_file.stem: {audio_file.stem}")
+                        logger.debug(f"  [DEBUG] audio_file.suffix: {audio_file.suffix}")
+                    
                     output_name = f"{audio_file.stem}_original{audio_file.suffix}"
+                    
+                    if debug:
+                        logger.debug(f"  [DEBUG] Nom de sortie créé: {output_name}")
+                        logger.debug(f"  [DEBUG] class_output_dir: {class_output_dir}")
+                    
                     output_path = class_output_dir / output_name
-                    shutil.copy2(audio_file, output_path)
+                    
+                    if debug:
+                        logger.debug(f"  [DEBUG] Chemin de sortie créé: {output_path}")
+                        logger.debug(f"  [DEBUG] Fichier source existe: {audio_file.exists()}")
+                        logger.debug(f"  [DEBUG] Répertoire destination existe: {class_output_dir.exists()}")
+                        logger.debug(f"  [DEBUG] Avant shutil.copy2...")
+                    
+                    shutil.copy2(str(audio_file), str(output_path))
+                    
+                    if debug:
+                        logger.debug(f"  [DEBUG] Copie réussie!")
+                    
                     files_created_count += 1
                 except Exception as e:
                     logger.error(f"  Erreur copie {audio_file.name}: {e}")
+                    if debug:
+                        import traceback
+                        logger.debug(f"  [DEBUG] Traceback complet: {traceback.format_exc()}")
                     continue
                 if save_detailed_metadata:
                     created_files.append({
