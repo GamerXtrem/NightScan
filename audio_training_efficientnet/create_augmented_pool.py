@@ -131,6 +131,14 @@ def create_augmented_pool(
     # Créer le répertoire de sortie
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    pool_stats = {
+        'timestamp': datetime.now().isoformat(),
+        'target_samples_per_class': target_samples_per_class,
+        'classes_processed': 0,
+        'total_original': 0,
+        'total_created': 0
+    }
+    
     # Scanner les classes
     if specific_class:
         class_dir = audio_root / specific_class
@@ -142,14 +150,6 @@ def create_augmented_pool(
     else:
         classes = [d for d in audio_root.iterdir() if d.is_dir() and not d.name.startswith('.')]
         logger.info(f"Nombre de classes trouvées: {len(classes)}")
-    
-    pool_stats = {
-        'timestamp': datetime.now().isoformat(),
-        'target_samples_per_class': target_samples_per_class,
-        'classes_processed': 0,
-        'total_original': 0,
-        'total_created': 0
-    }
     
     # Types d'augmentation disponibles
     augmentation_types = ['time_stretch', 'noise', 'volume', 'combined']
@@ -413,8 +413,9 @@ def create_augmented_pool(
                                     'strength': strength
                                 })
                             
-                            # Libérer la mémoire de l'augmentation
-                            del aug_waveform
+                            # Libérer la mémoire de l'augmentation (seulement si elle existe)
+                            if not low_memory:
+                                del aug_waveform
                             
                             # En mode faible mémoire, forcer le gc après chaque augmentation
                             if low_memory:
