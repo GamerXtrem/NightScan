@@ -47,7 +47,8 @@ def apply_audio_augmentation(waveform: torch.Tensor, sr: int, augmentation_type:
     Returns:
         Signal augmenté
     """
-    waveform = waveform.clone()
+    # Travailler sur une copie pour éviter de modifier l'original
+    waveform = waveform.detach().clone()
     
     if augmentation_type == 'time_stretch':
         # Étirement temporel
@@ -92,7 +93,8 @@ def create_augmented_pool(
     output_dir: Path,
     target_samples_per_class: int = 500,
     max_augmentations_per_sample: int = 20,
-    batch_size: int = 5
+    batch_size: int = 5,
+    save_detailed_metadata: bool = False
 ) -> Dict:
     """
     Crée un pool augmenté équilibré pour toutes les classes.
@@ -172,7 +174,8 @@ def create_augmented_pool(
             logger.info(f"  {original_count} échantillons → {augmentations_per_sample} augmentations/échantillon = ~{total_target} total")
         
         # Copier les originaux et créer les augmentations
-        created_files = []
+        created_files = [] if save_detailed_metadata else None
+        files_created_count = 0
         
         # Traiter par batch pour gérer la mémoire
         for batch_start in range(0, len(audio_files), batch_size):
@@ -192,11 +195,13 @@ def create_augmented_pool(
                 output_name = f"{audio_file.stem}_original{audio_file.suffix}"
                 output_path = class_output_dir / output_name
                 shutil.copy2(audio_file, output_path)
-                created_files.append({
-                    'filename': output_name,
-                    'type': 'original',
-                    'source': audio_file.name
-                })
+                files_created_count += 1
+                if save_detailed_metadata:
+                    created_files.append({
+                        'filename': output_name,
+                        'type': 'original',
+                        'source': audio_file.name
+                    })
                 
                 # 2. Créer les augmentations si nécessaire
                 if augmentations_per_sample > 0:
@@ -222,14 +227,16 @@ def create_augmented_pool(
                             aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
                             aug_path = class_output_dir / aug_name
                             torchaudio.save(str(aug_path), aug_waveform, sr)
+                            files_created_count += 1
                             
-                            created_files.append({
-                                'filename': aug_name,
-                                'type': 'augmented',
-                                'source': audio_file.name,
-                                'augmentation': aug_type,
-                                'strength': strength
-                            })
+                            if save_detailed_metadata:
+                                created_files.append({
+                                    'filename': aug_name,
+                                    'type': 'augmented',
+                                    'source': audio_file.name,
+                                    'augmentation': aug_type,
+                                    'strength': strength
+                                })
                             
                             # Libérer la mémoire de l'augmentation
                             del aug_waveform
@@ -246,14 +253,34 @@ def create_augmented_pool(
             gc.collect()
         
         # Statistiques pour cette classe
-        pool_stats['classes'][class_name] = {
+        class_stats = {
             'original_count': original_count,
             'augmentations_per_sample': augmentations_per_sample,
-            'total_count': len(created_files),
-            'files': created_files
+            'total_count': files_created_count
         }
         
-        logger.info(f"  Créé {len(created_files)} fichiers pour {class_name}")
+        if save_detailed_metadata:
+            class_stats['files'] = created_files
+            
+        pool_stats['classes'][class_name] = class_stats
+        
+        # Sauvegarder les métadonnées de la classe immédiatement pour libérer la mémoire
+        if save_detailed_metadata:
+            class_metadata_path = output_dir / f'metadata_{class_name}.json'
+            with open(class_metadata_path, 'w') as f:
+                json.dump({
+                    'class_name': class_name,
+                    'stats': class_stats,
+                    'timestamp': datetime.now().isoformat()
+                }, f, indent=2)
+            logger.info(f"  Métadonnées sauvegardées dans {class_metadata_path.name}")
+        
+        logger.info(f"  Créé {files_created_count} fichiers pour {class_name}")
+        
+        # Libérer la mémoire
+        if save_detailed_metadata:
+            created_files.clear()
+        gc.collect()
     
     # Sauvegarder les métadonnées
     metadata_path = output_dir / 'pool_metadata.json'
@@ -288,6 +315,8 @@ def main():
                        help='Maximum d\'augmentations par échantillon')
     parser.add_argument('--batch-size', type=int, default=5,
                        help='Nombre de fichiers à traiter simultanément')
+    parser.add_argument('--save-detailed-metadata', action='store_true',
+                       help='Sauvegarder les métadonnées détaillées (liste de tous les fichiers)')
     
     args = parser.parse_args()
     
@@ -296,7 +325,8 @@ def main():
         args.output_dir,
         args.target_samples,
         args.max_augmentations,
-        args.batch_size
+        args.batch_size,
+        args.save_detailed_metadata
     )
 
 
