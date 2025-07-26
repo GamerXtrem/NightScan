@@ -19,6 +19,8 @@ from datetime import datetime
 import shutil
 from typing import Dict, List, Tuple
 import random
+import gc
+import psutil
 
 # Configuration du logging
 logging.basicConfig(
@@ -89,7 +91,8 @@ def create_augmented_pool(
     audio_root: Path,
     output_dir: Path,
     target_samples_per_class: int = 500,
-    max_augmentations_per_sample: int = 20
+    max_augmentations_per_sample: int = 20,
+    batch_size: int = 5
 ) -> Dict:
     """
     Crée un pool augmenté équilibré pour toutes les classes.
@@ -107,6 +110,11 @@ def create_augmented_pool(
     logger.info(f"Source: {audio_root}")
     logger.info(f"Destination: {output_dir}")
     logger.info(f"Cible: {target_samples_per_class} échantillons par classe")
+    logger.info(f"Batch size: {batch_size} fichiers à la fois")
+    
+    # Vérifier la mémoire initiale
+    memory_info = psutil.virtual_memory()
+    logger.info(f"Mémoire disponible: {memory_info.available / (1024**3):.1f} GB / {memory_info.total / (1024**3):.1f} GB")
     
     # Créer le répertoire de sortie
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -166,48 +174,76 @@ def create_augmented_pool(
         # Copier les originaux et créer les augmentations
         created_files = []
         
-        for idx, audio_file in enumerate(tqdm(audio_files, desc=f"  {class_name}")):
-            # 1. Copier l'original
-            output_name = f"{audio_file.stem}_original{audio_file.suffix}"
-            output_path = class_output_dir / output_name
-            shutil.copy2(audio_file, output_path)
-            created_files.append({
-                'filename': output_name,
-                'type': 'original',
-                'source': audio_file.name
-            })
+        # Traiter par batch pour gérer la mémoire
+        for batch_start in range(0, len(audio_files), batch_size):
+            batch_end = min(batch_start + batch_size, len(audio_files))
+            batch_files = audio_files[batch_start:batch_end]
             
-            # 2. Créer les augmentations si nécessaire
-            if augmentations_per_sample > 0:
-                # Charger l'audio une seule fois
-                waveform, sr = torchaudio.load(str(audio_file))
+            # Vérifier la mémoire disponible
+            memory_percent = psutil.virtual_memory().percent
+            if memory_percent > 85:
+                logger.warning(f"  Mémoire à {memory_percent}%, pause de 5 secondes...")
+                gc.collect()
+                import time
+                time.sleep(5)
+            
+            for audio_file in tqdm(batch_files, desc=f"  {class_name} (batch {batch_start//batch_size + 1})"):
+                # 1. Copier l'original
+                output_name = f"{audio_file.stem}_original{audio_file.suffix}"
+                output_path = class_output_dir / output_name
+                shutil.copy2(audio_file, output_path)
+                created_files.append({
+                    'filename': output_name,
+                    'type': 'original',
+                    'source': audio_file.name
+                })
                 
-                # Convertir en mono si nécessaire
-                if waveform.shape[0] > 1:
-                    waveform = waveform.mean(dim=0, keepdim=True)
-                
-                for aug_idx in range(augmentations_per_sample):
-                    # Sélectionner le type d'augmentation
-                    aug_type = augmentation_types[aug_idx % len(augmentation_types)]
-                    
-                    # Varier la force de l'augmentation
-                    strength = 0.3 + (aug_idx / max(augmentations_per_sample - 1, 1)) * 0.7
-                    
-                    # Appliquer l'augmentation
-                    aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
-                    
-                    # Sauvegarder
-                    aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
-                    aug_path = class_output_dir / aug_name
-                    torchaudio.save(str(aug_path), aug_waveform, sr)
-                    
-                    created_files.append({
-                        'filename': aug_name,
-                        'type': 'augmented',
-                        'source': audio_file.name,
-                        'augmentation': aug_type,
-                        'strength': strength
-                    })
+                # 2. Créer les augmentations si nécessaire
+                if augmentations_per_sample > 0:
+                    try:
+                        # Charger l'audio une seule fois
+                        waveform, sr = torchaudio.load(str(audio_file))
+                        
+                        # Convertir en mono si nécessaire
+                        if waveform.shape[0] > 1:
+                            waveform = waveform.mean(dim=0, keepdim=True)
+                        
+                        for aug_idx in range(augmentations_per_sample):
+                            # Sélectionner le type d'augmentation
+                            aug_type = augmentation_types[aug_idx % len(augmentation_types)]
+                            
+                            # Varier la force de l'augmentation
+                            strength = 0.3 + (aug_idx / max(augmentations_per_sample - 1, 1)) * 0.7
+                            
+                            # Appliquer l'augmentation
+                            aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
+                            
+                            # Sauvegarder
+                            aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
+                            aug_path = class_output_dir / aug_name
+                            torchaudio.save(str(aug_path), aug_waveform, sr)
+                            
+                            created_files.append({
+                                'filename': aug_name,
+                                'type': 'augmented',
+                                'source': audio_file.name,
+                                'augmentation': aug_type,
+                                'strength': strength
+                            })
+                            
+                            # Libérer la mémoire de l'augmentation
+                            del aug_waveform
+                        
+                        # Libérer la mémoire du waveform original
+                        del waveform
+                        gc.collect()
+                        
+                    except Exception as e:
+                        logger.error(f"  Erreur lors du traitement de {audio_file.name}: {e}")
+                        continue
+            
+            # Forcer la libération de mémoire après chaque batch
+            gc.collect()
         
         # Statistiques pour cette classe
         pool_stats['classes'][class_name] = {
@@ -250,6 +286,8 @@ def main():
                        help='Nombre cible d\'échantillons par classe')
     parser.add_argument('--max-augmentations', type=int, default=20,
                        help='Maximum d\'augmentations par échantillon')
+    parser.add_argument('--batch-size', type=int, default=5,
+                       help='Nombre de fichiers à traiter simultanément')
     
     args = parser.parse_args()
     
@@ -257,7 +295,8 @@ def main():
         args.audio_root,
         args.output_dir,
         args.target_samples,
-        args.max_augmentations
+        args.max_augmentations,
+        args.batch_size
     )
 
 

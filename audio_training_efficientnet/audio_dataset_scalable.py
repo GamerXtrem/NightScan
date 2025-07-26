@@ -45,9 +45,6 @@ class AudioDatasetScalable(Dataset):
                  animal_type: str = 'general',
                  transform=None,
                  augment: bool = False,
-                 max_samples_per_class: int = 500,
-                 balance_classes: bool = True,
-                 chunk_size: int = 10000,
                  split: str = 'train',
                  spectrogram_cache_dir: Optional[Path] = None):
         """
@@ -58,9 +55,6 @@ class AudioDatasetScalable(Dataset):
             animal_type: Type d'animal pour configuration automatique
             transform: Transformations PyTorch à appliquer
             augment: Si True, applique l'augmentation à la volée
-            max_samples_per_class: Limite max d'échantillons par classe
-            balance_classes: Si True, équilibre les classes lors du sampling
-            chunk_size: Taille des chunks pour le chargement par batch
             split: Split à utiliser ('train', 'val', 'test')
             spectrogram_cache_dir: Répertoire contenant les spectrogrammes pré-générés (.npy)
         """
@@ -68,9 +62,6 @@ class AudioDatasetScalable(Dataset):
         self.audio_root = Path(audio_root)
         self.transform = transform
         self.augment = augment
-        self.max_samples_per_class = max_samples_per_class
-        self.balance_classes = balance_classes
-        self.chunk_size = chunk_size
         self.split = split
         self.spectrogram_cache_dir = Path(spectrogram_cache_dir) if spectrogram_cache_dir else None
         
@@ -126,13 +117,12 @@ class AudioDatasetScalable(Dataset):
         
         for idx, row in enumerate(cursor.fetchall()):
             class_name = row['class_name']
-            count = min(row['count'], self.max_samples_per_class)
+            count = row['count']
             
             self.class_names.append(class_name)
             self.class_to_idx[class_name] = idx
             self.class_info[class_name] = {
                 'count': count,
-                'original_count': row['count'],
                 'idx': idx
             }
         
@@ -142,92 +132,12 @@ class AudioDatasetScalable(Dataset):
         logger.info(f"Distribution des classes pour split '{self.split}':")
         for class_name in sorted(self.class_names):
             info = self.class_info[class_name]
-            logger.info(f"  {class_name}: {info['count']} échantillons (original: {info['original_count']})")
+            logger.info(f"  {class_name}: {info['count']} échantillons")
         
-        # Créer l'index d'échantillonnage équilibré si nécessaire
-        if self.balance_classes:
-            self._create_balanced_index()
-        
-        cursor.close()
-    
-    def _create_balanced_index(self):
-        """Crée un index équilibré pour l'échantillonnage uniforme des classes."""
-        logger.info("Création de l'index équilibré...")
-        
-        cursor = self.conn.cursor()
-        
-        # Créer une table temporaire pour l'index équilibré
-        cursor.execute("DROP TABLE IF EXISTS balanced_index")
-        cursor.execute("""
-            CREATE TEMPORARY TABLE balanced_index (
-                idx INTEGER PRIMARY KEY,
-                sample_id INTEGER,
-                class_name TEXT,
-                augmentation_variant INTEGER DEFAULT 0
-            )
-        """)
-        
-        # Remplir l'index équilibré
-        idx = 0
-        for class_name, info in self.class_info.items():
-            # Obtenir tous les échantillons de cette classe pour ce split
-            cursor.execute(
-                "SELECT id FROM audio_samples WHERE class_name = ? AND split = ? LIMIT ?",
-                (class_name, self.split, self.max_samples_per_class)
-            )
-            sample_ids = [row[0] for row in cursor.fetchall()]
-            
-            # Si moins d'échantillons que max_samples_per_class, créer des variantes augmentées
-            original_count = len(sample_ids)
-            if original_count == 0:
-                logger.warning(f"Classe '{class_name}' vide dans le split '{self.split}'!")
-                continue
-            
-            # Calculer combien de variantes on doit créer
-            target_count = min(self.max_samples_per_class, original_count * 10)  # Max 10x augmentation
-            
-            # Insérer les échantillons originaux
-            for i, sample_id in enumerate(sample_ids):
-                cursor.execute(
-                    "INSERT INTO balanced_index (idx, sample_id, class_name, augmentation_variant) VALUES (?, ?, ?, ?)",
-                    (idx, sample_id, class_name, 0)  # variant 0 = original
-                )
-                idx += 1
-            
-            # Si on a besoin de plus d'échantillons, créer des variantes augmentées
-            if original_count < target_count:
-                augmentations_needed = target_count - original_count
-                augmentations_per_sample = augmentations_needed // original_count
-                remaining = augmentations_needed % original_count
-                
-                logger.info(f"  Classe '{class_name}': {original_count} échantillons → {target_count} avec augmentation (×{target_count//original_count})")
-                
-                # Créer les variantes augmentées
-                for variant in range(1, augmentations_per_sample + 1):
-                    for sample_id in sample_ids:
-                        cursor.execute(
-                            "INSERT INTO balanced_index (idx, sample_id, class_name, augmentation_variant) VALUES (?, ?, ?, ?)",
-                            (idx, sample_id, class_name, variant)
-                        )
-                        idx += 1
-                
-                # Ajouter les variantes restantes
-                for i in range(remaining):
-                    cursor.execute(
-                        "INSERT INTO balanced_index (idx, sample_id, class_name, augmentation_variant) VALUES (?, ?, ?, ?)",
-                        (idx, sample_ids[i % original_count], class_name, augmentations_per_sample + 1)
-                    )
-                    idx += 1
-        
-        self.conn.commit()
-        self.balanced_samples = idx
-        logger.info(f"Index équilibré créé: {self.balanced_samples} échantillons")
         cursor.close()
     
     def __len__(self) -> int:
         """Retourne le nombre d'échantillons."""
-        if self.balance_classes:
-            return self.balanced_samples
         return self.total_samples
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
@@ -241,16 +151,7 @@ class AudioDatasetScalable(Dataset):
         
         # Obtenir les infos de l'échantillon
         cursor = self.conn.cursor()
-        
-        if self.balance_classes:
-            cursor.execute("""
-                SELECT s.*, b.augmentation_variant FROM audio_samples s
-                JOIN balanced_index b ON s.id = b.sample_id
-                WHERE b.idx = ?
-            """, (idx,))
-        else:
-            cursor.execute("SELECT *, 0 as augmentation_variant FROM audio_samples WHERE split = ? LIMIT 1 OFFSET ?", (self.split, idx))
-        
+        cursor.execute("SELECT * FROM audio_samples WHERE split = ? LIMIT 1 OFFSET ?", (self.split, idx))
         row = cursor.fetchone()
         cursor.close()
         
@@ -261,8 +162,18 @@ class AudioDatasetScalable(Dataset):
         audio_path = self.audio_root / row['file_path']
         label = row['class_name']
         label_idx = self.class_to_idx[label]
-        # SQLite retourne un dictionnaire, utiliser l'index ou la clé selon le driver
-        augmentation_variant = row['augmentation_variant'] if 'augmentation_variant' in row.keys() else 0
+        
+        # Déterminer si c'est un fichier augmenté depuis le nom
+        filename = Path(row['file_path']).name
+        if '_aug' in filename and '_var' in filename:
+            # Extraire le numéro de variante du nom de fichier
+            try:
+                variant_str = filename.split('_var')[1].split('_')[0].split('.')[0]
+                augmentation_variant = int(variant_str)
+            except:
+                augmentation_variant = 0
+        else:
+            augmentation_variant = 0
         
         # Essayer de charger depuis le cache de spectrogrammes pré-générés
         spectrogram = None
@@ -271,11 +182,9 @@ class AudioDatasetScalable(Dataset):
         
         # Si pas de cache ou échec du chargement, générer le spectrogramme
         if spectrogram is None:
-            if augmentation_variant > 0 and self.split == 'train':
-                # Utiliser la variante comme seed pour des augmentations déterministes mais différentes
-                spectrogram = self._generate_augmented_spectrogram_variant(audio_path, augmentation_variant)
-            else:
-                spectrogram = self._generate_spectrogram_memory_efficient(audio_path)
+            # Pas besoin de logique d'augmentation ici car les fichiers augmentés
+            # ont déjà été créés dans le pool
+            spectrogram = self._generate_spectrogram_memory_efficient(audio_path)
         
         # Appliquer l'augmentation aléatoire supplémentaire si demandé
         if self.augment and self.split == 'train':
@@ -405,98 +314,6 @@ class AudioDatasetScalable(Dataset):
             # Calculer la taille correcte du spectrogramme
             n_frames = int(np.ceil(self.duration * self.sample_rate / self.config.hop_length))
             return torch.zeros((3, self.n_mels, n_frames), dtype=torch.float16)
-    
-    def _generate_augmented_spectrogram_variant(self, audio_path: Path, variant: int) -> torch.Tensor:
-        """
-        Génère un spectrogramme avec augmentation déterministe basée sur la variante.
-        Chaque variante produit une augmentation différente mais reproductible.
-        """
-        try:
-            # Charger l'audio
-            waveform, orig_sr = torchaudio.load(str(audio_path))
-            
-            # Convertir en mono
-            if waveform.size(0) > 1:
-                waveform = waveform.mean(dim=0, keepdim=True)
-            
-            # Rééchantillonner si nécessaire
-            if orig_sr != self.sample_rate:
-                resampler = T.Resample(orig_sr, self.sample_rate)
-                waveform = resampler(waveform)
-                del resampler
-            
-            # Appliquer des augmentations déterministes basées sur la variante
-            # Utiliser la variante comme seed pour la reproductibilité
-            torch.manual_seed(variant + hash(str(audio_path)) % 1000000)
-            np.random.seed(variant + hash(str(audio_path)) % 1000000)
-            
-            # Augmentations audio basées sur la variante (PitchShift désactivé car trop lent)
-            # if variant % 3 == 1:  # Pitch shift - DÉSACTIVÉ
-            #     pitch_shift = (variant % 5 - 2) * 2  # -4, -2, 0, +2, +4 semitones
-            #     pitch_shift_transform = T.PitchShift(self.sample_rate, pitch_shift)
-            #     waveform = pitch_shift_transform(waveform)
-            
-            if variant % 3 == 2:  # Time stretch
-                rate = 1.0 + (variant % 5 - 2) * 0.1  # 0.8x à 1.2x
-                if rate != 1.0:
-                    waveform = T.Resample(self.sample_rate, int(self.sample_rate * rate))(waveform)
-                    waveform = T.Resample(int(self.sample_rate * rate), self.sample_rate)(waveform)
-            
-            # Ajout de bruit
-            if variant % 2 == 1:
-                noise_level = 0.001 * (1 + variant % 5)  # 0.001 à 0.005
-                noise = torch.randn_like(waveform) * noise_level
-                waveform = waveform + noise
-            
-            # Ajuster la durée
-            target_length = int(self.sample_rate * self.duration)
-            if waveform.shape[1] < target_length:
-                pad = target_length - waveform.shape[1]
-                waveform = torch.nn.functional.pad(waveform, (0, pad))
-            elif waveform.shape[1] > target_length:
-                # Time shift pour la variété
-                max_offset = waveform.shape[1] - target_length
-                offset = (variant * 1000) % max_offset if max_offset > 0 else 0
-                waveform = waveform[:, offset:offset + target_length]
-            
-            # Créer le spectrogramme
-            mel_transform = T.MelSpectrogram(
-                sample_rate=self.sample_rate,
-                n_fft=self.config.n_fft,
-                hop_length=self.config.hop_length,
-                n_mels=self.n_mels,
-                f_min=self.config.fmin,
-                f_max=self.config.fmax
-            )
-            
-            mel_spec = mel_transform(waveform)
-            
-            # Convertir en dB
-            db_transform = T.AmplitudeToDB(top_db=self.config.top_db)
-            mel_spec_db = db_transform(mel_spec)
-            
-            # Normaliser
-            mel_spec_db = (mel_spec_db - mel_spec_db.mean()) / (mel_spec_db.std() + 1e-6)
-            
-            # Convertir en 3 canaux
-            if mel_spec_db.dim() == 3:
-                mel_spec_db = mel_spec_db.squeeze(0)
-            mel_spec_db = mel_spec_db.unsqueeze(0).repeat(3, 1, 1)
-            
-            # Réinitialiser les seeds pour ne pas affecter le reste
-            torch.manual_seed(torch.initial_seed())
-            np.random.seed(None)
-            
-            # Libérer la mémoire
-            del waveform, mel_spec, mel_transform, db_transform
-            gc.collect()
-            
-            return mel_spec_db.to(torch.float16)
-            
-        except Exception as e:
-            logger.error(f"Erreur génération spectrogramme augmenté {audio_path} variant {variant}: {e}")
-            # Fallback sur la version non augmentée
-            return self._generate_spectrogram_memory_efficient(audio_path)
     
     def _augment_spectrogram(self, spectrogram: torch.Tensor) -> torch.Tensor:
         """Applique des augmentations légères au spectrogramme."""
