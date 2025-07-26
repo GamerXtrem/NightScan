@@ -287,12 +287,20 @@ def create_augmented_pool(
                         logger.debug(f"  [DEBUG] Copie réussie!")
                     
                     files_created_count += 1
+                    
+                    if debug:
+                        logger.debug(f"  [DEBUG] files_created_count incrémenté: {files_created_count}")
+                    
                 except Exception as e:
                     logger.error(f"  Erreur copie {audio_file.name}: {e}")
                     if debug:
                         import traceback
                         logger.debug(f"  [DEBUG] Traceback complet: {traceback.format_exc()}")
                     continue
+                
+                if debug:
+                    logger.debug(f"  [DEBUG] Avant check save_detailed_metadata: {save_detailed_metadata}")
+                
                 if save_detailed_metadata:
                     created_files.append({
                         'filename': output_name,
@@ -300,11 +308,20 @@ def create_augmented_pool(
                         'source': audio_file.name
                     })
                 
+                if debug:
+                    logger.debug(f"  [DEBUG] Avant check augmentations_per_sample: {augmentations_per_sample}")
+                
                 # 2. Créer les augmentations si nécessaire
                 if augmentations_per_sample > 0:
+                    if debug:
+                        logger.debug(f"  [DEBUG] Début création des augmentations")
+                    
                     try:
                         # Charger l'audio avec gestion mémoire
                         # Utiliser backend sox_io pour une meilleure gestion mémoire
+                        if debug:
+                            logger.debug(f"  [DEBUG] Avant torchaudio.load de: {audio_file}")
+                        
                         try:
                             waveform, sr = torchaudio.load(str(audio_file))
                         except Exception as load_error:
