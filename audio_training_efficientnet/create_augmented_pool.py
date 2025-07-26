@@ -24,6 +24,7 @@ import psutil
 import time
 from multiprocessing import Pool
 from functools import partial
+import sys
 
 
 # Configuration du logging
@@ -32,6 +33,58 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def count_torch_tensors():
+    """Compte le nombre de tensors PyTorch actifs en mémoire."""
+    import gc
+    count = 0
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj):
+                count += 1
+        except:
+            pass
+    return count
+
+
+def log_memory_state(context: str, verbose: bool = False):
+    """Log l'état détaillé de la mémoire."""
+    gc.collect()
+    
+    memory_info = psutil.virtual_memory()
+    process = psutil.Process()
+    process_memory = process.memory_info()
+    
+    logger.info(f"[MEM {context}]")
+    logger.info(f"  Système: {memory_info.percent:.1f}% ({memory_info.used/(1024**3):.2f}/{memory_info.total/(1024**3):.2f} GB)")
+    logger.info(f"  Processus: RSS={process_memory.rss/(1024**3):.2f} GB, VMS={process_memory.vms/(1024**3):.2f} GB")
+    
+    if verbose:
+        # Compter les tensors
+        tensor_count = count_torch_tensors()
+        logger.info(f"  Tensors PyTorch actifs: {tensor_count}")
+        
+        # Obtenir les plus gros objets
+        import sys
+        all_objects = gc.get_objects()
+        logger.info(f"  Total objets Python: {len(all_objects)}")
+        
+        # Chercher les gros objets
+        big_objects = []
+        for obj in all_objects:
+            try:
+                size = sys.getsizeof(obj)
+                if size > 1024 * 1024:  # Plus de 1 MB
+                    big_objects.append((size, type(obj).__name__))
+            except:
+                pass
+        
+        if big_objects:
+            big_objects.sort(reverse=True)
+            logger.info("  Gros objets (>1MB):")
+            for size, typename in big_objects[:5]:
+                logger.info(f"    {typename}: {size/(1024**2):.1f} MB")
 
 # Ajouter le chemin parent
 sys.path.append(str(Path(__file__).parent.parent))
@@ -248,7 +301,8 @@ def create_augmented_pool(
     specific_class: Optional[str] = None,
     low_memory: bool = False,
     debug: bool = False,
-    workers: int = 1
+    workers: int = 1,
+    ultra_debug: bool = False
 ) -> Dict:
     """
     Crée un pool augmenté équilibré pour toutes les classes.
@@ -264,6 +318,7 @@ def create_augmented_pool(
         low_memory: Mode faible mémoire (utilise subprocess)
         debug: Mode debug avec logs détaillés
         workers: Nombre de processus parallèles (seulement en mode low_memory)
+        ultra_debug: Mode ultra debug avec monitoring mémoire intensif
     
     Returns:
         Dictionnaire avec les statistiques du pool créé
@@ -278,6 +333,8 @@ def create_augmented_pool(
     if debug:
         logger.info("Mode DEBUG activé")
         logging.getLogger().setLevel(logging.DEBUG)
+    if ultra_debug:
+        logger.info("Mode ULTRA DEBUG activé - Monitoring mémoire intensif")
     
     # Vérifier la mémoire initiale
     memory_info = psutil.virtual_memory()
@@ -314,7 +371,9 @@ def create_augmented_pool(
         class_name = class_dir.name
         logger.info(f"\nTraitement de la classe: {class_name}")
         
-        if debug:
+        if ultra_debug:
+            log_memory_state(f"Début classe {class_name}", verbose=True)
+        elif debug:
             memory_info = psutil.virtual_memory()
             logger.debug(f"  [DEBUG] Mémoire avant traitement classe: {memory_info.percent:.1f}% ({memory_info.used / (1024**3):.1f} GB)")
         
@@ -448,7 +507,9 @@ def create_augmented_pool(
                 progress_bar = batch_files
             
             for file_idx, audio_file in enumerate(progress_bar):
-                if debug and file_idx == 0:
+                if ultra_debug:
+                    log_memory_state(f"Avant fichier {file_idx}: {audio_file.name}", verbose=True)
+                elif debug and file_idx == 0:
                     logger.debug(f"  [DEBUG] Début traitement fichier {file_idx}: {audio_file.name}")
                     memory_info = psutil.virtual_memory()
                     logger.debug(f"  [DEBUG] Mémoire: {memory_info.percent:.1f}% ({memory_info.used / (1024**3):.1f} GB)")
@@ -620,8 +681,14 @@ def create_augmented_pool(
                             # Petit délai pour laisser le système respirer
                             time.sleep(0.1)
                             
+                            if ultra_debug:
+                                log_memory_state(f"Avant load {audio_file.name}", verbose=True)
+                            
                             try:
                                 waveform, sr = torchaudio.load(str(audio_file))
+                                if ultra_debug:
+                                    logger.info(f"  Waveform shape: {waveform.shape}, dtype: {waveform.dtype}")
+                                    log_memory_state(f"Après load {audio_file.name}", verbose=True)
                             except Exception as load_error:
                                 logger.error(f"  Impossible de charger {audio_file.name}: {load_error}")
                                 continue
@@ -667,10 +734,29 @@ def create_augmented_pool(
                         
                     except Exception as e:
                         logger.error(f"  Erreur lors du traitement de {audio_file.name}: {e}")
+                        if ultra_debug:
+                            log_memory_state(f"Après erreur {audio_file.name}", verbose=True)
                         continue
+                
+                # Log mémoire après chaque fichier en ultra_debug
+                if ultra_debug:
+                    log_memory_state(f"Après fichier {file_idx}: {audio_file.name}", verbose=True)
             
             # Forcer la libération de mémoire après chaque batch
             gc.collect()
+            
+            if ultra_debug:
+                logger.info(f"  [ULTRA DEBUG] Fin batch {batch_start//batch_size + 1}")
+                logger.info(f"  [ULTRA DEBUG] files_created_count: {files_created_count}")
+                if created_files is not None:
+                    logger.info(f"  [ULTRA DEBUG] len(created_files): {len(created_files)}")
+                    # Calculer la taille approximative
+                    try:
+                        size_estimate = sys.getsizeof(created_files) / (1024**2)
+                        logger.info(f"  [ULTRA DEBUG] created_files size: ~{size_estimate:.1f} MB")
+                    except:
+                        pass
+                log_memory_state(f"Fin batch {batch_start//batch_size + 1}", verbose=True)
         
         # Statistiques pour cette classe
         class_stats = {
@@ -760,6 +846,8 @@ def main():
                        help='Activer les logs de debug détaillés')
     parser.add_argument('--workers', type=int, default=1,
                        help='Nombre de processus parallèles (seulement en mode --low-memory)')
+    parser.add_argument('--ultra-debug', action='store_true',
+                       help='Mode ultra debug avec monitoring mémoire intensif')
     
     args = parser.parse_args()
     
@@ -773,7 +861,8 @@ def main():
         args.specific_class,
         args.low_memory,
         args.debug,
-        args.workers
+        args.workers,
+        args.ultra_debug
     )
 
 
