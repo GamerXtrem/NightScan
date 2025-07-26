@@ -62,8 +62,8 @@ file_path = "/home/ubuntu/NightScan/data/audio_data/airplane/5-235956-A-47.wav"
 # Simuler exactement ce que fait create_augmented_pool
 show_mem("Avant gc.collect()")
 gc.collect()
-if torch.cuda.is_available():
-    torch.cuda.empty_cache()
+# NOTE: torch.cuda.empty_cache() fait exploser le VMS de 3.37GB à 7.79GB
+# Ne pas l'utiliser !
 
 import time
 time.sleep(0.1)

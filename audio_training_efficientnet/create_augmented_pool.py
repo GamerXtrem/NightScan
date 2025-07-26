@@ -793,13 +793,11 @@ def create_augmented_pool(
         
         # Forcer la libération de la mémoire
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        # NOTE: torch.cuda.empty_cache() cause une explosion du VMS (+4.4GB)
+        # même sur les systèmes sans GPU. Désactivé pour éviter OOM.
         
         # Pause pour permettre au GC de nettoyer
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
         time.sleep(0.5)
         
         # Afficher l'utilisation mémoire
