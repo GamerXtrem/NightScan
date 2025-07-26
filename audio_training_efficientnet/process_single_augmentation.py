@@ -12,6 +12,13 @@ import torchaudio
 import torchaudio.transforms as T
 from pathlib import Path
 
+try:
+    import soundfile as sf
+    import numpy as np
+    HAS_SOUNDFILE = True
+except ImportError:
+    HAS_SOUNDFILE = False
+
 
 def apply_audio_augmentation(waveform: torch.Tensor, sr: int, augmentation_type: str, strength: float = 1.0) -> torch.Tensor:
     """Applique une augmentation audio spécifique."""
@@ -70,7 +77,22 @@ def main():
     
     try:
         # Charger l'audio une seule fois
-        waveform, sr = torchaudio.load(str(input_path))
+        # Utiliser soundfile pour airplane si disponible
+        is_airplane = 'airplane' in str(input_path).lower()
+        
+        if is_airplane and HAS_SOUNDFILE:
+            try:
+                data, sr = sf.read(str(input_path))
+                waveform = torch.from_numpy(data).float()
+                if len(waveform.shape) == 1:
+                    waveform = waveform.unsqueeze(0)
+                else:
+                    waveform = waveform.T
+            except:
+                # Fallback sur torchaudio
+                waveform, sr = torchaudio.load(str(input_path))
+        else:
+            waveform, sr = torchaudio.load(str(input_path))
         
         # Convertir en mono si nécessaire
         if waveform.shape[0] > 1:
