@@ -116,6 +116,8 @@ def create_augmented_pool(
     logger.info(f"Destination: {output_dir}")
     logger.info(f"Cible: {target_samples_per_class} échantillons par classe")
     logger.info(f"Batch size: {batch_size} fichiers à la fois")
+    if low_memory:
+        logger.info("Mode FAIBLE MÉMOIRE activé")
     
     # Vérifier la mémoire initiale
     memory_info = psutil.virtual_memory()
@@ -157,7 +159,15 @@ def create_augmented_pool(
         class_output_dir.mkdir(exist_ok=True)
         
         # Lister tous les fichiers audio
-        audio_files = list(class_dir.glob("*.wav")) + list(class_dir.glob("*.mp3"))
+        try:
+            wav_files = list(class_dir.glob("*.wav"))
+            mp3_files = list(class_dir.glob("*.mp3"))
+            audio_files = wav_files + mp3_files
+            logger.debug(f"  Trouvé: {len(wav_files)} WAV, {len(mp3_files)} MP3")
+        except Exception as e:
+            logger.error(f"  Erreur lors du listage des fichiers: {e}")
+            continue
+            
         original_count = len(audio_files)
         
         if original_count == 0:
@@ -202,12 +212,18 @@ def create_augmented_pool(
                 gc.collect()
                 time.sleep(5)
             
-            for audio_file in tqdm(batch_files, desc=f"  {class_name} (batch {batch_start//batch_size + 1})"):
+            for file_idx, audio_file in enumerate(tqdm(batch_files, desc=f"  {class_name} (batch {batch_start//batch_size + 1})")):
+                if file_idx == 0 and batch_start == 0:
+                    logger.debug(f"  Traitement du premier fichier: {audio_file.name}")
                 # 1. Copier l'original
-                output_name = f"{audio_file.stem}_original{audio_file.suffix}"
-                output_path = class_output_dir / output_name
-                shutil.copy2(audio_file, output_path)
-                files_created_count += 1
+                try:
+                    output_name = f"{audio_file.stem}_original{audio_file.suffix}"
+                    output_path = class_output_dir / output_name
+                    shutil.copy2(audio_file, output_path)
+                    files_created_count += 1
+                except Exception as e:
+                    logger.error(f"  Erreur copie {audio_file.name}: {e}")
+                    continue
                 if save_detailed_metadata:
                     created_files.append({
                         'filename': output_name,
