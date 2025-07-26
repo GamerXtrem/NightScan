@@ -23,11 +23,6 @@ import gc
 import psutil
 import time
 
-# Essayer de réinitialiser le backend audio
-try:
-    torchaudio.set_audio_backend("sox_io")
-except:
-    pass
 
 # Configuration du logging
 logging.basicConfig(
@@ -356,21 +351,57 @@ def create_augmented_pool(
                             # Varier la force de l'augmentation
                             strength = 0.3 + (aug_idx / max(augmentations_per_sample - 1, 1)) * 0.7
                             
+                            # Définir le nom de sortie
+                            aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
+                            aug_path = class_output_dir / aug_name
+                            
                             if low_memory:
-                                # Mode faible mémoire: recharger l'audio à chaque fois
-                                waveform_aug, sr_aug = torchaudio.load(str(audio_file))
-                                if waveform_aug.shape[0] > 1:
-                                    waveform_aug = waveform_aug.mean(dim=0, keepdim=True)
-                                aug_waveform = apply_audio_augmentation(waveform_aug, sr_aug, aug_type, strength)
-                                del waveform_aug
+                                # Mode faible mémoire: utiliser subprocess pour isoler complètement
+                                if debug:
+                                    logger.debug(f"  [DEBUG] Utilisation de subprocess pour l'augmentation")
+                                
+                                import subprocess
+                                import json as json_module
+                                
+                                # Préparer les paramètres
+                                params = {
+                                    'input_path': str(audio_file),
+                                    'output_path': str(aug_path),
+                                    'aug_type': aug_type,
+                                    'strength': strength
+                                }
+                                
+                                # Appeler le processeur isolé
+                                processor_path = Path(__file__).parent / 'process_single_augmentation.py'
+                                result = subprocess.run(
+                                    [sys.executable, str(processor_path)],
+                                    input=json_module.dumps(params),
+                                    capture_output=True,
+                                    text=True
+                                )
+                                
+                                if result.returncode != 0:
+                                    logger.error(f"  Erreur subprocess augmentation: {result.stderr}")
+                                    continue
+                                
+                                # Vérifier le résultat
+                                try:
+                                    response = json_module.loads(result.stdout)
+                                    if response['status'] != 'success':
+                                        logger.error(f"  Erreur augmentation: {response.get('error', 'Unknown')}")
+                                        continue
+                                except:
+                                    logger.error(f"  Réponse subprocess invalide: {result.stdout}")
+                                    continue
+                                    
                             else:
                                 # Mode normal: utiliser le waveform déjà chargé
                                 aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
                             
-                            # Sauvegarder
-                            aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
-                            aug_path = class_output_dir / aug_name
-                            torchaudio.save(str(aug_path), aug_waveform, sr if not low_memory else sr_aug)
+                            # Sauvegarder (sauf en mode low_memory où c'est déjà fait)
+                            if not low_memory:
+                                torchaudio.save(str(aug_path), aug_waveform, sr)
+                            
                             files_created_count += 1
                             
                             if save_detailed_metadata:
