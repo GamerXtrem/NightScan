@@ -23,6 +23,12 @@ import gc
 import psutil
 import time
 
+# Essayer de réinitialiser le backend audio
+try:
+    torchaudio.set_audio_backend("sox_io")
+except:
+    pass
+
 # Configuration du logging
 logging.basicConfig(
     level=logging.INFO,
@@ -322,6 +328,17 @@ def create_augmented_pool(
                         if debug:
                             logger.debug(f"  [DEBUG] Avant torchaudio.load de: {audio_file}")
                         
+                        # Forcer le nettoyage avant le chargement
+                        gc.collect()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        
+                        # Petit délai pour laisser le système respirer
+                        time.sleep(0.1)
+                        
+                        if debug:
+                            logger.debug(f"  [DEBUG] Après gc.collect(), avant load effectif")
+                        
                         try:
                             waveform, sr = torchaudio.load(str(audio_file))
                         except Exception as load_error:
@@ -421,6 +438,9 @@ def create_augmented_pool(
             torch.cuda.empty_cache()
         
         # Pause pour permettre au GC de nettoyer
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         time.sleep(0.5)
         
         # Afficher l'utilisation mémoire
