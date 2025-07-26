@@ -678,13 +678,9 @@ def create_augmented_pool(
                             if debug:
                                 logger.debug(f"  [DEBUG] Mode normal: chargement audio")
                             
-                            # Forcer le nettoyage avant le chargement
-                            gc.collect()
-                            if torch.cuda.is_available():
-                                torch.cuda.empty_cache()
-                            
-                            # Petit délai pour laisser le système respirer
-                            time.sleep(0.1)
+                            # NOTE: gc.collect() et time.sleep() causent une explosion du VMS
+                            # de 3.37GB à 7.79GB sur certains systèmes. Désactivé pour éviter OOM.
+                            # Voir test_vms_gc_issue.py pour plus de détails.
                             
                             if ultra_debug:
                                 log_memory_state(f"Avant load {audio_file.name}", verbose=True)
