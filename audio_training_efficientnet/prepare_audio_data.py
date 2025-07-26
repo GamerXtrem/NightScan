@@ -12,25 +12,86 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import argparse
 import json
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 import logging
+import subprocess
+import tempfile
 
 # Importer le module de segmentation
 from audio_segmentation import AudioSegmenter
 
 logger = logging.getLogger(__name__)
 
-def scan_audio_directory(audio_dir: Path) -> Dict[str, List[Path]]:
+def check_ffmpeg():
+    """Vérifie si ffmpeg est installé."""
+    try:
+        subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def convert_mp3_to_wav(mp3_path: Path, wav_path: Path, sample_rate: int = 22050) -> bool:
+    """
+    Convertit un fichier MP3 en WAV en utilisant ffmpeg.
+    
+    Args:
+        mp3_path: Chemin du fichier MP3
+        wav_path: Chemin de sortie pour le fichier WAV
+        sample_rate: Taux d'échantillonnage cible
+        
+    Returns:
+        True si la conversion a réussi, False sinon
+    """
+    try:
+        # Créer le répertoire parent si nécessaire
+        wav_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Commande ffmpeg pour la conversion
+        cmd = [
+            'ffmpeg',
+            '-i', str(mp3_path),
+            '-acodec', 'pcm_s16le',  # Format PCM 16-bit
+            '-ar', str(sample_rate),  # Taux d'échantillonnage
+            '-ac', '1',  # Mono
+            '-y',  # Écraser si le fichier existe
+            str(wav_path)
+        ]
+        
+        # Exécuter la conversion silencieusement
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            logger.error(f"Erreur lors de la conversion de {mp3_path}: {result.stderr}")
+            return False
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"Exception lors de la conversion de {mp3_path}: {e}")
+        return False
+
+
+def scan_audio_directory(audio_dir: Path, convert_mp3: bool = True) -> Dict[str, List[Path]]:
     """
     Scanne le répertoire audio et retourne un dictionnaire {classe: [fichiers]}.
+    Gère à la fois les fichiers WAV et MP3.
     
     Args:
         audio_dir: Répertoire contenant les sous-dossiers de classes
+        convert_mp3: Si True, convertit les MP3 en WAV
         
     Returns:
-        Dict mapping classe -> liste de fichiers WAV
+        Dict mapping classe -> liste de fichiers audio (WAV)
     """
     class_files = {}
+    total_mp3_converted = 0
+    
+    # Vérifier ffmpeg si conversion MP3 nécessaire
+    if convert_mp3 and not check_ffmpeg():
+        print("⚠️  Attention: ffmpeg n'est pas installé. Les fichiers MP3 ne seront pas convertis.")
+        print("   Installez ffmpeg avec: sudo apt-get install ffmpeg (Linux) ou brew install ffmpeg (Mac)")
+        convert_mp3 = False
     
     # Scanner chaque sous-dossier
     for class_dir in audio_dir.iterdir():
@@ -43,24 +104,58 @@ def scan_audio_directory(audio_dir: Path) -> Dict[str, List[Path]]:
         if class_name.startswith('.'):
             continue
             
-        # Collecter tous les fichiers WAV dans ce dossier
+        # Collecter tous les fichiers audio dans ce dossier
         wav_files = list(class_dir.rglob('*.wav'))
+        mp3_files = list(class_dir.rglob('*.mp3'))
         
         # Filtrer les fichiers cachés macOS (commençant par ._)
         wav_files = [f for f in wav_files if not f.name.startswith('._')]
+        mp3_files = [f for f in mp3_files if not f.name.startswith('._')]
+        
+        # Convertir les MP3 en WAV si demandé
+        if mp3_files and convert_mp3:
+            print(f"\nConversion des {len(mp3_files)} fichiers MP3 pour la classe '{class_name}'...")
+            
+            # Créer un répertoire temporaire pour les conversions
+            temp_dir = audio_dir.parent / 'temp_wav_conversions' / class_name
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            
+            for mp3_file in mp3_files:
+                # Créer le chemin de sortie WAV
+                wav_filename = mp3_file.stem + '.wav'
+                wav_path = temp_dir / wav_filename
+                
+                # Convertir le fichier
+                if convert_mp3_to_wav(mp3_file, wav_path):
+                    wav_files.append(wav_path)
+                    total_mp3_converted += 1
+                else:
+                    print(f"   ❌ Échec de la conversion: {mp3_file.name}")
+        elif mp3_files and not convert_mp3:
+            print(f"⚠️  {len(mp3_files)} fichiers MP3 ignorés dans la classe '{class_name}' (ffmpeg non disponible)")
         
         if wav_files:
+            # Afficher le nombre de fichiers trouvés/convertis
+            original_wav_count = len([f for f in wav_files if 'temp_wav_conversions' not in str(f)])
+            converted_count = len([f for f in wav_files if 'temp_wav_conversions' in str(f)])
+            
+            if converted_count > 0:
+                print(f"Classe '{class_name}': {original_wav_count} WAV originaux + {converted_count} MP3 convertis = {len(wav_files)} total")
+            else:
+                print(f"Classe '{class_name}': {len(wav_files)} fichiers WAV trouvés")
+            
             # Limiter à 500 fichiers maximum par classe
             if len(wav_files) > 500:
                 # Échantillonner aléatoirement 500 fichiers
                 import random
                 random.seed(42)  # Pour la reproductibilité
                 wav_files = random.sample(wav_files, 500)
-                print(f"Classe '{class_name}': {len(wav_files)} fichiers WAV sélectionnés (limité à 500)")
-            else:
-                print(f"Classe '{class_name}': {len(wav_files)} fichiers WAV trouvés")
+                print(f"  → Limité à 500 fichiers (échantillonnage aléatoire)")
             
             class_files[class_name] = wav_files
+    
+    if total_mp3_converted > 0:
+        print(f"\n✅ Total: {total_mp3_converted} fichiers MP3 convertis en WAV")
     
     return class_files
 
@@ -244,6 +339,11 @@ def main():
         default=None,
         help="Répertoire pour les fichiers segmentés (défaut: audio_dir_segmented)"
     )
+    parser.add_argument(
+        '--no-mp3-conversion',
+        action='store_true',
+        help="Ne pas convertir les fichiers MP3 en WAV"
+    )
     
     args = parser.parse_args()
     
@@ -264,6 +364,12 @@ def main():
     if args.segment:
         print(f"\n🔪 Segmentation des fichiers audio longs...")
         
+        # D'abord, scanner et convertir les MP3 si nécessaire
+        if not args.no_mp3_conversion:
+            print("\n📂 Scan préliminaire pour conversion MP3...")
+            temp_class_files = scan_audio_directory(args.audio_dir, convert_mp3=True)
+            # Les fichiers MP3 sont maintenant convertis dans temp_wav_conversions
+        
         # Déterminer le répertoire de sortie pour les segments
         if args.segment_dir is None:
             segment_dir = args.audio_dir.parent / f"{args.audio_dir.name}_segmented"
@@ -277,12 +383,24 @@ def main():
             min_segment_duration=3.0
         )
         
-        # Segmenter les fichiers
+        # Segmenter les fichiers (incluant les MP3 convertis dans temp_wav_conversions)
         segments_info = segmenter.segment_directory(
             args.audio_dir,
             segment_dir,
             preserve_structure=True
         )
+        
+        # Si on a un dossier temp_wav_conversions, le segmenter aussi
+        temp_wav_dir = args.audio_dir.parent / 'temp_wav_conversions'
+        if temp_wav_dir.exists():
+            print("\n📂 Segmentation des fichiers MP3 convertis...")
+            temp_segments = segmenter.segment_directory(
+                temp_wav_dir,
+                segment_dir,
+                preserve_structure=True
+            )
+            if temp_segments:
+                segments_info.update(temp_segments)
         
         if not segments_info:
             print("Aucun fichier n'a été segmenté (tous les fichiers sont déjà courts)")
@@ -292,7 +410,9 @@ def main():
     
     # Scanner le répertoire (original ou segmenté)
     print(f"\nScan du répertoire: {working_dir}")
-    class_files = scan_audio_directory(working_dir)
+    # Si on a segmenté, les MP3 ont déjà été convertis, donc pas besoin de reconvertir
+    convert_mp3 = not args.segment and not args.no_mp3_conversion
+    class_files = scan_audio_directory(working_dir, convert_mp3=convert_mp3)
     
     if not class_files:
         print("Erreur: Aucune classe trouvée!")
