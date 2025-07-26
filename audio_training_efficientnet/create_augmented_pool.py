@@ -22,6 +22,8 @@ import random
 import gc
 import psutil
 import time
+from multiprocessing import Pool
+from functools import partial
 
 
 # Configuration du logging
@@ -90,6 +92,152 @@ def apply_audio_augmentation(waveform: torch.Tensor, sr: int, augmentation_type:
     return waveform
 
 
+def process_file_low_memory(args):
+    """
+    Traite un fichier audio en mode low_memory (utilise subprocess).
+    Conçu pour être utilisé avec multiprocessing.Pool.
+    """
+    audio_file, class_output_dir, augmentations_per_sample, augmentation_types, save_detailed_metadata = args
+    
+    import subprocess
+    import json as json_module
+    
+    files_created = 0
+    metadata_entries = []
+    
+    # 1. Copier l'original
+    try:
+        output_name = f"{audio_file.stem}_original{audio_file.suffix}"
+        output_path = class_output_dir / output_name
+        shutil.copy2(str(audio_file), str(output_path))
+        files_created += 1
+        
+        if save_detailed_metadata:
+            metadata_entries.append({
+                'filename': output_name,
+                'type': 'original',
+                'source': audio_file.name
+            })
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Erreur copie {audio_file.name}: {e}",
+            'files_created': 0,
+            'metadata': []
+        }
+    
+    # 2. Créer les augmentations si nécessaire
+    if augmentations_per_sample > 0:
+        # Préparer toutes les augmentations
+        augmentations = []
+        for aug_idx in range(augmentations_per_sample):
+            aug_type = augmentation_types[aug_idx % len(augmentation_types)]
+            strength = 0.3 + (aug_idx / max(augmentations_per_sample - 1, 1)) * 0.7
+            aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
+            aug_path = class_output_dir / aug_name
+            
+            augmentations.append({
+                'output_path': str(aug_path),
+                'aug_type': aug_type,
+                'strength': strength
+            })
+        
+        # Préparer les paramètres pour le subprocess
+        params = {
+            'input_path': str(audio_file),
+            'augmentations': augmentations
+        }
+        
+        # Appeler le processeur avec toutes les augmentations
+        processor_path = Path(__file__).parent / 'process_single_augmentation.py'
+        
+        # Ajouter retry pour gérer les erreurs transitoires
+        max_retries = 2
+        for retry in range(max_retries):
+            try:
+                result = subprocess.run(
+                    [sys.executable, str(processor_path)],
+                    input=json_module.dumps(params),
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if result.returncode != 0:
+                    error_msg = result.stderr.strip() if result.stderr else "Code de retour non-zéro"
+                    if retry < max_retries - 1:
+                        time.sleep(1)
+                        continue
+                    else:
+                        return {
+                            'success': False,
+                            'error': f"Erreur subprocess après {max_retries} essais: {error_msg}",
+                            'files_created': files_created,
+                            'metadata': metadata_entries
+                        }
+                
+                # Vérifier le résultat
+                try:
+                    response = json_module.loads(result.stdout)
+                    if response['status'] == 'success':
+                        # Compter les succès
+                        for result_item in response.get('results', []):
+                            if result_item['status'] == 'success':
+                                files_created += 1
+                                
+                                if save_detailed_metadata:
+                                    aug_filename = Path(result_item['output_path']).name
+                                    parts = aug_filename.replace(audio_file.stem + '_', '').replace('.wav', '').split('_')
+                                    aug_type_from_name = '_'.join(parts[1:]) if len(parts) > 1 else 'unknown'
+                                    
+                                    metadata_entries.append({
+                                        'filename': aug_filename,
+                                        'type': 'augmented',
+                                        'source': audio_file.name,
+                                        'augmentation': aug_type_from_name
+                                    })
+                        break
+                    else:
+                        return {
+                            'success': False,
+                            'error': f"Erreur batch augmentation: {response.get('error', 'Unknown')}",
+                            'files_created': files_created,
+                            'metadata': metadata_entries
+                        }
+                except json_module.JSONDecodeError:
+                    if retry < max_retries - 1:
+                        time.sleep(1)
+                        continue
+                    return {
+                        'success': False,
+                        'error': f"Réponse subprocess invalide",
+                        'files_created': files_created,
+                        'metadata': metadata_entries
+                    }
+                break
+                
+            except subprocess.TimeoutExpired:
+                return {
+                    'success': False,
+                    'error': "Timeout subprocess après 30 secondes",
+                    'files_created': files_created,
+                    'metadata': metadata_entries
+                }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': f"Erreur subprocess inattendue: {e}",
+                    'files_created': files_created,
+                    'metadata': metadata_entries
+                }
+    
+    return {
+        'success': True,
+        'files_created': files_created,
+        'metadata': metadata_entries
+    }
+
+
 def create_augmented_pool(
     audio_root: Path,
     output_dir: Path,
@@ -99,7 +247,8 @@ def create_augmented_pool(
     save_detailed_metadata: bool = False,
     specific_class: Optional[str] = None,
     low_memory: bool = False,
-    debug: bool = False
+    debug: bool = False,
+    workers: int = 1
 ) -> Dict:
     """
     Crée un pool augmenté équilibré pour toutes les classes.
@@ -109,6 +258,12 @@ def create_augmented_pool(
         output_dir: Répertoire de sortie pour le pool augmenté
         target_samples_per_class: Nombre cible d'échantillons par classe
         max_augmentations_per_sample: Maximum d'augmentations par échantillon
+        batch_size: Nombre de fichiers à traiter par batch
+        save_detailed_metadata: Sauvegarder les métadonnées détaillées
+        specific_class: Traiter uniquement cette classe
+        low_memory: Mode faible mémoire (utilise subprocess)
+        debug: Mode debug avec logs détaillés
+        workers: Nombre de processus parallèles (seulement en mode low_memory)
     
     Returns:
         Dictionnaire avec les statistiques du pool créé
@@ -119,7 +274,7 @@ def create_augmented_pool(
     logger.info(f"Cible: {target_samples_per_class} échantillons par classe")
     logger.info(f"Batch size: {batch_size} fichiers à la fois")
     if low_memory:
-        logger.info("Mode FAIBLE MÉMOIRE activé")
+        logger.info(f"Mode FAIBLE MÉMOIRE activé avec {workers} workers")
     if debug:
         logger.info("Mode DEBUG activé")
         logging.getLogger().setLevel(logging.DEBUG)
@@ -226,23 +381,59 @@ def create_augmented_pool(
         created_files = [] if save_detailed_metadata else None
         files_created_count = 0
         
-        # Traiter par batch pour gérer la mémoire
-        if debug:
-            logger.debug(f"  [DEBUG] Début du traitement par batch (batch_size={batch_size})")
-        
-        for batch_start in range(0, len(audio_files), batch_size):
-            batch_end = min(batch_start + batch_size, len(audio_files))
-            batch_files = audio_files[batch_start:batch_end]
+        # Si mode low_memory avec workers > 1, utiliser multiprocessing
+        if low_memory and workers > 1:
+            logger.info(f"  Utilisation de {workers} processus parallèles")
             
+            # Préparer les arguments pour multiprocessing
+            process_args = [
+                (audio_file, class_output_dir, augmentations_per_sample, augmentation_types, save_detailed_metadata)
+                for audio_file in audio_files
+            ]
+            
+            # Traiter avec Pool
+            with Pool(processes=workers) as pool:
+                try:
+                    results = list(tqdm(
+                        pool.imap(process_file_low_memory, process_args),
+                        total=len(audio_files),
+                        desc=f"  {class_name} (parallèle)"
+                    ))
+                    
+                    # Compiler les résultats
+                    for result in results:
+                        if result['success']:
+                            files_created_count += result['files_created']
+                            if save_detailed_metadata:
+                                created_files.extend(result['metadata'])
+                        else:
+                            logger.error(f"  {result['error']}")
+                            
+                except Exception as e:
+                    logger.error(f"  Erreur multiprocessing: {e}")
+                    
+            # Forcer le gc après le traitement parallèle
+            gc.collect()
+            
+        else:
+            # Mode séquentiel (original)
+            # Traiter par batch pour gérer la mémoire
             if debug:
-                logger.debug(f"  [DEBUG] Batch {batch_start//batch_size + 1}: indices {batch_start}-{batch_end}, {len(batch_files)} fichiers")
+                logger.debug(f"  [DEBUG] Début du traitement par batch (batch_size={batch_size})")
             
-            # Vérifier la mémoire disponible
-            memory_percent = psutil.virtual_memory().percent
-            if memory_percent > 85:
-                logger.warning(f"  Mémoire à {memory_percent}%, pause de 5 secondes...")
-                gc.collect()
-                time.sleep(5)
+            for batch_start in range(0, len(audio_files), batch_size):
+                batch_end = min(batch_start + batch_size, len(audio_files))
+                batch_files = audio_files[batch_start:batch_end]
+                
+                if debug:
+                    logger.debug(f"  [DEBUG] Batch {batch_start//batch_size + 1}: indices {batch_start}-{batch_end}, {len(batch_files)} fichiers")
+                
+                # Vérifier la mémoire disponible
+                memory_percent = psutil.virtual_memory().percent
+                if memory_percent > 85:
+                    logger.warning(f"  Mémoire à {memory_percent}%, pause de 5 secondes...")
+                    gc.collect()
+                    time.sleep(5)
             
             if debug:
                 logger.debug(f"  [DEBUG] Création de la barre de progression tqdm")
@@ -318,112 +509,161 @@ def create_augmented_pool(
                         logger.debug(f"  [DEBUG] Début création des augmentations")
                     
                     try:
-                        # Charger l'audio avec gestion mémoire
-                        # Utiliser backend sox_io pour une meilleure gestion mémoire
-                        if debug:
-                            logger.debug(f"  [DEBUG] Avant torchaudio.load de: {audio_file}")
-                        
-                        # Forcer le nettoyage avant le chargement
-                        gc.collect()
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
-                        
-                        # Petit délai pour laisser le système respirer
-                        time.sleep(0.1)
-                        
-                        if debug:
-                            logger.debug(f"  [DEBUG] Après gc.collect(), avant load effectif")
-                        
-                        try:
-                            waveform, sr = torchaudio.load(str(audio_file))
-                        except Exception as load_error:
-                            logger.error(f"  Impossible de charger {audio_file.name}: {load_error}")
-                            continue
-                        
-                        # Convertir en mono si nécessaire
-                        if waveform.shape[0] > 1:
-                            waveform = waveform.mean(dim=0, keepdim=True)
-                        
-                        for aug_idx in range(augmentations_per_sample):
-                            # Sélectionner le type d'augmentation
-                            aug_type = augmentation_types[aug_idx % len(augmentation_types)]
+                        if low_memory:
+                            # Mode faible mémoire: préparer toutes les augmentations pour un seul subprocess
+                            if debug:
+                                logger.debug(f"  [DEBUG] Mode low_memory: préparation batch d'augmentations")
                             
-                            # Varier la force de l'augmentation
-                            strength = 0.3 + (aug_idx / max(augmentations_per_sample - 1, 1)) * 0.7
+                            import subprocess
+                            import json as json_module
                             
-                            # Définir le nom de sortie
-                            aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
-                            aug_path = class_output_dir / aug_name
-                            
-                            if low_memory:
-                                # Mode faible mémoire: utiliser subprocess pour isoler complètement
-                                if debug:
-                                    logger.debug(f"  [DEBUG] Utilisation de subprocess pour l'augmentation")
+                            # Préparer toutes les augmentations
+                            augmentations = []
+                            for aug_idx in range(augmentations_per_sample):
+                                aug_type = augmentation_types[aug_idx % len(augmentation_types)]
+                                strength = 0.3 + (aug_idx / max(augmentations_per_sample - 1, 1)) * 0.7
+                                aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
+                                aug_path = class_output_dir / aug_name
                                 
-                                import subprocess
-                                import json as json_module
-                                
-                                # Préparer les paramètres
-                                params = {
-                                    'input_path': str(audio_file),
+                                augmentations.append({
                                     'output_path': str(aug_path),
                                     'aug_type': aug_type,
                                     'strength': strength
-                                }
-                                
-                                # Appeler le processeur isolé
-                                processor_path = Path(__file__).parent / 'process_single_augmentation.py'
-                                result = subprocess.run(
-                                    [sys.executable, str(processor_path)],
-                                    input=json_module.dumps(params),
-                                    capture_output=True,
-                                    text=True
-                                )
-                                
-                                if result.returncode != 0:
-                                    logger.error(f"  Erreur subprocess augmentation: {result.stderr}")
-                                    continue
-                                
-                                # Vérifier le résultat
-                                try:
-                                    response = json_module.loads(result.stdout)
-                                    if response['status'] != 'success':
-                                        logger.error(f"  Erreur augmentation: {response.get('error', 'Unknown')}")
-                                        continue
-                                except:
-                                    logger.error(f"  Réponse subprocess invalide: {result.stdout}")
-                                    continue
-                                    
-                            else:
-                                # Mode normal: utiliser le waveform déjà chargé
-                                aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
-                            
-                            # Sauvegarder (sauf en mode low_memory où c'est déjà fait)
-                            if not low_memory:
-                                torchaudio.save(str(aug_path), aug_waveform, sr)
-                            
-                            files_created_count += 1
-                            
-                            if save_detailed_metadata:
-                                created_files.append({
-                                    'filename': aug_name,
-                                    'type': 'augmented',
-                                    'source': audio_file.name,
-                                    'augmentation': aug_type,
-                                    'strength': strength
                                 })
                             
-                            # Libérer la mémoire de l'augmentation (seulement si elle existe)
-                            if not low_memory:
+                            # Préparer les paramètres pour le subprocess
+                            params = {
+                                'input_path': str(audio_file),
+                                'augmentations': augmentations
+                            }
+                            
+                            # Appeler le processeur avec toutes les augmentations
+                            processor_path = Path(__file__).parent / 'process_single_augmentation.py'
+                            
+                            # Ajouter retry pour gérer les erreurs transitoires
+                            max_retries = 2
+                            for retry in range(max_retries):
+                                try:
+                                    result = subprocess.run(
+                                        [sys.executable, str(processor_path)],
+                                        input=json_module.dumps(params),
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=30  # Timeout de 30 secondes
+                                    )
+                                    
+                                    if result.returncode != 0:
+                                        error_msg = result.stderr.strip() if result.stderr else "Code de retour non-zéro"
+                                        if retry < max_retries - 1:
+                                            logger.warning(f"  Retry {retry+1}/{max_retries} après erreur: {error_msg}")
+                                            time.sleep(1)
+                                            continue
+                                        else:
+                                            logger.error(f"  Erreur subprocess après {max_retries} essais: {error_msg}")
+                                            break
+                                    
+                                    # Vérifier le résultat
+                                    try:
+                                        response = json_module.loads(result.stdout)
+                                        if response['status'] == 'success':
+                                            # Compter les succès
+                                            for result_item in response.get('results', []):
+                                                if result_item['status'] == 'success':
+                                                    files_created_count += 1
+                                                    
+                                                    if save_detailed_metadata:
+                                                        # Extraire les infos du nom de fichier
+                                                        aug_filename = Path(result_item['output_path']).name
+                                                        # Parser le type et l'index depuis le nom
+                                                        parts = aug_filename.replace(audio_file.stem + '_', '').replace('.wav', '').split('_')
+                                                        aug_type_from_name = '_'.join(parts[1:]) if len(parts) > 1 else 'unknown'
+                                                        
+                                                        created_files.append({
+                                                            'filename': aug_filename,
+                                                            'type': 'augmented',
+                                                            'source': audio_file.name,
+                                                            'augmentation': aug_type_from_name
+                                                        })
+                                                else:
+                                                    logger.warning(f"  Échec augmentation: {result_item.get('error', 'Unknown')}")
+                                            break  # Sortir de la boucle retry
+                                        else:
+                                            logger.error(f"  Erreur batch augmentation: {response.get('error', 'Unknown')}")
+                                            break
+                                    except json_module.JSONDecodeError:
+                                        logger.error(f"  Réponse subprocess invalide: {result.stdout[:200]}")
+                                        if retry < max_retries - 1:
+                                            time.sleep(1)
+                                            continue
+                                    break  # Sortir si succès
+                                    
+                                except subprocess.TimeoutExpired:
+                                    logger.error(f"  Timeout subprocess après 30 secondes")
+                                    break
+                                except Exception as e:
+                                    logger.error(f"  Erreur subprocess inattendue: {e}")
+                                    break
+                            
+                            # Forcer le gc après le batch
+                            gc.collect()
+                            
+                        else:
+                            # Mode normal: charger l'audio et traiter en mémoire
+                            if debug:
+                                logger.debug(f"  [DEBUG] Mode normal: chargement audio")
+                            
+                            # Forcer le nettoyage avant le chargement
+                            gc.collect()
+                            if torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+                            
+                            # Petit délai pour laisser le système respirer
+                            time.sleep(0.1)
+                            
+                            try:
+                                waveform, sr = torchaudio.load(str(audio_file))
+                            except Exception as load_error:
+                                logger.error(f"  Impossible de charger {audio_file.name}: {load_error}")
+                                continue
+                            
+                            # Convertir en mono si nécessaire
+                            if waveform.shape[0] > 1:
+                                waveform = waveform.mean(dim=0, keepdim=True)
+                            
+                            for aug_idx in range(augmentations_per_sample):
+                                # Sélectionner le type d'augmentation
+                                aug_type = augmentation_types[aug_idx % len(augmentation_types)]
+                                
+                                # Varier la force de l'augmentation
+                                strength = 0.3 + (aug_idx / max(augmentations_per_sample - 1, 1)) * 0.7
+                                
+                                # Définir le nom de sortie
+                                aug_name = f"{audio_file.stem}_aug{aug_idx+1:03d}_{aug_type}.wav"
+                                aug_path = class_output_dir / aug_name
+                                
+                                # Appliquer l'augmentation
+                                aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
+                                
+                                # Sauvegarder
+                                torchaudio.save(str(aug_path), aug_waveform, sr)
+                                
+                                files_created_count += 1
+                                
+                                if save_detailed_metadata:
+                                    created_files.append({
+                                        'filename': aug_name,
+                                        'type': 'augmented',
+                                        'source': audio_file.name,
+                                        'augmentation': aug_type,
+                                        'strength': strength
+                                    })
+                                
+                                # Libérer la mémoire de l'augmentation
                                 del aug_waveform
                             
-                            # En mode faible mémoire, forcer le gc après chaque augmentation
-                            if low_memory:
-                                gc.collect()
-                        
-                        # Libérer la mémoire du waveform original
-                        del waveform
-                        gc.collect()
+                            # Libérer la mémoire du waveform original
+                            del waveform
+                            gc.collect()
                         
                     except Exception as e:
                         logger.error(f"  Erreur lors du traitement de {audio_file.name}: {e}")
@@ -518,6 +758,8 @@ def main():
                        help='Mode faible mémoire: recharge l\'audio pour chaque augmentation')
     parser.add_argument('--debug', action='store_true',
                        help='Activer les logs de debug détaillés')
+    parser.add_argument('--workers', type=int, default=1,
+                       help='Nombre de processus parallèles (seulement en mode --low-memory)')
     
     args = parser.parse_args()
     
@@ -530,7 +772,8 @@ def main():
         args.save_detailed_metadata,
         args.specific_class,
         args.low_memory,
-        args.debug
+        args.debug,
+        args.workers
     )
 
 

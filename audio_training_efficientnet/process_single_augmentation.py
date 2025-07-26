@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Processeur isolé pour créer une seule augmentation.
+Processeur isolé pour créer des augmentations.
 Utilisé par create_augmented_pool.py via subprocess pour éviter les fuites de mémoire.
+Peut traiter une seule augmentation ou plusieurs en batch.
 """
 
 import sys
@@ -55,29 +56,60 @@ def main():
     params = json.loads(sys.stdin.read())
     
     input_path = Path(params['input_path'])
-    output_path = Path(params['output_path'])
-    aug_type = params['aug_type']
-    strength = params['strength']
+    
+    # Support pour une seule augmentation (rétrocompatibilité)
+    if 'output_path' in params:
+        augmentations = [{
+            'output_path': params['output_path'],
+            'aug_type': params['aug_type'],
+            'strength': params['strength']
+        }]
+    else:
+        # Support pour plusieurs augmentations
+        augmentations = params['augmentations']
     
     try:
-        # Charger l'audio
+        # Charger l'audio une seule fois
         waveform, sr = torchaudio.load(str(input_path))
         
         # Convertir en mono si nécessaire
         if waveform.shape[0] > 1:
             waveform = waveform.mean(dim=0, keepdim=True)
         
-        # Appliquer l'augmentation
-        aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
+        # Traiter toutes les augmentations
+        results = []
+        for aug in augmentations:
+            try:
+                output_path = Path(aug['output_path'])
+                aug_type = aug['aug_type']
+                strength = aug['strength']
+                
+                # Appliquer l'augmentation
+                aug_waveform = apply_audio_augmentation(waveform, sr, aug_type, strength)
+                
+                # Sauvegarder
+                torchaudio.save(str(output_path), aug_waveform, sr)
+                
+                results.append({
+                    'output_path': str(output_path),
+                    'status': 'success'
+                })
+                
+            except Exception as e:
+                results.append({
+                    'output_path': str(aug.get('output_path', 'unknown')),
+                    'status': 'error',
+                    'error': str(e)
+                })
         
-        # Sauvegarder
-        torchaudio.save(str(output_path), aug_waveform, sr)
-        
-        # Retourner succès
-        print(json.dumps({'status': 'success'}))
+        # Retourner tous les résultats
+        print(json.dumps({
+            'status': 'success',
+            'results': results
+        }))
         
     except Exception as e:
-        # Retourner erreur
+        # Erreur lors du chargement du fichier
         print(json.dumps({
             'status': 'error',
             'error': str(e)
