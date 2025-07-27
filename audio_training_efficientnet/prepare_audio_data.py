@@ -159,6 +159,76 @@ def scan_audio_directory(audio_dir: Path, convert_mp3: bool = True) -> Dict[str,
     
     return class_files
 
+
+def limit_segments_per_class(segment_dir: Path, max_segments: int = 500) -> Dict[str, Dict[str, int]]:
+    """
+    Limite le nombre de segments par classe après la segmentation.
+    
+    Args:
+        segment_dir: Répertoire contenant les segments
+        max_segments: Nombre maximum de segments par classe
+        
+    Returns:
+        Dictionnaire avec les statistiques par classe
+    """
+    stats = {}
+    
+    print(f"\n🎯 Limitation à {max_segments} segments maximum par classe...")
+    
+    # Scanner chaque sous-dossier de classe
+    for class_dir in segment_dir.iterdir():
+        if not class_dir.is_dir() or class_dir.name.startswith('.'):
+            continue
+            
+        class_name = class_dir.name
+        
+        # Collecter tous les fichiers WAV dans ce dossier
+        wav_files = list(class_dir.glob('*.wav'))
+        total_segments = len(wav_files)
+        
+        if total_segments <= max_segments:
+            stats[class_name] = {
+                'total': total_segments,
+                'kept': total_segments,
+                'removed': 0
+            }
+            print(f"Classe '{class_name}': {total_segments} segments (tous conservés)")
+        else:
+            # Échantillonner aléatoirement max_segments fichiers
+            import random
+            random.seed(42)  # Pour la reproductibilité
+            
+            # Sélectionner les fichiers à garder
+            files_to_keep = set(random.sample(wav_files, max_segments))
+            files_to_remove = [f for f in wav_files if f not in files_to_keep]
+            
+            # Supprimer les fichiers excédentaires
+            for file_path in files_to_remove:
+                file_path.unlink()
+            
+            stats[class_name] = {
+                'total': total_segments,
+                'kept': max_segments,
+                'removed': len(files_to_remove)
+            }
+            
+            print(f"Classe '{class_name}': {total_segments} segments → {max_segments} conservés ({len(files_to_remove)} supprimés)")
+    
+    # Afficher le résumé
+    total_original = sum(s['total'] for s in stats.values())
+    total_kept = sum(s['kept'] for s in stats.values())
+    total_removed = sum(s['removed'] for s in stats.values())
+    
+    print(f"\n📊 Résumé de la limitation:")
+    print(f"   Total segments originaux: {total_original}")
+    print(f"   Total segments conservés: {total_kept}")
+    print(f"   Total segments supprimés: {total_removed}")
+    if total_removed > 0:
+        print(f"   Réduction: {total_removed/total_original*100:.1f}%")
+    
+    return stats
+
+
 def create_dataset_splits(class_files: Dict[str, List[Path]], 
                          train_ratio: float = 0.7,
                          val_ratio: float = 0.15,
@@ -344,6 +414,12 @@ def main():
         action='store_true',
         help="Ne pas convertir les fichiers MP3 en WAV"
     )
+    parser.add_argument(
+        '--max-segments-per-class',
+        type=int,
+        default=500,
+        help="Nombre maximum de segments par classe après segmentation (défaut: 500)"
+    )
     
     args = parser.parse_args()
     
@@ -406,6 +482,10 @@ def main():
             print("Aucun fichier n'a été segmenté (tous les fichiers sont déjà courts)")
         else:
             print(f"✅ Segmentation terminée. Segments créés dans: {segment_dir}")
+            
+            # Limiter le nombre de segments par classe si nécessaire
+            limit_stats = limit_segments_per_class(segment_dir, args.max_segments_per_class)
+            
             working_dir = segment_dir
     
     # Scanner le répertoire (original ou segmenté)
