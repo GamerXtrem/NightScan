@@ -1,24 +1,20 @@
 #!/usr/bin/env python3
 """
 Script de préparation des données audio pour NightScan
-Scanne les dossiers d'audio et crée les fichiers CSV pour l'entraînement
+Segmente les fichiers audio, filtre les silences et sauvegarde les métadonnées des classes
 """
 
 import os
 import sys
 from pathlib import Path
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
 import argparse
 import json
-from typing import List, Tuple, Dict, Union
+from typing import List, Dict
 import logging
 import subprocess
-import tempfile
 
-# Importer le module de segmentation
-from audio_segmentation import AudioSegmenter
+# Importer les modules de segmentation
+from audio_segmentation import AudioSegmenter, VocalActivitySegmenter
 
 logger = logging.getLogger(__name__)
 
@@ -116,14 +112,17 @@ def scan_audio_directory(audio_dir: Path, convert_mp3: bool = True) -> Dict[str,
         if mp3_files and convert_mp3:
             print(f"\nConversion des {len(mp3_files)} fichiers MP3 pour la classe '{class_name}'...")
             
-            # Créer un répertoire temporaire pour les conversions
-            temp_dir = audio_dir.parent / 'temp_wav_conversions' / class_name
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            
             for mp3_file in mp3_files:
-                # Créer le chemin de sortie WAV
-                wav_filename = mp3_file.stem + '.wav'
-                wav_path = temp_dir / wav_filename
+                # Créer le chemin de sortie WAV dans le même dossier
+                # Ajouter _converted pour éviter les conflits de noms
+                wav_filename = mp3_file.stem + '_converted.wav'
+                wav_path = mp3_file.parent / wav_filename
+                
+                # Vérifier si le fichier converti existe déjà
+                if wav_path.exists():
+                    print(f"   ⏭️  {wav_filename} existe déjà, passage au suivant")
+                    wav_files.append(wav_path)
+                    continue
                 
                 # Convertir le fichier
                 if convert_mp3_to_wav(mp3_file, wav_path):
@@ -136,8 +135,8 @@ def scan_audio_directory(audio_dir: Path, convert_mp3: bool = True) -> Dict[str,
         
         if wav_files:
             # Afficher le nombre de fichiers trouvés/convertis
-            original_wav_count = len([f for f in wav_files if 'temp_wav_conversions' not in str(f)])
-            converted_count = len([f for f in wav_files if 'temp_wav_conversions' in str(f)])
+            original_wav_count = len([f for f in wav_files if '_converted' not in f.name])
+            converted_count = len([f for f in wav_files if '_converted' in f.name])
             
             if converted_count > 0:
                 print(f"Classe '{class_name}': {original_wav_count} WAV originaux + {converted_count} MP3 convertis = {len(wav_files)} total")
@@ -184,6 +183,8 @@ def limit_segments_per_class(segment_dir: Path, max_segments: int = 500) -> Dict
         
         # Collecter tous les fichiers WAV dans ce dossier
         wav_files = list(class_dir.glob('*.wav'))
+        # Filtrer les fichiers cachés macOS (commençant par ._)
+        wav_files = [f for f in wav_files if not f.name.startswith('._')]
         total_segments = len(wav_files)
         
         if total_segments <= max_segments:
@@ -203,16 +204,22 @@ def limit_segments_per_class(segment_dir: Path, max_segments: int = 500) -> Dict
             files_to_remove = [f for f in wav_files if f not in files_to_keep]
             
             # Supprimer les fichiers excédentaires
+            removed_count = 0
             for file_path in files_to_remove:
-                file_path.unlink()
+                try:
+                    if file_path.exists():  # Vérifier que le fichier existe encore
+                        file_path.unlink()
+                        removed_count += 1
+                except Exception as e:
+                    logger.warning(f"Impossible de supprimer {file_path}: {e}")
             
             stats[class_name] = {
                 'total': total_segments,
                 'kept': max_segments,
-                'removed': len(files_to_remove)
+                'removed': removed_count
             }
             
-            print(f"Classe '{class_name}': {total_segments} segments → {max_segments} conservés ({len(files_to_remove)} supprimés)")
+            print(f"Classe '{class_name}': {total_segments} segments → {max_segments} conservés ({removed_count} supprimés)")
     
     # Afficher le résumé
     total_original = sum(s['total'] for s in stats.values())
@@ -229,97 +236,6 @@ def limit_segments_per_class(segment_dir: Path, max_segments: int = 500) -> Dict
     return stats
 
 
-def create_dataset_splits(class_files: Dict[str, List[Path]], 
-                         train_ratio: float = 0.7,
-                         val_ratio: float = 0.15,
-                         test_ratio: float = 0.15,
-                         random_state: int = 42) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    Crée les splits train/val/test avec stratification par classe.
-    
-    Args:
-        class_files: Dictionnaire {classe: [fichiers]}
-        train_ratio: Proportion pour l'entraînement
-        val_ratio: Proportion pour la validation
-        test_ratio: Proportion pour le test
-        random_state: Seed pour la reproductibilité
-        
-    Returns:
-        Tuple de DataFrames (train, val, test)
-    """
-    all_files = []
-    all_labels = []
-    
-    # Rassembler tous les fichiers et labels
-    for class_name, files in class_files.items():
-        for file_path in files:
-            all_files.append(str(file_path))
-            all_labels.append(class_name)
-    
-    # Créer un DataFrame
-    df = pd.DataFrame({
-        'filename': all_files,
-        'label': all_labels
-    })
-    
-    # Premier split: train+val vs test
-    train_val_df, test_df = train_test_split(
-        df, 
-        test_size=test_ratio,
-        stratify=df['label'],
-        random_state=random_state
-    )
-    
-    # Second split: train vs val
-    val_size = val_ratio / (train_ratio + val_ratio)
-    train_df, val_df = train_test_split(
-        train_val_df,
-        test_size=val_size,
-        stratify=train_val_df['label'],
-        random_state=random_state
-    )
-    
-    print(f"\nSplits créés:")
-    print(f"- Train: {len(train_df)} échantillons")
-    print(f"- Val: {len(val_df)} échantillons")
-    print(f"- Test: {len(test_df)} échantillons")
-    
-    # Afficher la distribution par classe
-    print("\nDistribution par classe:")
-    for split_name, split_df in [("Train", train_df), ("Val", val_df), ("Test", test_df)]:
-        print(f"\n{split_name}:")
-        print(split_df['label'].value_counts().to_string())
-    
-    return train_df, val_df, test_df
-
-def save_datasets(train_df: pd.DataFrame, 
-                  val_df: pd.DataFrame, 
-                  test_df: pd.DataFrame,
-                  output_dir: Path,
-                  relative_to: Path = None):
-    """
-    Sauvegarde les datasets en CSV.
-    
-    Args:
-        train_df, val_df, test_df: DataFrames à sauvegarder
-        output_dir: Répertoire de sortie pour les CSV
-        relative_to: Si fourni, les chemins seront relatifs à ce répertoire
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Convertir les chemins en relatifs si demandé
-    if relative_to:
-        for df in [train_df, val_df, test_df]:
-            df['filename'] = df['filename'].apply(
-                lambda p: str(Path(p).relative_to(relative_to))
-            )
-    
-    # Sauvegarder les CSV
-    train_df.to_csv(output_dir / 'train.csv', index=False)
-    val_df.to_csv(output_dir / 'val.csv', index=False)
-    test_df.to_csv(output_dir / 'test.csv', index=False)
-    
-    print(f"\nFichiers CSV sauvegardés dans: {output_dir}")
 
 def save_class_names(class_names: List[str], output_path: Path):
     """
@@ -352,31 +268,8 @@ def main():
     parser.add_argument(
         '--output-dir',
         type=Path,
-        default=Path('data/processed/csv'),
-        help="Répertoire de sortie pour les CSV (défaut: data/processed/csv)"
-    )
-    parser.add_argument(
-        '--train-ratio',
-        type=float,
-        default=0.7,
-        help="Proportion pour l'entraînement (défaut: 0.7)"
-    )
-    parser.add_argument(
-        '--val-ratio',
-        type=float,
-        default=0.15,
-        help="Proportion pour la validation (défaut: 0.15)"
-    )
-    parser.add_argument(
-        '--test-ratio',
-        type=float,
-        default=0.15,
-        help="Proportion pour le test (défaut: 0.15)"
-    )
-    parser.add_argument(
-        '--relative-paths',
-        action='store_true',
-        help="Utiliser des chemins relatifs dans les CSV"
+        default=Path('data/processed'),
+        help="Répertoire de sortie pour les métadonnées (défaut: data/processed)"
     )
     parser.add_argument(
         '--min-samples',
@@ -394,14 +287,8 @@ def main():
     parser.add_argument(
         '--segment-duration',
         type=float,
-        default=8.0,
-        help="Durée des segments en secondes (défaut: 8)"
-    )
-    parser.add_argument(
-        '--segment-overlap',
-        type=float,
-        default=2.0,
-        help="Chevauchement entre segments en secondes (défaut: 2)"
+        default=3.0,
+        help="Durée des segments en secondes (défaut: 3)"
     )
     parser.add_argument(
         '--segment-dir',
@@ -419,6 +306,12 @@ def main():
         type=int,
         default=500,
         help="Nombre maximum de segments par classe après segmentation (défaut: 500)"
+    )
+    parser.add_argument(
+        '--activity-threshold',
+        type=float,
+        default=-50.0,
+        help="Seuil d'énergie en dB pour la détection d'activité vocale (défaut: -50)"
     )
     
     args = parser.parse_args()
@@ -452,11 +345,15 @@ def main():
         else:
             segment_dir = args.segment_dir
         
-        # Créer le segmenteur
-        segmenter = AudioSegmenter(
+        # Créer le segmenteur avec détection d'activité vocale
+        print(f"\n🎤 Segmentation avec détection d'activité vocale")
+        print(f"   - Durée des segments: {args.segment_duration}s")
+        print(f"   - Seuil d'activité: {args.activity_threshold}dB")
+        
+        segmenter = VocalActivitySegmenter(
             segment_duration=args.segment_duration,
-            overlap=args.segment_overlap,
-            min_segment_duration=3.0
+            db_threshold=args.activity_threshold,
+            min_segment_duration=1.0
         )
         
         # Segmenter les fichiers (incluant les MP3 convertis dans temp_wav_conversions)
@@ -466,17 +363,8 @@ def main():
             preserve_structure=True
         )
         
-        # Si on a un dossier temp_wav_conversions, le segmenter aussi
-        temp_wav_dir = args.audio_dir.parent / 'temp_wav_conversions'
-        if temp_wav_dir.exists():
-            print("\n📂 Segmentation des fichiers MP3 convertis...")
-            temp_segments = segmenter.segment_directory(
-                temp_wav_dir,
-                segment_dir,
-                preserve_structure=True
-            )
-            if temp_segments:
-                segments_info.update(temp_segments)
+        # Note: Les MP3 ont été convertis directement dans leurs dossiers respectifs
+        # Pas besoin de segmenter un dossier temporaire
         
         if not segments_info:
             print("Aucun fichier n'a été segmenté (tous les fichiers sont déjà courts)")
@@ -510,23 +398,17 @@ def main():
         print("Erreur: Aucune classe n'a assez d'échantillons!")
         return 1
     
-    print(f"\n{len(filtered_classes)} classes retenues pour l'entraînement")
-    
-    # Créer les splits
-    train_df, val_df, test_df = create_dataset_splits(
-        filtered_classes,
-        train_ratio=args.train_ratio,
-        val_ratio=args.val_ratio,
-        test_ratio=args.test_ratio
-    )
-    
-    # Sauvegarder les CSV
-    relative_to = working_dir if args.relative_paths else None
-    save_datasets(train_df, val_df, test_df, args.output_dir, relative_to)
+    print(f"\n{len(filtered_classes)} classes retenues")
     
     # Sauvegarder les informations sur les classes
     class_names = list(filtered_classes.keys())
     save_class_names(class_names, args.output_dir / 'classes.json')
+    
+    # Afficher le résumé
+    print(f"\n📊 Résumé:")
+    for class_name, files in filtered_classes.items():
+        print(f"   - {class_name}: {len(files)} fichiers")
+    print(f"\n   Total: {sum(len(files) for files in filtered_classes.values())} fichiers")
     
     print("\n✅ Préparation des données terminée!")
     print(f"Classes détectées: {', '.join(sorted(class_names))}")
