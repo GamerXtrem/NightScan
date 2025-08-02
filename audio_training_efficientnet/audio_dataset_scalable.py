@@ -505,6 +505,7 @@ def create_scalable_data_loaders(
     batch_size: int = 32,
     num_workers: int = 4,
     spectrogram_cache_dir: Optional[Path] = None,
+    high_performance: bool = False,
     **dataset_kwargs
 ) -> Dict[str, DataLoader]:
     """
@@ -538,14 +539,25 @@ def create_scalable_data_loaders(
         shuffle = (split == 'train')
         drop_last = (split == 'train')
         
+        # Configuration des paramètres de performance
+        if high_performance and num_workers > 0:
+            # Mode haute performance pour serveurs avec beaucoup de RAM
+            persistent_workers = True
+            prefetch_factor = 4
+            logger.info(f"Mode haute performance activé pour {split}: persistent_workers=True, prefetch_factor=4")
+        else:
+            # Mode économe en mémoire (par défaut)
+            persistent_workers = False
+            prefetch_factor = 2 if num_workers > 0 else None
+        
         loader = DataLoader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
             num_workers=num_workers,
             pin_memory=torch.cuda.is_available(),
-            persistent_workers=False,  # Désactivé pour économiser la mémoire
-            prefetch_factor=2 if num_workers > 0 else None,
+            persistent_workers=persistent_workers,
+            prefetch_factor=prefetch_factor,
             drop_last=drop_last
         )
         

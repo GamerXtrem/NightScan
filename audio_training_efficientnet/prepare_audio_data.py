@@ -159,6 +159,120 @@ def scan_audio_directory(audio_dir: Path, convert_mp3: bool = True) -> Dict[str,
     return class_files
 
 
+def limit_segments_per_source(segment_dir: Path, max_segments_per_source: int = 5) -> Dict[str, Dict[str, int]]:
+    """
+    Limite le nombre de segments par fichier source pour éviter la sur-représentation.
+    
+    Args:
+        segment_dir: Répertoire contenant les segments
+        max_segments_per_source: Nombre maximum de segments par fichier source
+        
+    Returns:
+        Dictionnaire avec les statistiques par classe
+    """
+    import numpy as np
+    
+    stats = {}
+    
+    print(f"\n📊 Limitation à {max_segments_per_source} segments maximum par fichier source...")
+    
+    # Scanner chaque sous-dossier de classe
+    for class_dir in segment_dir.iterdir():
+        if not class_dir.is_dir() or class_dir.name.startswith('.'):
+            continue
+            
+        class_name = class_dir.name
+        
+        # Collecter tous les segments
+        wav_files = list(class_dir.glob('*.wav'))
+        wav_files = [f for f in wav_files if not f.name.startswith('._')]
+        
+        # Grouper par fichier source
+        segments_by_source = {}
+        for segment_file in wav_files:
+            # Extraire le nom du fichier source (avant '_segment_')
+            if '_segment_' in segment_file.stem:
+                source_name = segment_file.stem.split('_segment_')[0]
+            else:
+                source_name = segment_file.stem
+            
+            if source_name not in segments_by_source:
+                segments_by_source[source_name] = []
+            segments_by_source[source_name].append(segment_file)
+        
+        # Statistiques
+        total_segments = len(wav_files)
+        kept_segments = []
+        removed_count = 0
+        
+        # Traiter chaque fichier source
+        for source_name, source_segments in segments_by_source.items():
+            # Trier les segments par ordre numérique si possible
+            try:
+                # Extraire les numéros de segment
+                def get_segment_number(f):
+                    if '_segment_' in f.stem:
+                        try:
+                            return int(f.stem.split('_segment_')[1].split('_')[0])
+                        except:
+                            return 0
+                    return 0
+                
+                source_segments.sort(key=get_segment_number)
+            except:
+                # Si échec, garder l'ordre alphabétique
+                source_segments.sort()
+            
+            n_segments = len(source_segments)
+            
+            if n_segments <= max_segments_per_source:
+                # Garder tous les segments
+                kept_segments.extend(source_segments)
+            else:
+                # Sélectionner des segments espacés uniformément
+                # Utiliser linspace pour avoir des indices espacés
+                indices = np.linspace(0, n_segments - 1, max_segments_per_source, dtype=int)
+                
+                # Garder les segments sélectionnés
+                for i in indices:
+                    kept_segments.append(source_segments[i])
+                
+                # Supprimer les autres
+                for i, segment in enumerate(source_segments):
+                    if i not in indices:
+                        try:
+                            if segment.exists():
+                                segment.unlink()
+                                removed_count += 1
+                        except Exception as e:
+                            logger.warning(f"Impossible de supprimer {segment}: {e}")
+        
+        stats[class_name] = {
+            'total': total_segments,
+            'kept': len(kept_segments),
+            'removed': removed_count,
+            'sources': len(segments_by_source)
+        }
+        
+        print(f"Classe '{class_name}': {total_segments} segments de {len(segments_by_source)} sources → {len(kept_segments)} conservés")
+    
+    # Afficher le résumé
+    total_original = sum(s['total'] for s in stats.values())
+    total_kept = sum(s['kept'] for s in stats.values())
+    total_removed = sum(s['removed'] for s in stats.values())
+    total_sources = sum(s['sources'] for s in stats.values())
+    
+    print(f"\n📊 Résumé de la limitation par source:")
+    print(f"   Total fichiers sources: {total_sources}")
+    print(f"   Total segments originaux: {total_original}")
+    print(f"   Total segments conservés: {total_kept}")
+    print(f"   Total segments supprimés: {total_removed}")
+    if total_removed > 0:
+        print(f"   Réduction: {total_removed/total_original*100:.1f}%")
+    
+    return stats
+
+
 def limit_segments_per_class(segment_dir: Path, max_segments: int = 500) -> Dict[str, Dict[str, int]]:
     """
     Limite le nombre de segments par classe après la segmentation.
@@ -308,6 +422,12 @@ def main():
         help="Nombre maximum de segments par classe après segmentation (défaut: 500)"
     )
     parser.add_argument(
+        '--max-segments-per-source',
+        type=int,
+        default=5,
+        help="Nombre maximum de segments par fichier source pour éviter la sur-représentation (défaut: 5)"
+    )
+    parser.add_argument(
         '--activity-threshold',
         type=float,
         default=-50.0,
@@ -371,7 +491,10 @@ def main():
         else:
             print(f"✅ Segmentation terminée. Segments créés dans: {segment_dir}")
             
-            # Limiter le nombre de segments par classe si nécessaire
+            # D'abord limiter par source pour éviter la sur-représentation
+            source_stats = limit_segments_per_source(segment_dir, args.max_segments_per_source)
+            
+            # Ensuite limiter le nombre total de segments par classe si nécessaire
             limit_stats = limit_segments_per_class(segment_dir, args.max_segments_per_class)
             
             working_dir = segment_dir

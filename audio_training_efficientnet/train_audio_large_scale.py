@@ -165,6 +165,8 @@ def main():
                        help='Nombre de workers pour le chargement')
     parser.add_argument('--spectrogram-cache-dir', type=Path, default=None,
                        help='Répertoire contenant les spectrogrammes pré-générés')
+    parser.add_argument('--high-performance', action='store_true',
+                       help='Mode haute performance: persistent_workers=True, prefetch_factor=4 (nécessite plus de RAM)')
     
     # Sauvegarde
     parser.add_argument('--output-dir', type=str, default='models_large_scale',
@@ -202,12 +204,16 @@ def main():
     
     # Créer les datasets
     logger.info("Chargement des datasets...")
+    if args.high_performance:
+        logger.info("Mode haute performance activé (persistent_workers=True, prefetch_factor=4)")
+    
     loaders = create_scalable_data_loaders(
         index_db=args.index_db,
         audio_root=Path(args.audio_root),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        spectrogram_cache_dir=args.spectrogram_cache_dir
+        spectrogram_cache_dir=args.spectrogram_cache_dir,
+        high_performance=args.high_performance
     )
     
     if 'train' not in loaders:
