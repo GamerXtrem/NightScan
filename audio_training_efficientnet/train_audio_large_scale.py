@@ -39,6 +39,37 @@ def get_memory_usage():
     return process.memory_info().rss / 1024 / 1024
 
 
+def get_num_classes_from_db(index_db: str) -> int:
+    """
+    Détecte automatiquement le nombre de classes depuis la base SQLite.
+    
+    Args:
+        index_db: Chemin vers la base SQLite d'index
+        
+    Returns:
+        Nombre de classes distinctes dans le dataset
+    """
+    import sqlite3
+    
+    conn = sqlite3.connect(index_db)
+    cursor = conn.cursor()
+    
+    # Compter les classes distinctes dans le split train
+    cursor.execute("SELECT COUNT(DISTINCT class_name) FROM audio_samples WHERE split='train'")
+    num_classes = cursor.fetchone()[0]
+    
+    # Récupérer aussi la liste des classes pour vérification
+    cursor.execute("SELECT DISTINCT class_name FROM audio_samples WHERE split='train' ORDER BY class_name")
+    class_names = [row[0] for row in cursor.fetchall()]
+    
+    conn.close()
+    
+    logger.info(f"Détection automatique : {num_classes} classes trouvées dans la base")
+    logger.info(f"Classes (premières 10) : {class_names[:10]}{'...' if len(class_names) > 10 else ''}")
+    
+    return num_classes
+
+
 def train_one_epoch(model, train_loader, criterion, optimizer, scaler, device, epoch, 
                    accumulation_steps=4, log_interval=100):
     """
@@ -143,8 +174,8 @@ def main():
                        choices=['efficientnet-b1', 'efficientnet-b2', 'efficientnet-b3', 
                                'efficientnet-b4', 'efficientnet-b5'],
                        help='Architecture du modèle (défaut: efficientnet-b3)')
-    parser.add_argument('--num-classes', type=int, default=1500,
-                       help='Nombre de classes (défaut: 1500)')
+    parser.add_argument('--num-classes', type=int, default=0,
+                       help='Nombre de classes (0=détection auto, défaut: 0)')
     parser.add_argument('--pretrained', action='store_true', default=True,
                        help='Utiliser les poids pré-entraînés')
     
@@ -180,7 +211,7 @@ def main():
     logger.info("=== NightScan Large Scale Training ===")
     logger.info(f"Configuration:")
     logger.info(f"  Model: {args.model}")
-    logger.info(f"  Classes: {args.num_classes}")
+    logger.info(f"  Classes: {'AUTO-DETECT' if args.num_classes == 0 else args.num_classes}")
     logger.info(f"  Batch size: {args.batch_size}")
     logger.info(f"  Effective batch: {args.batch_size * args.accumulation_steps}")
     logger.info(f"  Epochs: {args.epochs}")
@@ -202,6 +233,20 @@ def main():
             output_db=args.index_db
         )
     
+    # Détection automatique du nombre de classes si nécessaire
+    if args.num_classes == 0:
+        logger.info("Détection automatique du nombre de classes...")
+        detected_num_classes = get_num_classes_from_db(args.index_db)
+        args.num_classes = detected_num_classes
+        logger.info(f"✅ Nombre de classes défini automatiquement : {args.num_classes}")
+    else:
+        logger.info(f"Nombre de classes spécifié manuellement : {args.num_classes}")
+        # Vérifier la cohérence avec la base
+        detected_num_classes = get_num_classes_from_db(args.index_db)
+        if detected_num_classes != args.num_classes:
+            logger.warning(f"⚠️  ATTENTION : {detected_num_classes} classes dans la base mais {args.num_classes} spécifié!")
+            logger.warning("Utilisation de la valeur spécifiée, mais cela pourrait causer des erreurs!")
+    
     # Créer les datasets
     logger.info("Chargement des datasets...")
     if args.high_performance:
@@ -215,6 +260,13 @@ def main():
         spectrogram_cache_dir=args.spectrogram_cache_dir,
         high_performance=args.high_performance
     )
+    
+    # Récupérer les noms de classes depuis le dataset
+    if 'train' in loaders:
+        train_dataset = loaders['train'].dataset
+        class_names = train_dataset.class_names
+        logger.info(f"Classes détectées: {len(class_names)}")
+        logger.info(f"Ordre des classes (premières 10): {class_names[:10]}")
     
     if 'train' not in loaders:
         logger.error("Aucun dataset d'entraînement trouvé!")
@@ -303,7 +355,10 @@ def main():
                     'train_acc': train_acc,
                     'val_loss': val_loss,
                     'val_acc': val_acc,
-                    'args': args
+                    'args': args,
+                    'class_names': class_names,
+                    'num_classes': args.num_classes,
+                    'model_name': args.model
                 }, best_model_path)
                 logger.info(f"✅ Nouveau meilleur modèle sauvegardé! Val Acc: {val_acc:.2f}%")
         
@@ -344,7 +399,8 @@ def main():
         'model_state_dict': model.state_dict(),
         'num_classes': args.num_classes,
         'model_name': args.model,
-        'history': history
+        'history': history,
+        'class_names': class_names
     }, final_model_path)
     logger.info(f"\nModèle final sauvegardé: {final_model_path}")
     
