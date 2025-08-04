@@ -231,6 +231,9 @@ class ModelBasedDetector:
         Returns:
             Spectrogramme mel en dB (3, n_mels, time)
         """
+        # S'assurer que l'audio est sur le bon device
+        audio = audio.to(self.device)
+        
         # Calculer le spectrogramme mel
         mel_spec = self.mel_transform(audio)
         
