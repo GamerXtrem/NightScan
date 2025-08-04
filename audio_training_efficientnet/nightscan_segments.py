@@ -29,7 +29,9 @@ def run_analysis(audio_input: Path,
                 device: str = None,
                 verbose: bool = False,
                 limit_files: int = None,
-                single_file: Path = None) -> bool:
+                single_file: Path = None,
+                log_file: Path = None,
+                progress_interval: int = 10) -> bool:
     """
     Exécute la première passe : analyse des fichiers audio.
     
@@ -58,6 +60,10 @@ def run_analysis(audio_input: Path,
         cmd.extend(["--limit-files", str(limit_files)])
     if single_file:
         cmd.extend(["--single-file", str(single_file)])
+    if log_file:
+        cmd.extend(["--log-file", str(log_file)])
+    if progress_interval != 10:
+        cmd.extend(["--progress-interval", str(progress_interval)])
     
     try:
         result = subprocess.run(cmd, check=True)
@@ -166,6 +172,10 @@ def main():
                                help='Limiter aux N premiers fichiers')
     analyze_parser.add_argument('--single-file', type=Path, default=None,
                                help='Traiter un seul fichier spécifique')
+    analyze_parser.add_argument('--log-file', type=Path, default=None,
+                               help='Fichier de log pour la progression (utile en multiprocessing)')
+    analyze_parser.add_argument('--progress-interval', type=int, default=10,
+                               help='Intervalle de mise à jour de la progression en secondes (défaut: 10)')
     
     # Commande "extract" - Extraction seulement
     extract_parser = subparsers.add_parser('extract', help='Extraction seulement (passe 2)')
@@ -229,7 +239,9 @@ def main():
             args.device,
             args.verbose,
             args.limit_files,
-            args.single_file
+            args.single_file,
+            getattr(args, 'log_file', None),
+            getattr(args, 'progress_interval', 10)
         )
         
         if not success:
@@ -269,7 +281,9 @@ def main():
             args.device,
             args.verbose,
             args.limit_files,
-            args.single_file
+            args.single_file,
+            args.log_file,
+            args.progress_interval
         )
         
         if success:
