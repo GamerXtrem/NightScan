@@ -184,6 +184,28 @@ def main():
     extract_parser.add_argument('--dry-run', action='store_true',
                                help='Mode simulation - ne pas extraire les fichiers')
     
+    # Commande "extract-balanced" - Extraction équilibrée
+    balanced_parser = subparsers.add_parser('extract-balanced', 
+                                          help='Extraction équilibrée (max par classe ET par fichier)')
+    balanced_parser.add_argument('--audio-input', type=Path, required=True,
+                                help='Répertoire contenant les fichiers audio originaux')
+    balanced_parser.add_argument('--results', type=Path, required=True,
+                                help='Répertoire contenant les résultats CSV')
+    balanced_parser.add_argument('--output', type=Path, required=True,
+                                help='Répertoire de sortie pour les segments')
+    balanced_parser.add_argument('--max-per-class', type=int, default=500,
+                                help='Nombre max de segments par espèce (défaut: 500)')
+    balanced_parser.add_argument('--max-per-file', type=int, default=5,
+                                help='Nombre max de segments par fichier audio (défaut: 5)')
+    balanced_parser.add_argument('--threads', type=int, default=1,
+                                help='Nombre de threads CPU (défaut: 1)')
+    balanced_parser.add_argument('--verbose', action='store_true',
+                                help='Mode verbose - affiche les détails')
+    balanced_parser.add_argument('--dry-run', action='store_true',
+                                help='Mode simulation - ne pas extraire les fichiers')
+    balanced_parser.add_argument('--limit-species', type=int, default=None,
+                                help='Limiter au N premières espèces (pour tests)')
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -279,6 +301,36 @@ def main():
         try:
             subprocess.run(cmd, check=True)
             logger.info("✅ Extraction terminée avec succès!")
+            logger.info(f"Segments dans : {args.output}")
+        except subprocess.CalledProcessError:
+            sys.exit(1)
+    
+    elif args.command == 'extract-balanced':
+        # Extraction équilibrée
+        args.output.mkdir(parents=True, exist_ok=True)
+        
+        # Appeler le script d'extraction équilibrée
+        cmd = [
+            sys.executable,
+            "extract_segments_balanced.py",
+            "--audio-input", str(args.audio_input),
+            "--results", str(args.results),
+            "--output", str(args.output),
+            "--max-per-class", str(args.max_per_class),
+            "--max-per-file", str(args.max_per_file),
+            "--threads", str(args.threads)
+        ]
+        
+        if args.verbose:
+            cmd.append("--verbose")
+        if args.dry_run:
+            cmd.append("--dry-run")
+        if args.limit_species:
+            cmd.extend(["--limit-species", str(args.limit_species)])
+        
+        try:
+            subprocess.run(cmd, check=True)
+            logger.info("✅ Extraction équilibrée terminée avec succès!")
             logger.info(f"Segments dans : {args.output}")
         except subprocess.CalledProcessError:
             sys.exit(1)
