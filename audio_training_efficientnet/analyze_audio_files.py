@@ -188,6 +188,20 @@ def init_worker(model_path: str, training_db: str, device: str, output_dir: Path
     logger.info(f"Worker initialisé (PID: {os.getpid()})")
 
 
+def process_single_file_mp_wrapper(args: Tuple[Path, bool]) -> Dict:
+    """
+    Wrapper pour process_single_file_mp compatible avec multiprocessing.
+    
+    Args:
+        args: Tuple (audio_file, verbose)
+        
+    Returns:
+        Dict avec les statistiques du traitement
+    """
+    audio_file, verbose = args
+    return process_single_file_mp(audio_file, verbose)
+
+
 def process_single_file_mp(audio_file: Path, verbose: bool = False) -> Dict:
     """
     Version multiprocessing de process_single_file.
@@ -456,6 +470,8 @@ def main():
                        help='Fichier de log pour la progression (utile en multiprocessing)')
     parser.add_argument('--progress-interval', type=int, default=10,
                        help='Intervalle de mise à jour de la progression en secondes (défaut: 10)')
+    parser.add_argument('--disable-multiprocessing', action='store_true',
+                       help='Désactiver le multiprocessing et forcer le mode single-thread')
     
     args = parser.parse_args()
     
@@ -468,6 +484,11 @@ def main():
     if not audio_files:
         logger.error("Aucun fichier audio trouvé!")
         return
+    
+    # Forcer single-thread si désactivé
+    if args.disable_multiprocessing:
+        args.threads = 1
+        logger.info("Multiprocessing désactivé, utilisation du mode single-thread")
     
     # Créer l'analyseur uniquement pour le mode single-thread
     analyzer = None
@@ -554,7 +575,7 @@ def main():
                 logger.info("Traitement en cours...")
                 
                 for result in pool.imap_unordered(
-                    lambda args: process_single_file_mp(*args),
+                    process_single_file_mp_wrapper,
                     arg_generator(),
                     chunksize=chunksize
                 ):
