@@ -13,8 +13,11 @@ from pathlib import Path
 import logging
 from typing import List, Dict, Optional, Tuple
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool, cpu_count, Manager, Queue
 import json
+import time
+from datetime import datetime, timedelta
+import threading
 
 # Ajouter le chemin parent pour les imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -36,6 +39,8 @@ _global_window_size = None
 _global_hop_size = None
 _global_min_conf = None
 _global_energy_threshold = None
+_global_progress_dict = None
+_global_start_time = None
 
 
 class AudioAnalyzer:
@@ -144,7 +149,8 @@ class AudioAnalyzer:
 
 
 def init_worker(model_path: str, training_db: str, device: str, output_dir: Path,
-                window_size: float, hop_size: float, min_conf: float, energy_threshold: float):
+                window_size: float, hop_size: float, min_conf: float, energy_threshold: float,
+                progress_dict: dict, start_time: float):
     """
     Initialise un worker pour le multiprocessing.
     Charge le modèle une seule fois par processus.
@@ -158,9 +164,12 @@ def init_worker(model_path: str, training_db: str, device: str, output_dir: Path
         hop_size: Décalage entre fenêtres
         min_conf: Confiance minimale
         energy_threshold: Seuil d'énergie
+        progress_dict: Dictionnaire partagé pour la progression
+        start_time: Temps de démarrage
     """
     global _global_analyzer, _global_output_dir, _global_window_size
     global _global_hop_size, _global_min_conf, _global_energy_threshold
+    global _global_progress_dict, _global_start_time
     
     # Créer l'analyseur une seule fois
     _global_analyzer = AudioAnalyzer(
@@ -175,6 +184,8 @@ def init_worker(model_path: str, training_db: str, device: str, output_dir: Path
     _global_hop_size = hop_size
     _global_min_conf = min_conf
     _global_energy_threshold = energy_threshold
+    _global_progress_dict = progress_dict
+    _global_start_time = start_time
     
     logger.info(f"Worker initialisé (PID: {os.getpid()})")
 
@@ -233,6 +244,11 @@ def process_single_file_mp(audio_file: Path, verbose: bool = False) -> Dict:
         # Sauvegarder les résultats
         _global_analyzer.save_results(detections, output_file, audio_file)
         
+        # Mettre à jour la progression
+        _global_progress_dict['processed'] += 1
+        _global_progress_dict['successful'] += 1
+        _global_progress_dict['total_detections'] += len(detections)
+        
         return {
             'status': 'success',
             'file': str(audio_file),
@@ -242,6 +258,11 @@ def process_single_file_mp(audio_file: Path, verbose: bool = False) -> Dict:
         
     except Exception as e:
         logger.error(f"Erreur lors du traitement de {audio_file}: {e}")
+        
+        # Mettre à jour la progression
+        _global_progress_dict['processed'] += 1
+        _global_progress_dict['errors'] += 1
+        
         return {
             'status': 'error',
             'file': str(audio_file),
@@ -320,6 +341,51 @@ def process_single_file(args: Tuple[Path, AudioAnalyzer, Path, float, float, flo
         }
 
 
+def progress_monitor(progress_dict: dict, total_files: int, log_file: Optional[Path] = None, 
+                    update_interval: int = 5):
+    """
+    Thread de monitoring qui affiche la progression périodiquement.
+    
+    Args:
+        progress_dict: Dictionnaire partagé contenant la progression
+        total_files: Nombre total de fichiers à traiter
+        log_file: Fichier de log optionnel
+        update_interval: Intervalle de mise à jour en secondes
+    """
+    start_time = progress_dict['start_time']
+    
+    while progress_dict['processed'] < total_files:
+        time.sleep(update_interval)
+        
+        # Calculer les statistiques
+        processed = progress_dict['processed']
+        if processed == 0:
+            continue
+            
+        elapsed = time.time() - start_time
+        rate = processed / elapsed
+        remaining = (total_files - processed) / rate if rate > 0 else 0
+        
+        # Créer le message de progression
+        msg = (
+            f"\n{'='*60}\n"
+            f"PROGRESSION: {processed}/{total_files} fichiers ({processed/total_files*100:.1f}%)\n"
+            f"Réussis: {progress_dict['successful']} | Erreurs: {progress_dict['errors']}\n"
+            f"Détections totales: {progress_dict['total_detections']}\n"
+            f"Vitesse: {rate:.1f} fichiers/sec\n"
+            f"Temps écoulé: {timedelta(seconds=int(elapsed))}\n"
+            f"Temps restant estimé: {timedelta(seconds=int(remaining))}\n"
+            f"{'='*60}"
+        )
+        
+        # Afficher et logger
+        print(msg)
+        
+        if log_file:
+            with open(log_file, 'a') as f:
+                f.write(f"{datetime.now().isoformat()} - {msg}\n")
+
+
 def parse_folders(audio_dir: Path, extensions: List[str] = ['.wav', '.mp3', '.flac']) -> List[Path]:
     """
     Parse le dossier audio pour trouver tous les fichiers à analyser.
@@ -387,6 +453,10 @@ def main():
                        help="Limiter le traitement aux N premiers fichiers (pour debug)")
     parser.add_argument('--single-file', type=Path, default=None,
                        help="Traiter un seul fichier spécifique en mode détaillé")
+    parser.add_argument('--log-file', type=Path, default=None,
+                       help='Fichier de log pour la progression (utile en multiprocessing)')
+    parser.add_argument('--progress-interval', type=int, default=10,
+                       help='Intervalle de mise à jour de la progression en secondes (défaut: 10)')
     
     args = parser.parse_args()
     
@@ -442,6 +512,24 @@ def main():
         # Mode multi-thread avec Pool
         logger.info(f"Utilisation du multiprocessing avec {args.threads} threads")
         
+        # Créer un manager pour partager des données entre processus
+        manager = Manager()
+        progress_dict = manager.dict({
+            'processed': 0,
+            'successful': 0,
+            'errors': 0,
+            'total_detections': 0,
+            'start_time': time.time()
+        })
+        
+        # Démarrer le thread de monitoring
+        monitor_thread = threading.Thread(
+            target=progress_monitor,
+            args=(progress_dict, len(audio_files), args.log_file, args.progress_interval),
+            daemon=True
+        )
+        monitor_thread.start()
+        
         # Calculer la taille de chunk optimale
         chunksize = max(1, len(audio_files) // (args.threads * 10))
         logger.info(f"Chunksize: {chunksize}")
@@ -458,18 +546,19 @@ def main():
                 args.seg_length,
                 args.hop_size,
                 args.min_conf,
-                args.energy_threshold
+                args.energy_threshold,
+                progress_dict,
+                time.time()
             )
         ) as pool:
             # Préparer les arguments pour chaque fichier
             file_args = [(f, args.verbose) for f in audio_files]
             
-            # Traiter les fichiers en parallèle
-            results = list(tqdm(
-                pool.starmap(process_single_file_mp, file_args, chunksize=chunksize),
-                total=len(audio_files),
-                desc="Analyse des fichiers (multiprocessing)"
-            ))
+            # Traiter les fichiers en parallèle (sans tqdm pour éviter les conflits)
+            if args.verbose:
+                logger.info("Traitement en cours... Surveillez la progression ci-dessous.")
+            
+            results = pool.starmap(process_single_file_mp, file_args, chunksize=chunksize)
     
     # Compiler les statistiques
     for result in results:
@@ -503,12 +592,18 @@ def main():
         json.dump(summary, f, indent=2)
     
     # Afficher le résumé
+    # Afficher un résumé final plus détaillé
     print(f"\n{'='*60}")
-    print("RÉSUMÉ DE L'ANALYSE")
+    print("RÉSUMÉ FINAL DE L'ANALYSE")
     print(f"{'='*60}")
     print(f"Fichiers analysés : {successful_files}/{len(audio_files)}")
     print(f"Erreurs : {error_files}")
     print(f"Total détections : {total_detections}")
+    
+    if args.threads >= 2:
+        elapsed = time.time() - progress_dict['start_time']
+        print(f"\nTemps total : {timedelta(seconds=int(elapsed))}")
+        print(f"Vitesse moyenne : {len(audio_files)/elapsed:.2f} fichiers/sec")
     
     if total_detections > 0:
         print(f"Moyenne détections/fichier : {total_detections/successful_files:.1f}")
