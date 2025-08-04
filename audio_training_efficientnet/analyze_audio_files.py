@@ -13,11 +13,13 @@ from pathlib import Path
 import logging
 from typing import List, Dict, Optional, Tuple
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count, Manager, Queue
+from multiprocessing import Pool, cpu_count, Manager, Queue, Value, Lock
 import json
 import time
 from datetime import datetime, timedelta
 import threading
+import queue
+import signal
 
 # Ajouter le chemin parent pour les imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -39,8 +41,7 @@ _global_window_size = None
 _global_hop_size = None
 _global_min_conf = None
 _global_energy_threshold = None
-_global_progress_dict = None
-_global_start_time = None
+_global_result_queue = None
 
 
 class AudioAnalyzer:
@@ -148,9 +149,75 @@ class AudioAnalyzer:
         logger.debug(f"Résultats sauvegardés : {output_path} ({len(detections)} détections)")
 
 
+class ProgressTracker:
+    """Classe thread-safe pour suivre la progression avec des compteurs atomiques."""
+    
+    def __init__(self):
+        self.processed = Value('i', 0)
+        self.successful = Value('i', 0)
+        self.errors = Value('i', 0)
+        self.total_detections = Value('i', 0)
+        self.start_time = time.time()
+        
+    def increment_processed(self):
+        with self.processed.get_lock():
+            self.processed.value += 1
+            
+    def increment_successful(self):
+        with self.successful.get_lock():
+            self.successful.value += 1
+            
+    def increment_errors(self):
+        with self.errors.get_lock():
+            self.errors.value += 1
+            
+    def add_detections(self, count):
+        with self.total_detections.get_lock():
+            self.total_detections.value += count
+            
+    def get_stats(self):
+        """Retourne les statistiques actuelles de manière thread-safe."""
+        return {
+            'processed': self.processed.value,
+            'successful': self.successful.value,
+            'errors': self.errors.value,
+            'total_detections': self.total_detections.value,
+            'elapsed': time.time() - self.start_time
+        }
+
+
+def result_collector(result_queue: Queue, progress_tracker: ProgressTracker, stop_event: threading.Event):
+    """
+    Thread qui collecte les résultats depuis la queue et met à jour les compteurs.
+    
+    Args:
+        result_queue: Queue contenant les résultats des workers
+        progress_tracker: Objet ProgressTracker pour les compteurs
+        stop_event: Event pour arrêter le thread
+    """
+    while not stop_event.is_set() or not result_queue.empty():
+        try:
+            # Timeout pour vérifier stop_event régulièrement
+            result = result_queue.get(timeout=0.5)
+            
+            # Mettre à jour les compteurs
+            progress_tracker.increment_processed()
+            
+            if result['status'] == 'success':
+                progress_tracker.increment_successful()
+                progress_tracker.add_detections(result['detections'])
+            else:
+                progress_tracker.increment_errors()
+                
+        except queue.Empty:
+            continue
+        except Exception as e:
+            logger.error(f"Erreur dans result_collector: {e}")
+
+
 def init_worker(model_path: str, training_db: str, device: str, output_dir: Path,
                 window_size: float, hop_size: float, min_conf: float, energy_threshold: float,
-                progress_dict: dict, start_time: float):
+                result_queue: Queue):
     """
     Initialise un worker pour le multiprocessing.
     Charge le modèle une seule fois par processus.
@@ -164,12 +231,11 @@ def init_worker(model_path: str, training_db: str, device: str, output_dir: Path
         hop_size: Décalage entre fenêtres
         min_conf: Confiance minimale
         energy_threshold: Seuil d'énergie
-        progress_dict: Dictionnaire partagé pour la progression
-        start_time: Temps de démarrage
+        result_queue: Queue pour envoyer les résultats
     """
     global _global_analyzer, _global_output_dir, _global_window_size
     global _global_hop_size, _global_min_conf, _global_energy_threshold
-    global _global_progress_dict, _global_start_time
+    global _global_result_queue
     
     # Créer l'analyseur une seule fois
     _global_analyzer = AudioAnalyzer(
@@ -184,8 +250,7 @@ def init_worker(model_path: str, training_db: str, device: str, output_dir: Path
     _global_hop_size = hop_size
     _global_min_conf = min_conf
     _global_energy_threshold = energy_threshold
-    _global_progress_dict = progress_dict
-    _global_start_time = start_time
+    _global_result_queue = result_queue
     
     logger.info(f"Worker initialisé (PID: {os.getpid()})")
 
@@ -244,30 +309,33 @@ def process_single_file_mp(audio_file: Path, verbose: bool = False) -> Dict:
         # Sauvegarder les résultats
         _global_analyzer.save_results(detections, output_file, audio_file)
         
-        # Mettre à jour la progression
-        _global_progress_dict['processed'] += 1
-        _global_progress_dict['successful'] += 1
-        _global_progress_dict['total_detections'] += len(detections)
-        
-        return {
+        # Créer le résultat
+        result = {
             'status': 'success',
             'file': str(audio_file),
             'detections': len(detections),
             'class': class_name
         }
         
+        # Envoyer le résultat dans la queue
+        _global_result_queue.put(result)
+        
+        return result
+        
     except Exception as e:
         logger.error(f"Erreur lors du traitement de {audio_file}: {e}")
         
-        # Mettre à jour la progression
-        _global_progress_dict['processed'] += 1
-        _global_progress_dict['errors'] += 1
-        
-        return {
+        # Créer le résultat d'erreur
+        result = {
             'status': 'error',
             'file': str(audio_file),
             'error': str(e)
         }
+        
+        # Envoyer le résultat dans la queue
+        _global_result_queue.put(result)
+        
+        return result
 
 
 def process_single_file(args: Tuple[Path, AudioAnalyzer, Path, float, float, float, float, bool]) -> Dict:
@@ -341,49 +409,64 @@ def process_single_file(args: Tuple[Path, AudioAnalyzer, Path, float, float, flo
         }
 
 
-def progress_monitor(progress_dict: dict, total_files: int, log_file: Optional[Path] = None, 
-                    update_interval: int = 5):
+def progress_monitor(progress_tracker: ProgressTracker, total_files: int, log_file: Optional[Path] = None, 
+                    update_interval: int = 5, stop_event: threading.Event = None):
     """
     Thread de monitoring qui affiche la progression périodiquement.
     
     Args:
-        progress_dict: Dictionnaire partagé contenant la progression
+        progress_tracker: Objet ProgressTracker pour accéder aux compteurs
         total_files: Nombre total de fichiers à traiter
         log_file: Fichier de log optionnel
         update_interval: Intervalle de mise à jour en secondes
+        stop_event: Event pour arrêter le thread proprement
     """
-    start_time = progress_dict['start_time']
+    last_processed = 0
+    last_time = time.time()
     
-    while progress_dict['processed'] < total_files:
+    while not stop_event.is_set():
         time.sleep(update_interval)
         
-        # Calculer les statistiques
-        processed = progress_dict['processed']
+        # Obtenir les statistiques actuelles
+        stats = progress_tracker.get_stats()
+        processed = stats['processed']
+        
         if processed == 0:
             continue
             
-        elapsed = time.time() - start_time
-        rate = processed / elapsed
-        remaining = (total_files - processed) / rate if rate > 0 else 0
+        # Calculer la vitesse instantanée
+        current_time = time.time()
+        instant_rate = (processed - last_processed) / (current_time - last_time) if current_time > last_time else 0
+        last_processed = processed
+        last_time = current_time
+        
+        # Calculer la vitesse moyenne et le temps restant
+        elapsed = stats['elapsed']
+        avg_rate = processed / elapsed if elapsed > 0 else 0
+        remaining = (total_files - processed) / avg_rate if avg_rate > 0 else 0
         
         # Créer le message de progression
         msg = (
             f"\n{'='*60}\n"
             f"PROGRESSION: {processed}/{total_files} fichiers ({processed/total_files*100:.1f}%)\n"
-            f"Réussis: {progress_dict['successful']} | Erreurs: {progress_dict['errors']}\n"
-            f"Détections totales: {progress_dict['total_detections']}\n"
-            f"Vitesse: {rate:.1f} fichiers/sec\n"
+            f"Réussis: {stats['successful']} | Erreurs: {stats['errors']}\n"
+            f"Détections totales: {stats['total_detections']}\n"
+            f"Vitesse: {avg_rate:.1f} fichiers/sec (instant: {instant_rate:.1f})\n"
             f"Temps écoulé: {timedelta(seconds=int(elapsed))}\n"
             f"Temps restant estimé: {timedelta(seconds=int(remaining))}\n"
             f"{'='*60}"
         )
         
         # Afficher et logger
-        print(msg)
+        print(msg, flush=True)
         
         if log_file:
             with open(log_file, 'a') as f:
                 f.write(f"{datetime.now().isoformat()} - {msg}\n")
+                
+        # Vérifier si on a fini
+        if processed >= total_files:
+            break
 
 
 def parse_folders(audio_dir: Path, extensions: List[str] = ['.wav', '.mp3', '.flac']) -> List[Path]:
@@ -512,21 +595,25 @@ def main():
         # Mode multi-thread avec Pool
         logger.info(f"Utilisation du multiprocessing avec {args.threads} threads")
         
-        # Créer un manager pour partager des données entre processus
+        # Créer les objets de synchronisation
         manager = Manager()
-        progress_dict = manager.dict({
-            'processed': 0,
-            'successful': 0,
-            'errors': 0,
-            'total_detections': 0,
-            'start_time': time.time()
-        })
+        result_queue = manager.Queue()
+        progress_tracker = ProgressTracker()
+        stop_event = threading.Event()
+        
+        # Démarrer le thread de collecte des résultats
+        collector_thread = threading.Thread(
+            target=result_collector,
+            args=(result_queue, progress_tracker, stop_event),
+            daemon=False
+        )
+        collector_thread.start()
         
         # Démarrer le thread de monitoring
         monitor_thread = threading.Thread(
             target=progress_monitor,
-            args=(progress_dict, len(audio_files), args.log_file, args.progress_interval),
-            daemon=True
+            args=(progress_tracker, len(audio_files), args.log_file, args.progress_interval, stop_event),
+            daemon=False
         )
         monitor_thread.start()
         
@@ -534,43 +621,64 @@ def main():
         chunksize = max(1, len(audio_files) // (args.threads * 10))
         logger.info(f"Chunksize: {chunksize}")
         
-        # Créer le pool avec initializer
-        with Pool(
-            processes=args.threads,
-            initializer=init_worker,
-            initargs=(
-                args.model,
-                args.training_db,
-                args.device,
-                args.output,
-                args.seg_length,
-                args.hop_size,
-                args.min_conf,
-                args.energy_threshold,
-                progress_dict,
-                time.time()
-            )
-        ) as pool:
-            # Préparer les arguments pour chaque fichier
-            file_args = [(f, args.verbose) for f in audio_files]
+        try:
+            # Créer le pool avec initializer
+            with Pool(
+                processes=args.threads,
+                initializer=init_worker,
+                initargs=(
+                    args.model,
+                    args.training_db,
+                    args.device,
+                    args.output,
+                    args.seg_length,
+                    args.hop_size,
+                    args.min_conf,
+                    args.energy_threshold,
+                    result_queue
+                )
+            ) as pool:
+                # Préparer les arguments pour chaque fichier
+                file_args = [(f, args.verbose) for f in audio_files]
+                
+                # Traiter les fichiers en parallèle
+                if args.verbose:
+                    logger.info("Traitement en cours... Surveillez la progression ci-dessous.")
+                
+                results = pool.starmap(process_single_file_mp, file_args, chunksize=chunksize)
+                
+        finally:
+            # Arrêter les threads proprement
+            stop_event.set()
+            collector_thread.join(timeout=5)
+            monitor_thread.join(timeout=5)
             
-            # Traiter les fichiers en parallèle (sans tqdm pour éviter les conflits)
-            if args.verbose:
-                logger.info("Traitement en cours... Surveillez la progression ci-dessous.")
-            
-            results = pool.starmap(process_single_file_mp, file_args, chunksize=chunksize)
+        # Obtenir les statistiques finales depuis le tracker
+        final_stats = progress_tracker.get_stats()
+        successful_files = final_stats['successful']
+        error_files = final_stats['errors']
+        total_detections = final_stats['total_detections']
     
-    # Compiler les statistiques
-    for result in results:
-        if result['status'] == 'success':
-            successful_files += 1
-            total_detections += result['detections']
-            class_name = result.get('class', 'unknown')
-            if class_name not in detections_by_class:
-                detections_by_class[class_name] = 0
-            detections_by_class[class_name] += result['detections']
-        else:
-            error_files += 1
+    # Compiler les statistiques par classe (uniquement en single-thread)
+    if args.threads < 2:
+        for result in results:
+            if result['status'] == 'success':
+                successful_files += 1
+                total_detections += result['detections']
+                class_name = result.get('class', 'unknown')
+                if class_name not in detections_by_class:
+                    detections_by_class[class_name] = 0
+                detections_by_class[class_name] += result['detections']
+            else:
+                error_files += 1
+    else:
+        # En multiprocessing, on doit parcourir les résultats pour les stats par classe
+        for result in results:
+            if result['status'] == 'success':
+                class_name = result.get('class', 'unknown')
+                if class_name not in detections_by_class:
+                    detections_by_class[class_name] = 0
+                detections_by_class[class_name] += result['detections']
     
     # Sauvegarder un résumé global
     summary_path = args.output / 'analysis_summary.json'
@@ -601,7 +709,7 @@ def main():
     print(f"Total détections : {total_detections}")
     
     if args.threads >= 2:
-        elapsed = time.time() - progress_dict['start_time']
+        elapsed = progress_tracker.get_stats()['elapsed']
         print(f"\nTemps total : {timedelta(seconds=int(elapsed))}")
         print(f"Vitesse moyenne : {len(audio_files)/elapsed:.2f} fichiers/sec")
     
