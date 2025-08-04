@@ -29,6 +29,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Variables globales pour le multiprocessing
+_global_analyzer = None
+_global_output_dir = None
+_global_window_size = None
+_global_hop_size = None
+_global_min_conf = None
+_global_energy_threshold = None
+
 
 class AudioAnalyzer:
     """Analyseur audio basé sur le modèle ML pour générer des résultats de détection."""
@@ -133,6 +141,112 @@ class AudioAnalyzer:
                 ])
         
         logger.debug(f"Résultats sauvegardés : {output_path} ({len(detections)} détections)")
+
+
+def init_worker(model_path: str, training_db: str, device: str, output_dir: Path,
+                window_size: float, hop_size: float, min_conf: float, energy_threshold: float):
+    """
+    Initialise un worker pour le multiprocessing.
+    Charge le modèle une seule fois par processus.
+    
+    Args:
+        model_path: Chemin vers le modèle
+        training_db: Base SQLite d'entraînement
+        device: Device à utiliser
+        output_dir: Répertoire de sortie
+        window_size: Taille de fenêtre
+        hop_size: Décalage entre fenêtres
+        min_conf: Confiance minimale
+        energy_threshold: Seuil d'énergie
+    """
+    global _global_analyzer, _global_output_dir, _global_window_size
+    global _global_hop_size, _global_min_conf, _global_energy_threshold
+    
+    # Créer l'analyseur une seule fois
+    _global_analyzer = AudioAnalyzer(
+        model_path=model_path,
+        training_db=training_db,
+        device=device
+    )
+    
+    # Stocker les paramètres
+    _global_output_dir = output_dir
+    _global_window_size = window_size
+    _global_hop_size = hop_size
+    _global_min_conf = min_conf
+    _global_energy_threshold = energy_threshold
+    
+    logger.info(f"Worker initialisé (PID: {os.getpid()})")
+
+
+def process_single_file_mp(audio_file: Path, verbose: bool = False) -> Dict:
+    """
+    Version multiprocessing de process_single_file.
+    Utilise les variables globales initialisées par init_worker.
+    
+    Args:
+        audio_file: Fichier audio à traiter
+        verbose: Mode verbose
+        
+    Returns:
+        Dict avec les statistiques du traitement
+    """
+    try:
+        if verbose:
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Analyse de : {audio_file}")
+            logger.info(f"Classe : {audio_file.parent.name}")
+            logger.info(f"Paramètres : fenêtre={_global_window_size}s, hop={_global_hop_size}s, min_conf={_global_min_conf}")
+        
+        # Analyser le fichier avec l'analyzer global
+        detections = _global_analyzer.analyze_file(
+            audio_path=audio_file,
+            window_size=_global_window_size,
+            hop_size=_global_hop_size,
+            min_confidence=_global_min_conf,
+            energy_threshold=_global_energy_threshold
+        )
+        
+        if verbose and detections:
+            logger.info(f"\nDétections trouvées : {len(detections)}")
+            # Afficher les top 5 détections
+            sorted_detections = sorted(detections, key=lambda d: d['confidence'], reverse=True)
+            for i, det in enumerate(sorted_detections[:5]):
+                logger.info(f"  [{i+1}] {det['start_time']:.1f}-{det['end_time']:.1f}s : "
+                          f"{det['class']} (conf: {det['confidence']:.3f})")
+            if len(detections) > 5:
+                logger.info(f"  ... et {len(detections)-5} autres détections")
+            
+            # Statistiques par classe
+            class_counts = {}
+            for det in detections:
+                class_counts[det['class']] = class_counts.get(det['class'], 0) + 1
+            logger.info(f"\nRépartition par espèce détectée :")
+            for species, count in sorted(class_counts.items(), key=lambda x: x[1], reverse=True):
+                logger.info(f"  {species}: {count}")
+        
+        # Générer le nom du fichier de résultats
+        class_name = audio_file.parent.name
+        output_subdir = _global_output_dir / class_name
+        output_file = output_subdir / f"{audio_file.stem}.csv"
+        
+        # Sauvegarder les résultats
+        _global_analyzer.save_results(detections, output_file, audio_file)
+        
+        return {
+            'status': 'success',
+            'file': str(audio_file),
+            'detections': len(detections),
+            'class': class_name
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement de {audio_file}: {e}")
+        return {
+            'status': 'error',
+            'file': str(audio_file),
+            'error': str(e)
+        }
 
 
 def process_single_file(args: Tuple[Path, AudioAnalyzer, Path, float, float, float, float, bool]) -> Dict:
@@ -286,12 +400,14 @@ def main():
         logger.error("Aucun fichier audio trouvé!")
         return
     
-    # Créer l'analyseur
-    analyzer = AudioAnalyzer(
-        model_path=args.model,
-        training_db=args.training_db,
-        device=args.device
-    )
+    # Créer l'analyseur uniquement pour le mode single-thread
+    analyzer = None
+    if args.threads < 2:
+        analyzer = AudioAnalyzer(
+            model_path=args.model,
+            training_db=args.training_db,
+            device=args.device
+        )
     
     # Statistiques globales
     total_detections = 0
@@ -323,17 +439,37 @@ def main():
             ))
             results.append(result)
     else:
-        # Mode multi-thread
-        # Note: En multiprocessing, chaque processus devra recréer l'analyseur
-        # Pour l'instant, on garde le mode single-thread pour éviter les problèmes
-        logger.warning("Le multiprocessing n'est pas encore implémenté. Utilisation du mode single-thread.")
-        results = []
-        for audio_file in tqdm(audio_files, desc="Analyse des fichiers", disable=args.verbose):
-            result = process_single_file((
-                audio_file, analyzer, args.output, args.seg_length, 
-                args.hop_size, args.min_conf, args.energy_threshold, args.verbose
+        # Mode multi-thread avec Pool
+        logger.info(f"Utilisation du multiprocessing avec {args.threads} threads")
+        
+        # Calculer la taille de chunk optimale
+        chunksize = max(1, len(audio_files) // (args.threads * 10))
+        logger.info(f"Chunksize: {chunksize}")
+        
+        # Créer le pool avec initializer
+        with Pool(
+            processes=args.threads,
+            initializer=init_worker,
+            initargs=(
+                args.model,
+                args.training_db,
+                args.device,
+                args.output,
+                args.seg_length,
+                args.hop_size,
+                args.min_conf,
+                args.energy_threshold
+            )
+        ) as pool:
+            # Préparer les arguments pour chaque fichier
+            file_args = [(f, args.verbose) for f in audio_files]
+            
+            # Traiter les fichiers en parallèle
+            results = list(tqdm(
+                pool.starmap(process_single_file_mp, file_args, chunksize=chunksize),
+                total=len(audio_files),
+                desc="Analyse des fichiers (multiprocessing)"
             ))
-            results.append(result)
     
     # Compiler les statistiques
     for result in results:
