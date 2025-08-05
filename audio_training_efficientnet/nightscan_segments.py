@@ -217,6 +217,13 @@ def main():
                                 help='Limiter au N premières espèces (pour tests)')
     balanced_parser.add_argument('--validation-mode', action='store_true',
                                 help='Mode validation : ne garder que les détections où la classe détectée correspond au dossier source')
+    balanced_parser.add_argument('--min-correct-detections', type=int, default=0,
+                                help='Nombre minimum de détections correctes pour inclure une espèce (défaut: 0)')
+    balanced_parser.add_argument('--min-accuracy', type=float, default=0.0,
+                                help='Précision minimale pour inclure une espèce (0.0-1.0, défaut: 0.0)')
+    balanced_parser.add_argument('--sort-by', type=str, default='total',
+                                choices=['total', 'correct', 'accuracy'],
+                                help='Critère de tri des espèces (défaut: total)')
     
     args = parser.parse_args()
     
@@ -345,6 +352,12 @@ def main():
             cmd.extend(["--limit-species", str(args.limit_species)])
         if args.validation_mode:
             cmd.append("--validation-mode")
+        if args.min_correct_detections > 0:
+            cmd.extend(["--min-correct-detections", str(args.min_correct_detections)])
+        if args.min_accuracy > 0.0:
+            cmd.extend(["--min-accuracy", str(args.min_accuracy)])
+        if args.sort_by != 'total':
+            cmd.extend(["--sort-by", args.sort_by])
         
         try:
             subprocess.run(cmd, check=True)

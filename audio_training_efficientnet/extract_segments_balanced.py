@@ -136,6 +136,66 @@ def parse_all_results(audio_root: Path, results_dir: Path) -> Dict[str, List[Det
     return dict(detections_by_species)
 
 
+def analyze_species_quality(detections_by_species: Dict[str, List[Detection]], 
+                          validation_mode: bool = True,
+                          min_correct: int = 0,
+                          min_accuracy: float = 0.0) -> Dict[str, Dict]:
+    """
+    Analyse la qualité des détections par espèce et filtre selon les critères.
+    
+    Args:
+        detections_by_species: Dict des détections par espèce
+        validation_mode: Si True, ne compte que les détections correctes
+        min_correct: Nombre minimum de détections correctes requises
+        min_accuracy: Précision minimale requise (0.0 à 1.0)
+        
+    Returns:
+        Dict avec statistiques et détections filtrées par espèce
+    """
+    quality_stats = {}
+    
+    for species, detections in detections_by_species.items():
+        if validation_mode:
+            # Séparer les détections correctes et incorrectes
+            correct_detections = [d for d in detections if d.is_correct_detection()]
+            incorrect_count = len(detections) - len(correct_detections)
+            accuracy = len(correct_detections) / len(detections) if detections else 0.0
+            
+            # Appliquer les filtres
+            if len(correct_detections) >= min_correct and accuracy >= min_accuracy:
+                quality_stats[species] = {
+                    'total_detections': len(detections),
+                    'correct_detections': len(correct_detections),
+                    'incorrect_detections': incorrect_count,
+                    'accuracy': accuracy,
+                    'detections': correct_detections,  # Ne garder que les correctes
+                    'included': True
+                }
+            else:
+                # Espèce exclue mais on garde les stats pour le rapport
+                quality_stats[species] = {
+                    'total_detections': len(detections),
+                    'correct_detections': len(correct_detections),
+                    'incorrect_detections': incorrect_count,
+                    'accuracy': accuracy,
+                    'detections': [],  # Pas de détections car exclue
+                    'included': False,
+                    'exclusion_reason': f"correct={len(correct_detections)}<{min_correct} ou accuracy={accuracy:.2%}<{min_accuracy:.2%}"
+                }
+        else:
+            # Mode sans validation : toutes les détections sont considérées
+            quality_stats[species] = {
+                'total_detections': len(detections),
+                'correct_detections': len(detections),
+                'incorrect_detections': 0,
+                'accuracy': 1.0,
+                'detections': detections,
+                'included': True
+            }
+    
+    return quality_stats
+
+
 def select_balanced_segments(detections: List[Detection], 
                            max_per_class: int = 500,
                            max_per_file: int = 5,
@@ -267,18 +327,8 @@ def process_species(args: Tuple[str, List[Detection], Path, int, int, float, int
     if verbose:
         logger.info(f"\n{'='*60}")
         logger.info(f"Traitement espèce : {species}")
-        logger.info(f"Détections totales : {len(detections)}")
-    
-    # Filtrer en mode validation pour ne garder que les détections correctes
-    if validation_mode:
-        original_count = len(detections)
-        detections = [d for d in detections if d.is_correct_detection()]
-        filtered_count = original_count - len(detections)
-        
-        if verbose:
-            logger.info(f"Mode validation activé : {len(detections)} détections correctes sur {original_count}")
-            if filtered_count > 0:
-                logger.info(f"  → {filtered_count} détections incorrectes filtrées")
+        logger.info(f"Détections à traiter : {len(detections)}")
+        # Note: En mode validation, les détections sont déjà filtrées par analyze_species_quality
     
     # Sélectionner les segments équilibrés
     selected_detections = select_balanced_segments(
@@ -352,6 +402,15 @@ def main():
     parser.add_argument('--validation-mode', action='store_true',
                        help="Mode validation : ne garder que les détections où la classe détectée correspond au dossier source")
     
+    # Filtres de qualité
+    parser.add_argument('--min-correct-detections', type=int, default=0,
+                       help="Nombre minimum de détections correctes pour inclure une espèce (défaut: 0)")
+    parser.add_argument('--min-accuracy', type=float, default=0.0,
+                       help="Précision minimale pour inclure une espèce (0.0-1.0, défaut: 0.0)")
+    parser.add_argument('--sort-by', type=str, default='total',
+                       choices=['total', 'correct', 'accuracy'],
+                       help="Critère de tri des espèces (défaut: total)")
+    
     args = parser.parse_args()
     
     # Créer le répertoire de sortie
@@ -367,8 +426,55 @@ def main():
     
     logger.info(f"Trouvé {len(detections_by_species)} espèces avec détections")
     
-    # Trier les espèces par nombre de détections (pour traiter les plus importantes en premier)
-    species_list = sorted(detections_by_species.items(), key=lambda x: len(x[1]), reverse=True)
+    # Analyser la qualité des détections et filtrer selon les critères
+    logger.info("\nAnalyse de la qualité des détections...")
+    quality_stats = analyze_species_quality(
+        detections_by_species,
+        validation_mode=args.validation_mode,
+        min_correct=args.min_correct_detections,
+        min_accuracy=args.min_accuracy
+    )
+    
+    # Afficher le rapport de pré-filtrage
+    included_species = [s for s, stats in quality_stats.items() if stats['included']]
+    excluded_species = [s for s, stats in quality_stats.items() if not stats['included']]
+    
+    logger.info(f"\n{'='*60}")
+    logger.info("RAPPORT DE PRÉ-FILTRAGE")
+    logger.info(f"{'='*60}")
+    logger.info(f"Espèces analysées : {len(quality_stats)}")
+    logger.info(f"Espèces incluses : {len(included_species)}")
+    logger.info(f"Espèces exclues : {len(excluded_species)}")
+    
+    if excluded_species and args.verbose:
+        logger.info("\nEspèces exclues :")
+        for species in excluded_species[:10]:  # Limiter à 10 pour ne pas spam
+            stats = quality_stats[species]
+            logger.info(f"  - {species}: {stats['exclusion_reason']}")
+        if len(excluded_species) > 10:
+            logger.info(f"  ... et {len(excluded_species)-10} autres")
+    
+    # Préparer la liste des espèces à traiter (seulement celles incluses)
+    species_data = [(species, stats['detections']) for species, stats in quality_stats.items() if stats['included']]
+    
+    if not species_data:
+        logger.error("Aucune espèce ne satisfait les critères de qualité!")
+        return
+    
+    # Trier selon le critère choisi
+    if args.sort_by == 'correct':
+        # Trier par nombre de détections correctes
+        species_list = sorted(species_data, key=lambda x: len(x[1]), reverse=True)
+    elif args.sort_by == 'accuracy':
+        # Trier par précision
+        species_list = sorted(species_data, 
+                            key=lambda x: quality_stats[x[0]]['accuracy'], 
+                            reverse=True)
+    else:  # 'total' par défaut
+        # Trier par nombre total de détections (comportement original)
+        species_list = sorted(species_data, 
+                            key=lambda x: quality_stats[x[0]]['total_detections'], 
+                            reverse=True)
     
     # Limiter si demandé
     if args.limit_species:
@@ -378,7 +484,12 @@ def main():
     # Afficher un aperçu
     logger.info("\nAperçu des espèces à traiter :")
     for species, detections in species_list[:10]:
-        logger.info(f"  {species}: {len(detections)} détections")
+        stats = quality_stats[species]
+        if args.validation_mode:
+            logger.info(f"  {species}: {len(detections)} détections correctes "
+                       f"(précision: {stats['accuracy']:.1%})")
+        else:
+            logger.info(f"  {species}: {len(detections)} détections")
     if len(species_list) > 10:
         logger.info(f"  ... et {len(species_list)-10} autres espèces")
     
@@ -421,6 +532,24 @@ def main():
     
     # Sauvegarder le résumé
     summary_path = args.output / 'extraction_balanced_summary.json'
+    
+    # Ajouter les statistiques de qualité au résumé
+    quality_summary = {
+        'total_species_analyzed': len(quality_stats),
+        'species_included': len(included_species),
+        'species_excluded': len(excluded_species),
+        'quality_stats': {
+            species: {
+                'total_detections': stats['total_detections'],
+                'correct_detections': stats['correct_detections'],
+                'accuracy': stats['accuracy'],
+                'included': stats['included'],
+                'exclusion_reason': stats.get('exclusion_reason', '')
+            }
+            for species, stats in quality_stats.items()
+        }
+    }
+    
     summary = {
         'species_processed': len(results),
         'total_detections': total_detections,
@@ -431,8 +560,13 @@ def main():
             'max_per_class': args.max_per_class,
             'max_per_file': args.max_per_file,
             'min_overlap': args.min_overlap,
-            'sample_rate': args.sample_rate
+            'sample_rate': args.sample_rate,
+            'validation_mode': args.validation_mode,
+            'min_correct_detections': args.min_correct_detections,
+            'min_accuracy': args.min_accuracy,
+            'sort_by': args.sort_by
         },
+        'quality_analysis': quality_summary,
         'species_details': sorted(results, key=lambda x: x['extracted'], reverse=True)
     }
     
