@@ -207,6 +207,8 @@ def main():
                                 help='Nombre max de segments par espèce (défaut: 500)')
     balanced_parser.add_argument('--max-per-file', type=int, default=5,
                                 help='Nombre max de segments par fichier audio (défaut: 5)')
+    balanced_parser.add_argument('--min-overlap', type=float, default=0.5,
+                                help='Chevauchement minimum pour filtrer les doublons (défaut: 0.5)')
     balanced_parser.add_argument('--threads', type=int, default=1,
                                 help='Nombre de threads CPU (défaut: 1)')
     balanced_parser.add_argument('--verbose', action='store_true',
@@ -341,6 +343,7 @@ def main():
             "--output", str(args.output),
             "--max-per-class", str(args.max_per_class),
             "--max-per-file", str(args.max_per_file),
+            "--min-overlap", str(args.min_overlap),
             "--threads", str(args.threads)
         ]
         
