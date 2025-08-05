@@ -31,7 +31,8 @@ class Detection:
     """Représente une détection avec toutes ses métadonnées."""
     
     def __init__(self, start_time: float, end_time: float, species: str, 
-                 confidence: float, audio_file: Path, result_file: Path):
+                 confidence: float, audio_file: Path, result_file: Path,
+                 original_class: str = None):
         self.start_time = start_time
         self.end_time = end_time
         self.species = species
@@ -39,9 +40,16 @@ class Detection:
         self.audio_file = audio_file
         self.result_file = result_file
         self.duration = end_time - start_time
+        # Classe originale (dossier d'où vient le fichier audio)
+        self.original_class = original_class or audio_file.parent.name
+    
+    def is_correct_detection(self) -> bool:
+        """Vérifie si la détection correspond à la classe du dossier source."""
+        return self.species == self.original_class
     
     def __repr__(self):
-        return f"Detection({self.species}, {self.confidence:.2f}, {self.start_time:.1f}-{self.end_time:.1f}s, {self.audio_file.name})"
+        correct = "✓" if self.is_correct_detection() else "✗"
+        return f"Detection({self.species}, {self.confidence:.2f}, {self.start_time:.1f}-{self.end_time:.1f}s, {self.audio_file.name}) {correct}"
 
 
 def parse_result_file(result_file: Path, audio_root: Path) -> List[Detection]:
@@ -82,7 +90,8 @@ def parse_result_file(result_file: Path, audio_root: Path) -> List[Detection]:
                     species=row['Scientific name'],
                     confidence=float(row['Confidence']),
                     audio_file=audio_file,
-                    result_file=result_file
+                    result_file=result_file,
+                    original_class=class_name  # Passer explicitement la classe du dossier
                 )
                 detections.append(detection)
                 
@@ -242,23 +251,34 @@ def extract_segment(detection: Detection, output_dir: Path, sample_rate: int = 2
         return None
 
 
-def process_species(args: Tuple[str, List[Detection], Path, int, int, float, int, bool, bool]) -> Dict:
+def process_species(args: Tuple[str, List[Detection], Path, int, int, float, int, bool, bool, bool]) -> Dict:
     """
     Traite toutes les détections d'une espèce (pour multiprocessing).
     
     Args:
         args: Tuple (species, detections, output_dir, max_per_class, max_per_file, 
-                    min_overlap, sample_rate, verbose, dry_run)
+                    min_overlap, sample_rate, verbose, dry_run, validation_mode)
         
     Returns:
         Dict avec les statistiques
     """
-    species, detections, output_dir, max_per_class, max_per_file, min_overlap, sample_rate, verbose, dry_run = args
+    species, detections, output_dir, max_per_class, max_per_file, min_overlap, sample_rate, verbose, dry_run, validation_mode = args
     
     if verbose:
         logger.info(f"\n{'='*60}")
         logger.info(f"Traitement espèce : {species}")
         logger.info(f"Détections totales : {len(detections)}")
+    
+    # Filtrer en mode validation pour ne garder que les détections correctes
+    if validation_mode:
+        original_count = len(detections)
+        detections = [d for d in detections if d.is_correct_detection()]
+        filtered_count = original_count - len(detections)
+        
+        if verbose:
+            logger.info(f"Mode validation activé : {len(detections)} détections correctes sur {original_count}")
+            if filtered_count > 0:
+                logger.info(f"  → {filtered_count} détections incorrectes filtrées")
     
     # Sélectionner les segments équilibrés
     selected_detections = select_balanced_segments(
@@ -329,6 +349,8 @@ def main():
                        help="Mode simulation - ne pas extraire les fichiers")
     parser.add_argument('--limit-species', type=int, default=None,
                        help="Limiter au N premières espèces (pour tests)")
+    parser.add_argument('--validation-mode', action='store_true',
+                       help="Mode validation : ne garder que les détections où la classe détectée correspond au dossier source")
     
     args = parser.parse_args()
     
@@ -363,11 +385,14 @@ def main():
     # Préparer les arguments pour le traitement
     process_args = [
         (species, detections, args.output, args.max_per_class, args.max_per_file,
-         args.min_overlap, args.sample_rate, args.verbose, args.dry_run)
+         args.min_overlap, args.sample_rate, args.verbose, args.dry_run, args.validation_mode)
         for species, detections in species_list
     ]
     
     # Traiter les espèces
+    if args.validation_mode:
+        logger.info(f"\n🎯 MODE VALIDATION ACTIVÉ : seules les détections correctes seront extraites")
+    
     if args.dry_run:
         logger.info(f"\nMODE DRY-RUN : Simulation de l'extraction équilibrée...")
     else:

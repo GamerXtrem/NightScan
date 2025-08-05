@@ -215,6 +215,8 @@ def main():
                                 help='Mode simulation - ne pas extraire les fichiers')
     balanced_parser.add_argument('--limit-species', type=int, default=None,
                                 help='Limiter au N premières espèces (pour tests)')
+    balanced_parser.add_argument('--validation-mode', action='store_true',
+                                help='Mode validation : ne garder que les détections où la classe détectée correspond au dossier source')
     
     args = parser.parse_args()
     
@@ -341,6 +343,8 @@ def main():
             cmd.append("--dry-run")
         if args.limit_species:
             cmd.extend(["--limit-species", str(args.limit_species)])
+        if args.validation_mode:
+            cmd.append("--validation-mode")
         
         try:
             subprocess.run(cmd, check=True)
