@@ -1,0 +1,103 @@
+# Configuration pour l'entraînement du modèle EfficientNet sur images réelles
+# Optimisé pour serveur Infomaniak avec GPU NVIDIA L4
+
+# ===========================
+# Configuration des données
+# ===========================
+data:
+  data_dir: /path/to/processed/data  # Dossier avec train/val/test
+  metadata_path: null  # Optionnel: chemin vers dataset_metadata.json
+  image_size: 224  # Taille des images (224 pour EfficientNet)
+  augmentation_level: moderate  # light, moderate, heavy
+  
+# ===========================
+# Configuration du modèle
+# ===========================
+model:
+  architecture: efficientnet
+  model_name: null  # null pour auto-sélection selon nombre de classes
+  pretrained: true  # Utiliser les poids ImageNet
+  dropout_rate: 0.3  # Taux de dropout
+  use_attention: false  # Activer module d'attention spatial
+  differential_lr: true  # Learning rates différents pour backbone et classifier
+  
+# ===========================
+# Configuration d'entraînement
+# ===========================
+training:
+  epochs: 50  # Nombre d'epochs maximum
+  batch_size: 64  # Taille du batch (sera ajusté selon VRAM)
+  learning_rate: 0.001  # Learning rate initial
+  weight_decay: 0.0001  # Régularisation L2
+  optimizer: adamw  # adamw ou sgd
+  scheduler: cosine  # cosine, onecycle, ou null
+  min_lr: 1.0e-6  # Learning rate minimum pour cosine scheduler
+  
+  # Mixed Precision Training (pour GPU L4)
+  use_amp: true  # Activer Mixed Precision (FP16)
+  gradient_accumulation_steps: 1  # Accumulation de gradients si batch trop grand
+  gradient_clip: 1.0  # Gradient clipping (0 pour désactiver)
+  
+  # Gestion des classes déséquilibrées
+  use_class_weights: false  # Utiliser des poids de classe
+  label_smoothing: 0.0  # Label smoothing (0-1)
+  
+  # Early stopping
+  patience: 10  # Nombre d'epochs sans amélioration avant arrêt
+  
+  # Mixup/CutMix (augmentation avancée)
+  use_mixup: false  # Activer Mixup
+  mixup_alpha: 0.2  # Alpha pour Mixup
+  
+# ===========================
+# Configuration système
+# ===========================
+system:
+  num_workers: 4  # Nombre de workers pour DataLoader (8 cœurs / 2)
+  pin_memory: true  # Optimisation GPU
+  persistent_workers: true  # Garder les workers entre epochs
+  prefetch_factor: 2  # Nombre de batches à précharger
+  compile_model: false  # Utiliser torch.compile (PyTorch 2.0+)
+  
+# ===========================
+# Configuration monitoring
+# ===========================
+monitoring:
+  tensorboard: true  # Activer TensorBoard
+  save_frequency: 5  # Sauvegarder checkpoint tous les N epochs
+  keep_last_checkpoints: 5  # Nombre de checkpoints à garder
+  log_interval: 10  # Log toutes les N batches
+  
+# ===========================
+# Configuration validation
+# ===========================
+validation:
+  val_frequency: 1  # Valider tous les N epochs
+  compute_roc_auc: true  # Calculer ROC/AUC (plus lent)
+  compute_top_k: true  # Calculer Top-K accuracy
+  
+# ===========================
+# Configuration sortie
+# ===========================
+output:
+  output_dir: ./outputs  # Dossier de sortie principal
+  experiment_name: null  # Nom de l'expérience (null = timestamp)
+  save_best_only: false  # Sauvegarder seulement le meilleur modèle
+  
+# ===========================
+# Configuration avancée
+# ===========================
+advanced:
+  seed: 42  # Random seed pour reproductibilité
+  deterministic: false  # Mode déterministe (plus lent)
+  benchmark: true  # CuDNN benchmark pour GPU
+  tf32: true  # Utiliser TensorFloat32 sur GPU Ampere+
+  
+# ===========================
+# Configuration spécifique Infomaniak
+# ===========================
+infomaniak:
+  gpu_memory_fraction: 0.95  # Fraction de VRAM à utiliser
+  cuda_visible_devices: "0"  # GPU à utiliser
+  omp_num_threads: 8  # Threads OpenMP
+  mixed_precision_backend: native  # native ou apex
