@@ -253,6 +253,7 @@ class DataPreparation:
     def compute_pixel_statistics(self, sample_size: int = 100) -> Dict:
         """
         Calcule les statistiques des pixels pour la normalisation.
+        Version optimisée qui calcule les stats par image pour éviter l'accumulation en mémoire.
         
         Args:
             sample_size: Nombre d'images à échantillonner
@@ -270,13 +271,28 @@ class DataPreparation:
         all_images = list(train_dir.glob('*/*'))
         sample = random.sample(all_images, min(sample_size, len(all_images)))
         
-        pixel_values = []
+        # Listes pour stocker les statistiques par image (beaucoup plus léger)
+        means = []
+        stds = []
+        
         for idx, img_path in enumerate(tqdm(sample, desc="Analyse des pixels", leave=False)):
             try:
                 img = Image.open(img_path)
                 img = img.convert('RGB')
+                
+                # Redimensionner si l'image est très grande pour accélérer
+                if img.width > 1000 or img.height > 1000:
+                    img.thumbnail((1000, 1000), Image.Resampling.LANCZOS)
+                
                 img_array = np.array(img) / 255.0
-                pixel_values.append(img_array.reshape(-1, 3))
+                
+                # Calculer mean et std pour cette image seulement
+                # axis=(0,1) = moyenne sur hauteur et largeur, garde les 3 canaux RGB
+                img_mean = img_array.mean(axis=(0, 1))
+                img_std = img_array.std(axis=(0, 1))
+                
+                means.append(img_mean)
+                stds.append(img_std)
                 
                 # Fermer explicitement l'image
                 img.close()
@@ -290,15 +306,18 @@ class DataPreparation:
             except Exception as e:
                 logger.warning(f"Erreur lors de l'analyse de {img_path}: {e}")
         
-        if pixel_values:
-            all_pixels = np.vstack(pixel_values)
-            mean = all_pixels.mean(axis=0).tolist()
-            std = all_pixels.std(axis=0).tolist()
+        if means:
+            # Calculer la moyenne des moyennes et des écarts-types
+            # C'est une approximation mais suffisante pour la normalisation
+            mean = np.mean(means, axis=0).tolist()
+            std = np.mean(stds, axis=0).tolist()
+            
+            logger.info(f"  Statistiques calculées sur {len(means)} images")
             
             return {
                 'mean': mean,
                 'std': std,
-                'sample_size': len(pixel_values)
+                'sample_size': len(means)
             }
         
         return {}
