@@ -7,6 +7,7 @@ Détecte automatiquement les classes et organise les données en train/val/test.
 import os
 import shutil
 import random
+import gc
 from pathlib import Path
 from typing import Dict, List, Tuple
 import json
@@ -92,29 +93,50 @@ class DataPreparation:
         valid_images = []
         corrupted_count = 0
         
-        for img_path in class_dir.iterdir():
-            if img_path.suffix.lower() not in valid_extensions:
-                continue
-                
+        # Lister toutes les images pour avoir le total
+        img_paths = [p for p in class_dir.iterdir() if p.suffix.lower() in valid_extensions]
+        total_images = len(img_paths)
+        
+        for idx, img_path in enumerate(img_paths):
             try:
-                # Vérifier que l'image peut être ouverte et obtenir ses dimensions
-                with Image.open(img_path) as img:
-                    img.verify()
-                    # Réouvrir pour obtenir les dimensions (verify() ferme le fichier)
-                    img = Image.open(img_path)
-                    width, height = img.size
-                    # Stocker les stats
-                    self.image_stats.append({
-                        'width': width,
-                        'height': height,
-                        'aspect_ratio': width / height,
-                        'size_px': width * height,
-                        'class': class_dir.name
-                    })
+                # Ouvrir l'image une seule fois pour vérification et dimensions
+                img = Image.open(img_path)
+                # Vérifier que l'image est valide
+                img.verify()
+                
+                # Réouvrir pour obtenir les dimensions (verify() ferme le fichier)
+                img = Image.open(img_path)
+                width, height = img.size
+                
+                # Stocker les stats
+                self.image_stats.append({
+                    'width': width,
+                    'height': height,
+                    'aspect_ratio': width / height,
+                    'size_px': width * height,
+                    'class': class_dir.name
+                })
+                
+                # Fermer explicitement l'image
+                img.close()
+                del img
+                
                 valid_images.append(img_path)
+                
+                # Garbage collection périodique tous les 50 images
+                if (idx + 1) % 50 == 0:
+                    gc.collect()
+                    
+                # Message de progression tous les 100 images
+                if (idx + 1) % 100 == 0:
+                    logger.info(f"    Traité {idx + 1}/{total_images} images dans {class_dir.name}...")
+                    
             except Exception as e:
                 logger.warning(f"Image corrompue ignorée: {img_path} - {e}")
                 corrupted_count += 1
+        
+        # Garbage collection final pour cette classe
+        gc.collect()
         
         if corrupted_count > 0:
             logger.info(f"  ⚠️ {corrupted_count} images corrompues ignorées dans {class_dir.name}")
@@ -228,7 +250,7 @@ class DataPreparation:
         
         return stats
     
-    def compute_pixel_statistics(self, sample_size: int = 1000) -> Dict:
+    def compute_pixel_statistics(self, sample_size: int = 100) -> Dict:
         """
         Calcule les statistiques des pixels pour la normalisation.
         
@@ -249,12 +271,22 @@ class DataPreparation:
         sample = random.sample(all_images, min(sample_size, len(all_images)))
         
         pixel_values = []
-        for img_path in tqdm(sample, desc="Analyse des pixels", leave=False):
+        for idx, img_path in enumerate(tqdm(sample, desc="Analyse des pixels", leave=False)):
             try:
-                with Image.open(img_path) as img:
-                    img = img.convert('RGB')
-                    img_array = np.array(img) / 255.0
-                    pixel_values.append(img_array.reshape(-1, 3))
+                img = Image.open(img_path)
+                img = img.convert('RGB')
+                img_array = np.array(img) / 255.0
+                pixel_values.append(img_array.reshape(-1, 3))
+                
+                # Fermer explicitement l'image
+                img.close()
+                del img
+                del img_array
+                
+                # Garbage collection périodique
+                if (idx + 1) % 20 == 0:
+                    gc.collect()
+                    
             except Exception as e:
                 logger.warning(f"Erreur lors de l'analyse de {img_path}: {e}")
         
@@ -306,6 +338,9 @@ class DataPreparation:
             
             logger.info(f"  ✅ {class_name}: train={len(train_imgs)}, "
                        f"val={len(val_imgs)}, test={len(test_imgs)}")
+            
+            # Garbage collection après chaque classe pour libérer la mémoire
+            gc.collect()
         
         # 4. Calculer et sauvegarder les statistiques
         self.statistics = self.compute_statistics()
