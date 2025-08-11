@@ -107,7 +107,7 @@ echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
 EXPERIMENT_NAME="exp_$(date +%Y%m%d_%H%M%S)"
 
 # Commande d'entraînement avec tous les paramètres
-python3 picture_training_enhanced/train_real_images.py \
+python3 train_real_images.py \
     --data_dir "$DATA_DIR" \
     --output_dir "$OUTPUT_DIR/$EXPERIMENT_NAME" \
     --config "$CONFIG_FILE" \
@@ -167,4 +167,4 @@ echo ""
 echo "Pour visualiser avec TensorBoard:"
 echo "  tensorboard --logdir=$OUTPUT_DIR/$EXPERIMENT_NAME/runs"
 echo ""
-echo -e "${GREEN}Fin du script$(NC)"
+echo -e "${GREEN}Fin du script${NC}"
