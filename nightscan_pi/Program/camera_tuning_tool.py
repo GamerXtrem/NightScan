@@ -25,11 +25,11 @@ from typing import Optional, Dict, Any
 # Add the program directory to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from utils.camera_tuning import (
+from .utils.camera_tuning import (
     get_tuning_manager, TuningParameters, get_optimal_tuning
 )
-from camera_trigger import get_camera_manager, capture_image
-from camera_sensor_detector import detect_camera_sensor
+from .camera_trigger import get_camera_manager, capture_image
+from .camera_sensor_detector import detect_camera_sensor
 
 
 class CameraTuningTool:

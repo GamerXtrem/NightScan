@@ -12,8 +12,8 @@ from .utils import energy_manager
 from .utils import detector
 from .utils.smart_scheduler import get_energy_scheduler
 from . import spectrogram_gen
-from filename_utils import FilenameGenerator
-from location_manager import location_manager
+from .filename_utils import FilenameGenerator
+from .location_manager import location_manager
 
 LOG_PATH = Path(os.getenv("NIGHTSCAN_LOG", "nightscan.log"))
 logging.basicConfig(

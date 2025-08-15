@@ -6,8 +6,8 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Tuple
-from filename_utils import FilenameGenerator
-from location_manager import location_manager
+from .filename_utils import FilenameGenerator
+from .location_manager import location_manager
 
 # Modern picamera2 API (libcamera-based)
 try:

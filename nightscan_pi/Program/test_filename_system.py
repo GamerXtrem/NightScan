@@ -14,8 +14,8 @@ from pathlib import Path
 # Add current directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from filename_utils import FilenameGenerator, FilenameParser, create_audio_filename, create_image_filename
-from location_manager import LocationManager
+from .filename_utils import FilenameGenerator, FilenameParser, create_audio_filename, create_image_filename
+from .location_manager import LocationManager
 
 # Configuration logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
